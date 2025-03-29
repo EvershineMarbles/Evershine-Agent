@@ -1,88 +1,38 @@
-"use client"
-
+import type React from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { cn } from "@/lib/utils"
-import { Home, ShoppingCart, Heart, QrCode, Package, Settings, LogOut, User } from "lucide-react"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface IconSidebarProps {
   clientId: string
 }
 
-export function IconSidebar({ clientId }: IconSidebarProps) {
-  const pathname = usePathname()
-
-  const routes = [
-    {
-      name: "Dashboard",
-      href: `/client-dashboard/${clientId}`,
-      icon: Home,
-    },
-    {
-      name: "Products",
-      href: `/client-dashboard/${clientId}/products`,
-      icon: Package,
-    },
-    {
-      name: "Scan Products",
-      href: `/client-dashboard/${clientId}/scan`,
-      icon: QrCode,
-    },
-    {
-      name: "Wishlist",
-      href: `/client-dashboard/${clientId}/wishlist`,
-      icon: Heart,
-    },
-    {
-      name: "Cart",
-      href: `/client-dashboard/${clientId}/cart`,
-      icon: ShoppingCart,
-    },
-    {
-      name: "Settings",
-      href: `/client-dashboard/${clientId}/settings`,
-      icon: Settings,
-    },
-  ]
-
+export const IconSidebar: React.FC<IconSidebarProps> = ({ clientId }) => {
   return (
-    <div className="fixed top-0 left-0 h-screen w-16 flex flex-col bg-dark text-white shadow-lg">
-      <div className="sidebar-icon mt-4">
-        <User size={24} />
-        <span className="sidebar-tooltip">Profile</span>
-      </div>
-
-      <hr className="sidebar-hr my-2" />
-
-      <TooltipProvider>
-        {routes.map((route) => (
-          <Tooltip key={route.href}>
-            <TooltipTrigger asChild>
-              <Link href={route.href} className={cn("sidebar-icon", pathname === route.href ? "bg-blue" : "")}>
-                <route.icon size={24} />
-                <span className="sidebar-tooltip">{route.name}</span>
-              </Link>
-            </TooltipTrigger>
-            <TooltipContent side="right">{route.name}</TooltipContent>
-          </Tooltip>
-        ))}
-      </TooltipProvider>
-
-      <div className="mt-auto mb-4">
-        <hr className="sidebar-hr my-2" />
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Link href="/" className="sidebar-icon">
-                <LogOut size={24} />
-                <span className="sidebar-tooltip">Logout</span>
-              </Link>
-            </TooltipTrigger>
-            <TooltipContent side="right">Logout</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      </div>
+    <div className="w-64 bg-gray-100 p-4">
+      <h2 className="text-lg font-semibold mb-4">Client: {clientId}</h2>
+      <nav>
+        <ul>
+          <li className="mb-2">
+            <Link href={`/client-dashboard/${clientId}/products`} className="block hover:bg-gray-200 p-2 rounded">
+              Products
+            </Link>
+          </li>
+          <li className="mb-2">
+            <Link href={`/client-dashboard/${clientId}/scan`} className="block hover:bg-gray-200 p-2 rounded">
+              Scan QR
+            </Link>
+          </li>
+          <li className="mb-2">
+            <Link href={`/client-dashboard/${clientId}/wishlist`} className="block hover:bg-gray-200 p-2 rounded">
+              Wishlist
+            </Link>
+          </li>
+          <li className="mb-2">
+            <Link href={`/client-dashboard/${clientId}/cart`} className="block hover:bg-gray-200 p-2 rounded">
+              Cart
+            </Link>
+          </li>
+        </ul>
+      </nav>
     </div>
   )
 }
