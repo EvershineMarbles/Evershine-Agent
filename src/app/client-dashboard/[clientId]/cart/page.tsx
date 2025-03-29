@@ -169,7 +169,7 @@ export default function CartPage({ params }: { params: { clientId: string } }) {
 
         if (data.success && Array.isArray(data.data)) {
           // Add type assertion to ensure the status is one of the allowed values
-          productsData = data.data.map((product: any) => {
+          productsData = data.data.map((product: unknown) => {
             return product as Product
           })
           console.log("Successfully fetched products from API")

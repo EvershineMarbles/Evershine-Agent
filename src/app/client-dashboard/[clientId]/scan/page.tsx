@@ -8,7 +8,7 @@ import Image from "next/image"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/components/ui/use-toast"
 
-export default function ScanPage({ params }: { params: { clientId: string } }) {
+export default function ScanPage() {
   const [scanning, setScanning] = useState(false)
   const [scannedProduct, setScannedProduct] = useState<null | {
     id: number
@@ -150,7 +150,7 @@ export default function ScanPage({ params }: { params: { clientId: string } }) {
               </div>
               <div>
                 <h3 className="font-medium">Position the QR code</h3>
-                <p className="text-muted-foreground">Center the QR code in the scanning area</p>
+                <p className="text-muted-foreground mb-4">Position a QR code in front of your camera</p>
               </div>
             </div>
 

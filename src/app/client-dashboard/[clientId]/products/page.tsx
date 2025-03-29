@@ -132,7 +132,7 @@ export default function ProductsPage({ params }: { params: { clientId: string } 
       setLoading(true)
 
       // Try to fetch from API
-      let apiSuccess = false
+      const apiSuccess = false
 
       try {
         // Use environment variable if available, otherwise use a default URL
@@ -156,12 +156,12 @@ export default function ProductsPage({ params }: { params: { clientId: string } 
 
         if (data.success && Array.isArray(data.data)) {
           // Add type assertion to ensure the status is one of the allowed values
-          const typedProducts = data.data.map((product: any) => {
+          const typedProducts = data.data.map((product: unknown) => {
             return product as Product
           })
 
           setProducts(typedProducts)
-          apiSuccess = true
+          // apiSuccess = true
           console.log("Successfully fetched products from API")
         } else {
           throw new Error(data.msg || "Invalid API response format")

@@ -14,7 +14,6 @@ import Image from "next/image"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { format } from "date-fns"
 
 export default function RegisterClient() {
   const router = useRouter()
@@ -104,12 +103,6 @@ export default function RegisterClient() {
 
   const handleSelectChange = (name: string, value: string) => {
     setFormData((prev) => ({ ...prev, [name]: value }))
-  }
-
-  const handleDateChange = (date: Date | undefined) => {
-    if (date) {
-      setFormData((prev) => ({ ...prev, dateOfBirth: format(date, "yyyy-MM-dd") }))
-    }
   }
 
   const handleSubmitInitial = (e: React.FormEvent) => {
