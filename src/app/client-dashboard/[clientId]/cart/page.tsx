@@ -87,11 +87,9 @@ interface Product {
   quantity?: number
 }
 
-// Create a server component to handle the async params
-export default function CartPage({ params }: { params: { clientId: string } }) {
+export default function CartClient({ clientId }: { clientId: string }) {
   const router = useRouter()
   const { toast } = useToast()
-  const clientId = params.clientId
 
   const [items, setItems] = useState<Product[]>([])
   const [allProducts, setAllProducts] = useState<Record<string, Product>>({})
@@ -314,22 +312,6 @@ export default function CartPage({ params }: { params: { clientId: string } }) {
     )
   }
 
-  // Error state
-  // if (error && items.length === 0 && !orderPlaced) {
-  //   return (
-  //     <div className="p-6 md:p-8">
-  //       <h1 className="text-3xl font-bold mb-8">Your Cart</h1>
-  //       <div className="text-center py-12">
-  //         <h2 className="text-xl font-medium mb-4">Error Loading Cart</h2>
-  //         <p className="text-muted-foreground mb-6">{error}</p>
-  //         <Button onClick={() => window.location.reload()} className="bg-blue hover:bg-blue/90">
-  //           Retry
-  //         </Button>
-  //       </div>
-  //     </div>
-  //   )
-  // }
-
   return (
     <div className="p-6 md:p-8">
       <h1 className="text-3xl font-bold mb-8">Your Cart</h1>
@@ -500,4 +482,3 @@ export default function CartPage({ params }: { params: { clientId: string } }) {
     </div>
   )
 }
-
