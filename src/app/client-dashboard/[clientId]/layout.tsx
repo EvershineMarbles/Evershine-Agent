@@ -1,31 +1,18 @@
 import type React from "react"
-import type { Metadata } from "next"
-import { Inter } from "next/font/google"
-import "./globals.css"
-import { ThemeProvider } from "@/components/theme-provider"
-import { Toaster } from "@/components/ui/toaster"
+import { IconSidebar } from "@/components/icon-sidebar"
 
-const inter = Inter({ subsets: ["latin"] })
-
-export const metadata: Metadata = {
-  title: "Feeder App",
-  description: "Client management application",
-}
-
-export default function RootLayout({
+export default function ClientDashboardLayout({
   children,
-}: Readonly<{
+  params,
+}: {
   children: React.ReactNode
-}>) {
+  params: { clientId: string }
+}) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
-            {children}
-            <Toaster />
-        </ThemeProvider>
-      </body>
-    </html>
+    <div className="flex min-h-screen">
+      <IconSidebar clientId={params.clientId} />
+      <main className="flex-1 bg-gray-50">{children}</main>
+    </div>
   )
 }
 
