@@ -8,7 +8,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/components/hooks/use-toast"
 
 // Mock data for fallback
 const MOCK_PRODUCTS = [
@@ -87,7 +87,10 @@ interface Product {
   quantity?: number
 }
 
-export default function CartPage({ params }: { params: { clientId: string } }) {
+export default async function CartPage({ params }: { params: Promise<{ clientId: string }> }) {
+  const unwrappedParams = await params
+  const clientId = unwrappedParams.clientId
+
   const router = useRouter()
   const { toast } = useToast()
 
@@ -336,7 +339,7 @@ export default function CartPage({ params }: { params: { clientId: string } }) {
         <div className="text-center py-12">
           <h2 className="text-xl font-medium mb-4">Your cart is empty</h2>
           <p className="text-muted-foreground mb-6">Add items to your cart to place an order</p>
-          <Link href={`/client-dashboard/${params.clientId}/products`}>
+          <Link href={`/client-dashboard/${clientId}/products`}>
             <Button className="bg-blue hover:bg-blue/90">Browse Products</Button>
           </Link>
         </div>
@@ -350,7 +353,7 @@ export default function CartPage({ params }: { params: { clientId: string } }) {
               <div className="flex flex-col sm:flex-row justify-center gap-4">
                 <Button
                   variant="outline"
-                  onClick={() => router.push(`/client-dashboard/${params.clientId}/products`)}
+                  onClick={() => router.push(`/client-dashboard/${clientId}/products`)}
                   className="h-12"
                   type="button"
                 >
@@ -463,7 +466,7 @@ export default function CartPage({ params }: { params: { clientId: string } }) {
                 <CardFooter className="flex flex-col sm:flex-row justify-between gap-4">
                   <Button
                     variant="outline"
-                    onClick={() => router.push(`/client-dashboard/${params.clientId}/products`)}
+                    onClick={() => router.push(`/client-dashboard/${clientId}/products`)}
                     type="button"
                   >
                     Continue Shopping

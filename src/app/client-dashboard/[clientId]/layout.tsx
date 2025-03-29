@@ -1,39 +1,31 @@
-"use client"
+import type React from "react"
+import type { Metadata } from "next"
+import { Inter } from "next/font/google"
+import "./globals.css"
+import { ThemeProvider } from "@/components/theme-provider"
+import { Toaster } from "@/components/ui/toaster"
 
-import React from "react"
-import { IconSidebar } from "@/components/icon-sidebar"
-import Link from "next/link"
-import { ArrowLeft } from "lucide-react"
+const inter = Inter({ subsets: ["latin"] })
 
-// Define the type for the unwrapped params
-type ClientParams = {
-  clientId: string
+export const metadata: Metadata = {
+  title: "Feeder App",
+  description: "Client management application",
 }
 
-export default function ClientDashboardLayout({
+export default function RootLayout({
   children,
-  params,
-}: {
+}: Readonly<{
   children: React.ReactNode
-  params: Promise<ClientParams> | ClientParams
-}) {
-  // Unwrap the params object using React.use()
-  const unwrappedParams = React.use(params as Promise<ClientParams>)
-  const clientId = unwrappedParams.clientId
-
+}>) {
   return (
-    <div className="flex h-screen bg-gray-50">
-      <IconSidebar clientId={clientId} />
-      <main className="flex-1 ml-16 overflow-auto">
-        <div className="p-4 border-b bg-white">
-          <Link href="/" className="inline-flex items-center text-dark hover:underline">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Home
-          </Link>
-        </div>
-        {children}
-      </main>
-    </div>
+    <html lang="en" suppressHydrationWarning>
+      <body className={inter.className}>
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+            {children}
+            <Toaster />
+        </ThemeProvider>
+      </body>
+    </html>
   )
 }
 

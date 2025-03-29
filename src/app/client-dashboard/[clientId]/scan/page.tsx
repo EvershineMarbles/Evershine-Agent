@@ -6,8 +6,19 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { QrCode, Camera, ShoppingCart, Heart } from "lucide-react"
 import Image from "next/image"
 import { Badge } from "@/components/ui/badge"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/components/hooks/use-toast"
 
+/*************  ✨ Codeium Command ⭐  *************/
+/**
+ * Page for scanning product QR codes.
+ *
+ * This page displays a QR code scanner and displays the product details
+ * when a QR code is scanned. It also provides instructions on how to scan
+ * a QR code.
+ *
+ * @return {JSX.Element} The page element
+ */
+/******  3133081e-ba48-48e7-8236-681bb2c97914  *******/
 export default function ScanPage() {
   const [scanning, setScanning] = useState(false)
   const [scannedProduct, setScannedProduct] = useState<null | {
@@ -29,7 +40,7 @@ export default function ScanPage() {
     toast({
       title: "Added to Cart",
       description: `${scannedProduct?.name} has been added to your cart`,
-      variant: "success",
+      variant: "default",
       duration: 3000,
     })
   }
