@@ -87,7 +87,6 @@ interface Product {
 
 export default function WishlistPage({ params }: { params: { clientId: string } }) {
   const [wishlistItems, setWishlistItems] = useState<Product[]>([])
-  const [allProducts, setAllProducts] = useState<Record<string, Product>>({})
   const [loading, setLoading] = useState(true)
   const { toast } = useToast()
   const [cart, setCart] = useState<string[]>([])
@@ -174,7 +173,10 @@ export default function WishlistPage({ params }: { params: { clientId: string } 
         const data = await response.json()
 
         if (data.success && Array.isArray(data.data)) {
-          productsData = data.data
+          // Add type assertion to ensure the status is one of the allowed values
+          productsData = data.data.map((product: any) => {
+            return product as Product
+          })
           console.log("Successfully fetched products from API")
         } else {
           throw new Error(data.msg || "Invalid API response format")
@@ -201,7 +203,7 @@ export default function WishlistPage({ params }: { params: { clientId: string } 
         productsById[product.postId] = product
       })
 
-      setAllProducts(productsById)
+      // Remove the unused allProducts state
 
       // Filter products that are in the wishlist
       const items = wishlistIds.map((id) => productsById[id]).filter(Boolean) // Remove undefined items

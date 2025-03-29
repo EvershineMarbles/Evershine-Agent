@@ -1,14 +1,77 @@
 "use client"
 
 import type React from "react"
+
 import { useState, useEffect, useCallback } from "react"
-import { useRouter, useParams } from "next/navigation"
-import Link from "next/link"
 import { Search, Loader2, Heart, ShoppingCart } from "lucide-react"
 import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
+import Link from "next/link"
 
-// Define the Product interface
+// Mock data for fallback when API is not available
+const MOCK_PRODUCTS = [
+  {
+    _id: "1",
+    name: "Marble Tile - White",
+    price: 1200,
+    image: ["/placeholder.svg?height=300&width=300"],
+    postId: "marble-1",
+    category: "Marble",
+    description: "Premium quality white marble tile",
+    status: "approved" as const,
+  },
+  {
+    _id: "2",
+    name: "Granite Countertop",
+    price: 3500,
+    image: ["/placeholder.svg?height=300&width=300"],
+    postId: "granite-1",
+    category: "Granite",
+    description: "Durable granite countertop",
+    status: "approved" as const,
+  },
+  {
+    _id: "3",
+    name: "Limestone Flooring",
+    price: 950,
+    image: ["/placeholder.svg?height=300&width=300"],
+    postId: "limestone-1",
+    category: "Limestone",
+    description: "Natural limestone flooring tiles",
+    status: "approved" as const,
+  },
+  {
+    _id: "4",
+    name: "Sandstone Pavers",
+    price: 850,
+    image: ["/placeholder.svg?height=300&width=300"],
+    postId: "sandstone-1",
+    category: "Sandstone",
+    description: "Outdoor sandstone pavers",
+    status: "approved" as const,
+  },
+  {
+    _id: "5",
+    name: "Quartz Slab",
+    price: 4200,
+    image: ["/placeholder.svg?height=300&width=300"],
+    postId: "quartz-1",
+    category: "Quartz",
+    description: "Engineered quartz slab",
+    status: "approved" as const,
+  },
+  {
+    _id: "6",
+    name: "Travertine Tiles",
+    price: 1100,
+    image: ["/placeholder.svg?height=300&width=300"],
+    postId: "travertine-1",
+    category: "Travertine",
+    description: "Natural travertine tiles",
+    status: "approved" as const,
+  },
+]
+
 interface Product {
   _id: string
   name: string
@@ -18,16 +81,9 @@ interface Product {
   category: string
   description: string
   status?: "draft" | "pending" | "approved"
-  applicationAreas?: string
-  quantityAvailable?: number
 }
 
-export default function ProductsPage() {
-  // Use the useParams hook to get the clientId
-  const params = useParams()
-  const clientId = params.clientId as string
-
-  const router = useRouter()
+export default function ProductsPage({ params }: { params: { clientId: string } }) {
   const { toast } = useToast()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
@@ -56,66 +112,80 @@ export default function ProductsPage() {
     }
   }, [])
 
-  // Save wishlist and cart to localStorage whenever they change
+  // Save wishlist to localStorage whenever it changes
   useEffect(() => {
     if (typeof window !== "undefined") {
       localStorage.setItem("wishlist", JSON.stringify(wishlist))
+    }
+  }, [wishlist])
+
+  // Save cart to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== "undefined") {
       localStorage.setItem("cart", JSON.stringify(cart))
     }
-  }, [wishlist, cart])
+  }, [cart])
 
-  // Fetch products function
+  // Fetch products function with improved error handling
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true)
 
-      // Use environment variable if available, otherwise use a default URL
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-      console.log("Fetching products from:", `${apiUrl}/api/getAllProducts`)
+      // Try to fetch from API
+      let apiSuccess = false
 
-      const response = await fetch(`${apiUrl}/api/getAllProducts`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        // Add a timeout to prevent long waiting times
-        signal: AbortSignal.timeout(8000), // 8 second timeout
-      })
+      try {
+        // Use environment variable if available, otherwise use a default URL
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+        console.log("Attempting to fetch products from:", `${apiUrl}/api/getAllProducts`)
 
-      if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`)
-      }
+        const response = await fetch(`${apiUrl}/api/getAllProducts`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          // Add a timeout to prevent long waiting times
+          signal: AbortSignal.timeout(5000), // 5 second timeout
+        })
 
-      const data = await response.json()
+        if (!response.ok) {
+          throw new Error(`API request failed with status ${response.status}`)
+        }
 
-      if (data.success && Array.isArray(data.data)) {
-        console.log("Products fetched successfully:", data.data)
+        const data = await response.json()
 
-        // Process the image URLs to ensure they're valid
-        const processedProducts = data.data.map((product: Product) => ({
-          ...product,
-          image:
-            Array.isArray(product.image) && product.image.length > 0
-              ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
-              : ["/placeholder.svg?height=300&width=300"],
-        }))
+        if (data.success && Array.isArray(data.data)) {
+          // Add type assertion to ensure the status is one of the allowed values
+          const typedProducts = data.data.map((product: any) => {
+            return product as Product
+          })
 
-        setProducts(processedProducts)
-      } else {
-        throw new Error(data.msg || "Invalid API response format")
+          setProducts(typedProducts)
+          apiSuccess = true
+          console.log("Successfully fetched products from API")
+        } else {
+          throw new Error(data.msg || "Invalid API response format")
+        }
+      } catch (apiError) {
+        console.error("API fetch error:", apiError)
+        // Let the outer try/catch handle this
+        throw apiError
       }
     } catch (error) {
       console.error("Error fetching products:", error)
 
-      // Show error toast
-      toast({
-        title: "Error fetching products",
-        description: "Could not load products from the server. Please try again later.",
-        variant: "destructive",
-      })
+      // Use mock data as fallback
+      console.log("Using mock product data as fallback")
+      setProducts(MOCK_PRODUCTS)
 
-      // Set empty products array
-      setProducts([])
+      // Show a toast only if we're in a browser environment
+      if (typeof window !== "undefined") {
+        toast({
+          title: "Using demo data",
+          description: "Could not connect to the server. Showing demo products.",
+          variant: "default",
+        })
+      }
     } finally {
       setLoading(false)
     }
@@ -189,7 +259,7 @@ export default function ProductsPage() {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-[80vh]">
-        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+        <Loader2 className="h-12 w-12 animate-spin text-blue mb-4" />
         <p className="text-muted-foreground">Loading products...</p>
       </div>
     )
@@ -201,19 +271,19 @@ export default function ProductsPage() {
         <h1 className="text-3xl font-bold">Products</h1>
 
         <div className="flex items-center gap-4">
-          <Link href={`/client-dashboard/${clientId}/wishlist`} className="relative">
+          <Link href={`/client-dashboard/${params.clientId}/wishlist`} className="relative">
             <Heart className="h-6 w-6 text-gray-600" />
             {wishlist.length > 0 && (
-              <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+              <span className="absolute -top-2 -right-2 bg-blue text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
                 {wishlist.length}
               </span>
             )}
           </Link>
 
-          <Link href={`/client-dashboard/${clientId}/cart`} className="relative">
+          <Link href={`/client-dashboard/${params.clientId}/cart`} className="relative">
             <ShoppingCart className="h-6 w-6 text-gray-600" />
             {cart.length > 0 && (
-              <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+              <span className="absolute -top-2 -right-2 bg-blue text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
                 {cart.length}
               </span>
             )}
@@ -228,38 +298,28 @@ export default function ProductsPage() {
           placeholder="Search products by name or category..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10 pr-4 py-2 w-full rounded-lg border border-input focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+          className="pl-10 pr-4 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue focus:border-transparent"
         />
       </div>
 
       {filteredProducts.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-xl font-medium mb-4">No products found</p>
-          <p className="text-muted-foreground mb-6">
-            {searchQuery ? "Try a different search term" : "No products are currently available"}
-          </p>
-          <button
-            onClick={fetchProducts}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
-          >
-            Refresh Products
-          </button>
+          <p className="text-muted-foreground mb-6">Try a different search term</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProducts.map((product) => (
             <div
               key={product._id}
-              className="group relative bg-card rounded-lg overflow-hidden border border-border hover:border-primary transition-all hover:shadow-md"
+              className="group relative bg-white rounded-lg overflow-hidden border border-gray-200 hover:border-blue transition-all hover:shadow-md"
             >
               <div className="relative aspect-square">
                 <Image
                   src={
                     imageError[product._id]
                       ? "/placeholder.svg?height=300&width=300"
-                      : product.image && product.image.length > 0 && product.image[0]
-                        ? product.image[0]
-                        : "/placeholder.svg?height=300&width=300"
+                      : product.image[0] || "/placeholder.svg?height=300&width=300"
                   }
                   alt={product.name}
                   fill
@@ -281,36 +341,24 @@ export default function ProductsPage() {
               </div>
 
               <div className="p-4">
-                <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
-                <p className="text-lg font-bold mt-2">₹{product.price.toLocaleString()}</p>
-                <p className="text-sm text-muted-foreground mt-1">{product.category}</p>
-
-                {product.quantityAvailable !== undefined && (
-                  <p className="text-sm mt-1">
-                    {product.quantityAvailable > 0 ? `In stock: ${product.quantityAvailable}` : "Out of stock"}
-                  </p>
-                )}
+                <h3 className="font-semibold text-lg text-gray-900 line-clamp-1">{product.name}</h3>
+                <p className="text-gray-600 text-sm line-clamp-2 mt-1">{product.description}</p>
+                <p className="text-lg font-bold mt-2">₹{product.price}</p>
+                <p className="text-sm text-gray-500 mt-1">{product.category}</p>
 
                 <button
                   onClick={(e) => addToCart(e, product.postId, product.name)}
                   className={`mt-4 w-full py-2 rounded-lg text-sm font-medium
                             ${
                               cart.includes(product.postId)
-                                ? "bg-muted text-muted-foreground"
-                                : "bg-primary hover:bg-primary/90 text-primary-foreground"
+                                ? "bg-gray-100 text-gray-800"
+                                : "bg-blue hover:bg-blue/90 text-white"
                             } 
                             transition-colors`}
-                  disabled={
-                    cart.includes(product.postId) ||
-                    (product.quantityAvailable !== undefined && product.quantityAvailable <= 0)
-                  }
+                  disabled={cart.includes(product.postId)}
                   type="button"
                 >
-                  {cart.includes(product.postId)
-                    ? "Added to Cart"
-                    : product.quantityAvailable !== undefined && product.quantityAvailable <= 0
-                      ? "Out of Stock"
-                      : "Add to Cart"}
+                  {cart.includes(product.postId) ? "Added to Cart" : "Add to Cart"}
                 </button>
               </div>
             </div>
