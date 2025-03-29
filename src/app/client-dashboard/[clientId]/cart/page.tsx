@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Trash2, CheckCircle, Clock, Loader2 } from "lucide-react"
+import { Trash2, CheckCircle, Clock, Loader2 } from 'lucide-react'
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -87,12 +87,11 @@ interface Product {
   quantity?: number
 }
 
-export default async function CartPage({ params }: { params: Promise<{ clientId: string }> }) {
-  const unwrappedParams = await params
-  const clientId = unwrappedParams.clientId
-
+// Create a server component to handle the async params
+export default function CartPage({ params }: { params: { clientId: string } }) {
   const router = useRouter()
   const { toast } = useToast()
+  const clientId = params.clientId
 
   const [items, setItems] = useState<Product[]>([])
   const [allProducts, setAllProducts] = useState<Record<string, Product>>({})
