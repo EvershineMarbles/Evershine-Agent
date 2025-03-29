@@ -2,6 +2,7 @@
 
 import * as React from "react"
 
+// Import the types from toast.tsx
 import type { ToastActionElement, ToastProps } from "@/components/ui/toast"
 
 const TOAST_LIMIT = 5
@@ -21,14 +22,15 @@ const actionTypes = {
   REMOVE_TOAST: "REMOVE_TOAST",
 } as const
 
+// Use the actionTypes to avoid the unused variable warning
+type ActionType = typeof actionTypes
+
 let count = 0
 
 function genId() {
   count = (count + 1) % Number.MAX_VALUE
   return count.toString()
 }
-
-type ActionType = typeof actionTypes
 
 type Action =
   | {
@@ -136,7 +138,7 @@ function toast({ ...props }: Toast) {
       ...props,
       id,
       open: true,
-      onOpenChange: (open) => {
+      onOpenChange: (open: boolean) => {
         if (!open) dismiss()
       },
     },

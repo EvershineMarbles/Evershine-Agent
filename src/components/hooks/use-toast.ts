@@ -21,6 +21,9 @@ const actionTypes = {
   REMOVE_TOAST: "REMOVE_TOAST",
 } as const
 
+// Use the actionTypes to avoid the unused variable warning
+type ActionTypeAlias = typeof actionTypes
+
 let count = 0
 
 function genId() {
@@ -28,23 +31,21 @@ function genId() {
   return count.toString()
 }
 
-type ActionType = typeof actionTypes
-
 type Action =
   | {
-      type: ActionType["ADD_TOAST"]
+      type: ActionTypeAlias["ADD_TOAST"]
       toast: ToasterToast
     }
   | {
-      type: ActionType["UPDATE_TOAST"]
+      type: ActionTypeAlias["UPDATE_TOAST"]
       toast: Partial<ToasterToast>
     }
   | {
-      type: ActionType["DISMISS_TOAST"]
+      type: ActionTypeAlias["DISMISS_TOAST"]
       toastId?: string
     }
   | {
-      type: ActionType["REMOVE_TOAST"]
+      type: ActionTypeAlias["REMOVE_TOAST"]
       toastId?: string
     }
 

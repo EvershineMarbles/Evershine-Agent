@@ -132,8 +132,6 @@ export default function ProductsPage({ params }: { params: { clientId: string } 
       setLoading(true)
 
       // Try to fetch from API
-      const apiSuccess = false
-
       try {
         // Use environment variable if available, otherwise use a default URL
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
@@ -161,7 +159,6 @@ export default function ProductsPage({ params }: { params: { clientId: string } 
           })
 
           setProducts(typedProducts)
-          // apiSuccess = true
           console.log("Successfully fetched products from API")
         } else {
           throw new Error(data.msg || "Invalid API response format")
