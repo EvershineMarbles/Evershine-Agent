@@ -139,7 +139,7 @@ export default function ScanPage() {
                 <span className="font-bold">2</span>
               </div>
               <div>
-                <h3 className="font-medium">Click "Start Scanning"</h3>
+                <h3 className="font-medium">Click &quot;Start Scanning&quot;</h3>
                 <p className="text-muted-foreground">Press the button to activate the scanner</p>
               </div>
             </div>
