@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -34,38 +34,53 @@ export default function RegisterClient() {
     agreeToTerms: false,
   })
 
-  // Change the OTP state and refs initialization
-  const [otp, setOtp] = useState(["", "", "", "", "", ""])
-  const otpInputs = useRef<(HTMLInputElement | null)[]>([null, null, null, null, null, null])
+  // Simplified OTP state - use a single string instead of array
+  const [otpValue, setOtpValue] = useState("")
+  const otpInputs = useRef<(HTMLInputElement | null)[]>([])
+
+  // Initialize refs array
+  useEffect(() => {
+    otpInputs.current = otpInputs.current.slice(0, 6)
+  }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
-  // Replace the handleOtpChange function with this simpler implementation
-  const handleOtpChange = (index: number, value: string) => {
-    // Create a new array to avoid direct state mutation
-    const newOtp = [...otp]
+  // Simplified OTP handling
+  const handleOtpChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+    const value = e.target.value
 
-    // Handle pasting multiple digits
+    // Only allow numbers
+    if (!/^\d*$/.test(value)) return
+
+    // Create a new OTP string
+    const newOtpValue = otpValue.split("")
+
+    // Handle pasting
     if (value.length > 1) {
-      const digits = value.split("")
-      // Fill as many inputs as we have digits, starting from the current index
-      for (let i = 0; i < digits.length && index + i < 6; i++) {
-        newOtp[index + i] = digits[i]
-      }
-      setOtp(newOtp)
+      // If pasting, distribute the digits across fields
+      const digits = value.split("").slice(0, 6 - index)
+      const newValue = otpValue.split("")
 
-      // Focus on the next empty field or the last field
-      const nextEmptyIndex = Math.min(index + value.length, 5)
+      digits.forEach((digit, i) => {
+        if (index + i < 6) {
+          newValue[index + i] = digit
+        }
+      })
+
+      setOtpValue(newValue.join(""))
+
+      // Focus the next empty field or the last field
+      const nextIndex = Math.min(index + digits.length, 5)
       setTimeout(() => {
-        otpInputs.current[nextEmptyIndex]?.focus()
+        otpInputs.current[nextIndex]?.focus()
       }, 0)
     } else {
-      // Handle single digit input
-      newOtp[index] = value
-      setOtp(newOtp)
+      // For single digit input
+      newOtpValue[index] = value.charAt(0) || ""
+      setOtpValue(newOtpValue.join(""))
 
       // Auto-focus next input if a digit was entered
       if (value && index < 5) {
@@ -76,9 +91,9 @@ export default function RegisterClient() {
     }
   }
 
-  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleOtpKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
     // Handle backspace to go to previous field
-    if (e.key === "Backspace" && !otp[index] && index > 0) {
+    if (e.key === "Backspace" && !otpValue[index] && index > 0) {
       otpInputs.current[index - 1]?.focus()
     }
   }
@@ -193,37 +208,38 @@ export default function RegisterClient() {
               <form onSubmit={handleVerifyOTP} className="space-y-4">
                 <div className="text-center mb-6">
                   <p className="text-muted-foreground">
-                    We've sent a 6-digit OTP to <span className="font-medium text-foreground">{formData.mobile}</span>
+                    We{"'"}ve sent a 6-digit OTP to{" "}
+                    <span className="font-medium text-foreground">{formData.mobile}</span>
                   </p>
                 </div>
 
-                {/* Replace the OTP input rendering in the form with this */}
+                {/* Simplified OTP input rendering */}
                 <div className="flex justify-center gap-2">
-                  {otp.map((digit, index) => (
-                    <Input
-                      key={index}
-                      ref={(el) => (otpInputs.current[index] = el)}
-                      className="h-14 w-12 text-center text-xl font-bold rounded-md"
-                      value={digit}
-                      onChange={(e) => handleOtpChange(index, e.target.value)}
-                      onKeyDown={(e) => {
-                        // Handle backspace to go to previous field
-                        if (e.key === "Backspace" && !otp[index] && index > 0) {
-                          otpInputs.current[index - 1]?.focus()
-                        }
-                      }}
-                      maxLength={6} // Allow pasting multiple digits
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      required
-                    />
-                  ))}
+                  {Array(6)
+                    .fill(0)
+                    .map((_, index) => (
+                      <Input
+                        key={index}
+                        ref={(el) => {
+                          otpInputs.current[index] = el
+                        }}
+                        className="h-14 w-12 text-center text-xl font-bold rounded-md"
+                        value={otpValue[index] || ""}
+                        onChange={(e) => handleOtpChange(e, index)}
+                        onKeyDown={(e) => handleOtpKeyDown(e, index)}
+                        maxLength={index === 0 ? 6 : 1}
+                        inputMode="numeric"
+                        type="text"
+                        pattern="[0-9]*"
+                        required={index === 0}
+                      />
+                    ))}
                 </div>
 
                 <div className="text-center mt-4">
                   <p className="text-sm text-muted-foreground">
-                    Didn't receive OTP?{" "}
-                    <Button variant="link" className="p-0 h-auto text-blue">
+                    Didn{"'"}t receive OTP?{" "}
+                    <Button variant="link" className="p-0 h-auto text-blue" type="button">
                       Resend
                     </Button>
                   </p>
@@ -239,7 +255,7 @@ export default function RegisterClient() {
             </CardContent>
 
             <CardFooter className="flex justify-center">
-              <Button variant="link" onClick={() => setStep("initial")} className="text-blue">
+              <Button variant="link" onClick={() => setStep("initial")} className="text-blue" type="button">
                 Back to details
               </Button>
             </CardFooter>
@@ -395,7 +411,7 @@ export default function RegisterClient() {
             </CardContent>
 
             <CardFooter className="flex justify-center">
-              <Button variant="link" onClick={() => setStep("otp")} className="text-blue">
+              <Button variant="link" onClick={() => setStep("otp")} className="text-blue" type="button">
                 Back to OTP verification
               </Button>
             </CardFooter>
