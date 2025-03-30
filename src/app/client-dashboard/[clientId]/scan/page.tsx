@@ -8,7 +8,7 @@ import Image from "next/image"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/components/ui/use-toast"
 
-export default function ScanPage({ params }: { params: { clientId: string } }) {
+export default function ScanPage() {
   const [scanning, setScanning] = useState(false)
   const [scannedProduct, setScannedProduct] = useState<null | {
     id: number
@@ -139,7 +139,7 @@ export default function ScanPage({ params }: { params: { clientId: string } }) {
                 <span className="font-bold">2</span>
               </div>
               <div>
-                <h3 className="font-medium">Click "Start Scanning"</h3>
+                <h3 className="font-medium">Click &quot;Start Scanning&quot;</h3>
                 <p className="text-muted-foreground">Press the button to activate the scanner</p>
               </div>
             </div>

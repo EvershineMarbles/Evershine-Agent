@@ -167,7 +167,7 @@ export default function CartPage() {
             <ShoppingBag className="h-24 w-24 text-gray-300 mb-6" />
             <h2 className="text-2xl font-bold text-gray-800 mb-4">Your cart is empty</h2>
             <p className="text-gray-500 mb-8 text-center max-w-md">
-              Looks like you haven't added any products to your cart yet.
+              Looks like you haven&apos;t added any products to your cart yet.
             </p>
             <Link href="/">
               <button className="px-6 py-3 bg-[#194a95] text-white rounded-lg hover:bg-[#0f3a7a] transition-colors">

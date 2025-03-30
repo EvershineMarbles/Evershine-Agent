@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect, useCallback } from "react"
-import { useRouter, useParams } from "next/navigation"
+import { useParams } from "next/navigation"
 import Link from "next/link"
 import { Search, Loader2, Heart, ShoppingCart } from "lucide-react"
 import Image from "next/image"
@@ -27,7 +27,6 @@ export default function ProductsPage() {
   const params = useParams()
   const clientId = params.clientId as string
 
-  const router = useRouter()
   const { toast } = useToast()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)

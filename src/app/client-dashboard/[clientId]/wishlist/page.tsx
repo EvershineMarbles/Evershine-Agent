@@ -131,7 +131,7 @@ export default function WishlistPage() {
             <Heart className="h-24 w-24 text-gray-300 mb-6" />
             <h2 className="text-2xl font-bold text-gray-800 mb-4">Your wishlist is empty</h2>
             <p className="text-gray-500 mb-8 text-center max-w-md">
-              Save items you like to your wishlist and they'll appear here.
+              Save items you like to your wishlist and they&apos;ll appear here.
             </p>
             <Link href="/">
               <button className="px-6 py-3 bg-[#194a95] text-white rounded-lg hover:bg-[#0f3a7a] transition-colors">
