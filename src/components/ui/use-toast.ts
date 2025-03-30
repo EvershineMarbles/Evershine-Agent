@@ -6,7 +6,6 @@ import { useEffect, useState } from "react"
 import type { ToastActionElement, ToastProps } from "@/components/ui/toast"
 
 const TOAST_LIMIT = 1
-const TOAST_REMOVE_DELAY = 1000000
 
 type ToasterToast = ToastProps & {
   id: string
@@ -14,13 +13,6 @@ type ToasterToast = ToastProps & {
   description?: React.ReactNode
   action?: ToastActionElement
 }
-
-const actionTypes = {
-  ADD_TOAST: "ADD_TOAST",
-  UPDATE_TOAST: "UPDATE_TOAST",
-  DISMISS_TOAST: "DISMISS_TOAST",
-  REMOVE_TOAST: "REMOVE_TOAST",
-} as const
 
 let count = 0
 
@@ -33,7 +25,14 @@ type State = {
   toasts: ToasterToast[]
 }
 
-export const reducer = (state: State, action: any): State => {
+// Update the Action type to allow undefined id for DISMISS_TOAST
+type Action =
+  | { type: "ADD_TOAST"; toast: ToasterToast }
+  | { type: "UPDATE_TOAST"; toast: ToasterToast }
+  | { type: "DISMISS_TOAST"; id: string | undefined }
+  | { type: "REMOVE_TOAST"; id?: string }
+
+export const reducer = (state: State, action: Action): State => {
   switch (action.type) {
     case "ADD_TOAST":
       return {
@@ -50,8 +49,8 @@ export const reducer = (state: State, action: any): State => {
     case "DISMISS_TOAST": {
       const { id } = action
 
-      // If toast is already with dismiss state, do nothing
-      if (state.toasts.find((t) => t.id === id && t.open === false)) {
+      // If id is undefined or toast is already with dismiss state, do nothing
+      if (id === undefined || state.toasts.find((t) => t.id === id && t.open === false)) {
         return state
       }
 
@@ -82,7 +81,7 @@ const listeners: Array<(state: State) => void> = []
 
 let memoryState: State = { toasts: [] }
 
-function dispatch(action: any) {
+function dispatch(action: Action) {
   memoryState = reducer(memoryState, action)
   listeners.forEach((listener) => {
     listener(memoryState)

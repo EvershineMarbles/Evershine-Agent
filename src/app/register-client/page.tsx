@@ -184,12 +184,15 @@ export default function RegisterClient() {
                   </p>
                 </div>
 
-                {/* Replace the OTP input rendering in the form with this */}
+                {/* Fix the ref callback to not return anything (void) */}
                 <div className="flex justify-center gap-2">
                   {otp.map((digit, index) => (
                     <Input
                       key={index}
-                      ref={(el) => (otpInputs.current[index] = el)}
+                      ref={(el) => {
+                        otpInputs.current[index] = el
+                        // No return value
+                      }}
                       className="h-14 w-12 text-center text-xl font-bold rounded-md"
                       value={digit}
                       onChange={(e) => handleOtpChange(index, e.target.value)}
