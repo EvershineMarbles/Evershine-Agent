@@ -1,24 +1,15 @@
 "use client"
 
-import React from "react"
+import { useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Package, QrCode, ShoppingCart, Heart } from 'lucide-react'
+import { Package, QrCode, ShoppingCart, Heart } from "lucide-react"
 import Link from "next/link"
 
-// Define the type for the unwrapped params
-type ClientParams = {
-  clientId: string
-}
-
-export default function ClientDashboard({
-  params,
-}: {
-  params: Promise<ClientParams> | ClientParams
-}) {
-  // Unwrap the params object using React.use()
-  const unwrappedParams = React.use(params as Promise<ClientParams>)
-  const clientId = unwrappedParams.clientId
+export default function ClientDashboard() {
+  // Use the useParams hook to get the clientId
+  const params = useParams()
+  const clientId = params.clientId as string
 
   // Format client name for display (convert from URL format)
   const clientName = clientId
@@ -123,3 +114,4 @@ export default function ClientDashboard({
     </div>
   )
 }
+
