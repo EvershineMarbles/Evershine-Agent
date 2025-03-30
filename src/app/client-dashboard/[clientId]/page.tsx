@@ -1,13 +1,27 @@
 "use client"
 
+import React from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Package, QrCode, ShoppingCart, Heart } from "lucide-react"
+import { Package, QrCode, ShoppingCart, Heart } from 'lucide-react'
 import Link from "next/link"
 
-export default function ClientDashboard({ params }: { params: { clientId: string } }) {
+// Define the type for the unwrapped params
+type ClientParams = {
+  clientId: string
+}
+
+export default function ClientDashboard({
+  params,
+}: {
+  params: Promise<ClientParams> | ClientParams
+}) {
+  // Unwrap the params object using React.use()
+  const unwrappedParams = React.use(params as Promise<ClientParams>)
+  const clientId = unwrappedParams.clientId
+
   // Format client name for display (convert from URL format)
-  const clientName = params.clientId
+  const clientName = clientId
     .split("-")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ")
@@ -17,7 +31,7 @@ export default function ClientDashboard({ params }: { params: { clientId: string
       <h1 className="text-3xl font-bold mb-8">Welcome to {clientName}&apos;s Dashboard</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Link href={`/client-dashboard/${params.clientId}/products`}>
+        <Link href={`/client-dashboard/${clientId}/products`}>
           <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
             <CardHeader className="pb-2">
               <Package className="h-8 w-8 text-blue mb-2" />
@@ -30,7 +44,7 @@ export default function ClientDashboard({ params }: { params: { clientId: string
           </Card>
         </Link>
 
-        <Link href={`/client-dashboard/${params.clientId}/scan`}>
+        <Link href={`/client-dashboard/${clientId}/scan`}>
           <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
             <CardHeader className="pb-2">
               <QrCode className="h-8 w-8 text-blue mb-2" />
@@ -43,7 +57,7 @@ export default function ClientDashboard({ params }: { params: { clientId: string
           </Card>
         </Link>
 
-        <Link href={`/client-dashboard/${params.clientId}/wishlist`}>
+        <Link href={`/client-dashboard/${clientId}/wishlist`}>
           <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
             <CardHeader className="pb-2">
               <Heart className="h-8 w-8 text-blue mb-2" />
@@ -56,7 +70,7 @@ export default function ClientDashboard({ params }: { params: { clientId: string
           </Card>
         </Link>
 
-        <Link href={`/client-dashboard/${params.clientId}/cart`}>
+        <Link href={`/client-dashboard/${clientId}/cart`}>
           <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
             <CardHeader className="pb-2">
               <ShoppingCart className="h-8 w-8 text-blue mb-2" />
@@ -109,4 +123,3 @@ export default function ClientDashboard({ params }: { params: { clientId: string
     </div>
   )
 }
-
