@@ -6,20 +6,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { QrCode, Camera, ShoppingCart, Heart } from "lucide-react"
 import Image from "next/image"
 import { Badge } from "@/components/ui/badge"
-import { useToast } from "@/components/hooks/use-toast"
+import { useToast } from "@/components/ui/use-toast"
 
-/*************  ✨ Codeium Command ⭐  *************/
-/**
- * Page for scanning product QR codes.
- *
- * This page displays a QR code scanner and displays the product details
- * when a QR code is scanned. It also provides instructions on how to scan
- * a QR code.
- *
- * @return {JSX.Element} The page element
- */
-/******  3133081e-ba48-48e7-8236-681bb2c97914  *******/
-export default function ScanPage() {
+export default function ScanPage({ params }: { params: { clientId: string } }) {
   const [scanning, setScanning] = useState(false)
   const [scannedProduct, setScannedProduct] = useState<null | {
     id: number
@@ -40,7 +29,7 @@ export default function ScanPage() {
     toast({
       title: "Added to Cart",
       description: `${scannedProduct?.name} has been added to your cart`,
-      variant: "default",
+      variant: "success",
       duration: 3000,
     })
   }
@@ -150,7 +139,7 @@ export default function ScanPage() {
                 <span className="font-bold">2</span>
               </div>
               <div>
-                <h3 className="font-medium">Click &quot;Start Scanning&quot;</h3>
+                <h3 className="font-medium">Click "Start Scanning"</h3>
                 <p className="text-muted-foreground">Press the button to activate the scanner</p>
               </div>
             </div>
@@ -161,7 +150,7 @@ export default function ScanPage() {
               </div>
               <div>
                 <h3 className="font-medium">Position the QR code</h3>
-                <p className="text-muted-foreground mb-4">Position a QR code in front of your camera</p>
+                <p className="text-muted-foreground">Center the QR code in the scanning area</p>
               </div>
             </div>
 

@@ -1,21 +1,38 @@
-// Change the layout component to handle async params
+"use client"
 
-import type React from "react"
+import React from "react"
 import { IconSidebar } from "@/components/icon-sidebar"
+import Link from "next/link"
+import { ArrowLeft } from "lucide-react"
 
-export default async function ClientDashboardLayout({
+// Define the type for the unwrapped params
+type ClientParams = {
+  clientId: string
+}
+
+export default function ClientDashboardLayout({
   children,
   params,
 }: {
   children: React.ReactNode
-  params: Promise<{ clientId: string }>
+  params: Promise<ClientParams> | ClientParams
 }) {
-  const resolvedParams = await params
+  // Unwrap the params object using React.use()
+  const unwrappedParams = React.use(params as Promise<ClientParams>)
+  const clientId = unwrappedParams.clientId
 
   return (
-    <div className="flex min-h-screen">
-      <IconSidebar clientId={resolvedParams.clientId} />
-      <main className="flex-1 bg-gray-50">{children}</main>
+    <div className="flex h-screen bg-gray-50">
+      <IconSidebar clientId={clientId} />
+      <main className="flex-1 ml-16 overflow-auto">
+        <div className="p-4 border-b bg-white">
+          <Link href="/" className="inline-flex items-center text-dark hover:underline">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Home
+          </Link>
+        </div>
+        {children}
+      </main>
     </div>
   )
 }
