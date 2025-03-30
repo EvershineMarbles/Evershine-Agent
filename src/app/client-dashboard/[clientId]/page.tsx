@@ -3,6 +3,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Package, QrCode, ShoppingCart, Heart } from "lucide-react"
 import Link from "next/link"
 
+// Fix the type error by making this a client component or updating the params type
+;("use client")
+
 export default function ClientDashboard({ params }: { params: { clientId: string } }) {
   // Format client name for display (convert from URL format)
   const clientName = params.clientId
