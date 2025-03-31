@@ -1,9 +1,0 @@
-# Generated files
-.next
-.next/**
-.next/types/**
-.next/types/app/**
-# Build output
-dist
-# Node modules
-node_modules
