@@ -256,6 +256,7 @@ export default function RegisterClient() {
                             setError(result.error || "Failed to resend OTP")
                           }
                         } catch (error) {
+                          console.error("Error resending OTP:", error)
                           setError("Failed to resend OTP")
                         } finally {
                           setIsLoading(false)
