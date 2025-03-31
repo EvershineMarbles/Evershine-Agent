@@ -14,6 +14,7 @@ import Image from "next/image"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { sendOtp } from "@/app/actions/send-otp"
 
 export default function RegisterClient() {
   const router = useRouter()
@@ -32,6 +33,9 @@ export default function RegisterClient() {
     dateOfBirth: "",
     agreeToTerms: false,
   })
+
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   // Change the OTP state and refs initialization
   const [otp, setOtp] = useState(["", "", "", "", "", ""])
@@ -83,10 +87,34 @@ export default function RegisterClient() {
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleSubmitInitial = (e: React.FormEvent) => {
+  const handleSubmitInitial = async (e: React.FormEvent) => {
     e.preventDefault()
-    // In a real app, you would send an API request to send OTP
-    setStep("otp")
+
+    // Validate mobile number
+    if (!formData.mobile.startsWith("+")) {
+      setError("Phone number must be in E.164 format (starting with +)")
+      return
+    }
+
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      // Call the sendOtp server action
+      const result = await sendOtp(formData.mobile)
+
+      if (result.success) {
+        // Move to OTP verification step
+        setStep("otp")
+      } else {
+        setError(result.error || "Failed to send OTP")
+      }
+    } catch (error) {
+      setError("Something went wrong. Please try again.")
+      console.error("Error sending OTP:", error)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleVerifyOTP = (e: React.FormEvent) => {
@@ -157,11 +185,14 @@ export default function RegisterClient() {
                   </div>
                 </div>
 
+                {error && <div className="text-red-500 text-sm mt-2">{error}</div>}
+
                 <Button
                   type="submit"
                   className="w-full h-12 mt-6 bg-blue hover:bg-blue/90 text-white rounded-md text-base"
+                  disabled={isLoading}
                 >
-                  Send OTP
+                  {isLoading ? "Sending..." : "Send OTP"}
                 </Button>
               </form>
             </CardContent>
@@ -184,18 +215,22 @@ export default function RegisterClient() {
                   </p>
                 </div>
 
-                {/* Fix the ref callback to not return anything (void) */}
                 <div className="flex justify-center gap-2">
                   {otp.map((digit, index) => (
                     <Input
                       key={index}
                       ref={(el) => {
                         otpInputs.current[index] = el
-                        // No return value
                       }}
                       className="h-14 w-12 text-center text-xl font-bold rounded-md"
                       value={digit}
                       onChange={(e) => handleOtpChange(index, e.target.value)}
+                      onKeyDown={(e) => {
+                        // Handle backspace to go to previous field
+                        if (e.key === "Backspace" && !otp[index] && index > 0) {
+                          otpInputs.current[index - 1]?.focus()
+                        }
+                      }}
                       maxLength={6} // Allow pasting multiple digits
                       inputMode="numeric"
                       pattern="[0-9]*"
@@ -204,11 +239,31 @@ export default function RegisterClient() {
                   ))}
                 </div>
 
+                {error && <div className="text-red-500 text-sm mt-2 text-center">{error}</div>}
+
                 <div className="text-center mt-4">
                   <p className="text-sm text-muted-foreground">
                     Didn&apos;t receive OTP?{" "}
-                    <Button variant="link" className="p-0 h-auto text-blue">
-                      Resend
+                    <Button
+                      variant="link"
+                      className="p-0 h-auto text-blue"
+                      onClick={async () => {
+                        setIsLoading(true)
+                        setError(null)
+                        try {
+                          const result = await sendOtp(formData.mobile)
+                          if (!result.success) {
+                            setError(result.error || "Failed to resend OTP")
+                          }
+                        } catch (error) {
+                          setError("Failed to resend OTP")
+                        } finally {
+                          setIsLoading(false)
+                        }
+                      }}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? "Sending..." : "Resend"}
                     </Button>
                   </p>
                 </div>
