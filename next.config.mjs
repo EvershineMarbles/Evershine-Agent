@@ -1,14 +1,16 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  typescript: {
-    // Ignore TypeScript errors during build
-    ignoreBuildErrors: true,
+  images: {
+    domains: ['evershine-product.s3.us-east-1.amazonaws.com'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'evershine-product.s3.us-east-1.amazonaws.com',
+        port: '',
+        pathname: '/**',
+      },
+    ],
   },
-  eslint: {
-    // Ignore ESLint errors during build
-    ignoreDuringBuilds: true,
-  },
-}
+};
 
-export default nextConfig
-
+export default nextConfig;
