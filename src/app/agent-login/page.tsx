@@ -95,9 +95,9 @@ export default function AgentLogin() {
       } else {
         throw new Error(response.message || "Failed to login")
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Login error:", error)
-      setApiError(error.message || "An error occurred during login")
+      setApiError(error instanceof Error ? error.message : "An error occurred during login")
     } finally {
       setIsLoading(false)
     }
@@ -174,7 +174,7 @@ export default function AgentLogin() {
           </CardContent>
           <CardFooter className="flex justify-center">
             <p className="text-sm text-center">
-              Don't have an account?{" "}
+              Don&apos;t have an account?{" "}
               <Link href="/register-agent" className="text-blue hover:underline">
                 Register here
               </Link>

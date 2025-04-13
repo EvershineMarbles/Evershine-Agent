@@ -68,11 +68,12 @@ export default function CartPage() {
         } else {
           setCartItems([])
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
         console.error("Error fetching cart:", error)
         toast({
           title: "Error",
-          description: error.message || "Failed to load your cart. Please try again.",
+          description: errorMessage || "Failed to load your cart. Please try again.",
           variant: "destructive",
         })
         setCartItems([])
@@ -138,11 +139,12 @@ export default function CartPage() {
       } else {
         throw new Error(data.message || "Failed to remove item")
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
       console.error("Error removing item from cart:", error)
       toast({
         title: "Error",
-        description: error.message || "Failed to remove item from cart. Please try again.",
+        description: errorMessage || "Failed to remove item from cart. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -198,7 +200,7 @@ export default function CartPage() {
         try {
           const errorData = JSON.parse(errorText)
           throw new Error(errorData.message || `API error: ${response.status} ${response.statusText}`)
-        } catch (e) {
+        } catch {
           throw new Error(`API error: ${response.status} ${response.statusText}`)
         }
       }
@@ -227,11 +229,12 @@ export default function CartPage() {
       } else {
         throw new Error(data.message || "Failed to place order")
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
       console.error("Error during checkout:", error)
       toast({
         title: "Checkout Failed",
-        description: error.message || "Failed to place your order. Please try again.",
+        description: errorMessage || "Failed to place your order. Please try again.",
         variant: "destructive",
       })
     } finally {
