@@ -7,8 +7,9 @@ import { QrCode, Camera, ShoppingCart, Heart } from "lucide-react"
 import Image from "next/image"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/components/ui/use-toast"
+import axiosInstance from "@/lib/apiInstance"
 
-export default function ScanPage() {
+export default function ScanPage({ params }: { params: { clientId: string } }) {
   const [scanning, setScanning] = useState(false)
   const [scannedProduct, setScannedProduct] = useState<null | {
     id: number
@@ -25,13 +26,15 @@ export default function ScanPage() {
     // In a real app, you would add to cart via API
     console.log(`Added product ${productId} to cart`)
 
-    // Show toast notification
-    toast({
-      title: "Added to Cart",
-      description: `${scannedProduct?.name} has been added to your cart`,
-      variant: "success",
-      duration: 3000,
-    })
+    // // Show toast notification
+    // toast({
+    //   title: "Added to Cart",
+    //   description: `${scannedProduct?.name} has been added to your cart`,
+    //   variant: "success",
+    //   duration: 3000,
+    // })
+
+   const response =  axiosInstance.post('/api/addToCart', productId)
   }
 
   const startScanning = () => {
@@ -139,7 +142,7 @@ export default function ScanPage() {
                 <span className="font-bold">2</span>
               </div>
               <div>
-                <h3 className="font-medium">Click &quot;Start Scanning&quot;</h3>
+                <h3 className="font-medium">Click "Start Scanning"</h3>
                 <p className="text-muted-foreground">Press the button to activate the scanner</p>
               </div>
             </div>

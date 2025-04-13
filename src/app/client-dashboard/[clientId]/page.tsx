@@ -1,25 +1,54 @@
 "use client"
 
-import { useParams } from "next/navigation"
+import { useEffect, useState } from "react"
+import { useRouter, useParams } from "next/navigation"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Package, QrCode, ShoppingCart, Heart } from "lucide-react"
-import Link from "next/link"
+import { Package, QrCode, Heart, ShoppingCart } from "lucide-react"
+import { hasClientImpersonation } from "@/lib/auth-utils"
 
 export default function ClientDashboard() {
-  // Use the useParams hook to get the clientId
+  const router = useRouter()
   const params = useParams()
-  const clientId = params.clientId as string
+  const [clientName, setClientName] = useState("")
+  const [clientId, setClientId] = useState("")
 
-  // Format client name for display (convert from URL format)
-  const clientName = clientId
-    .split("-")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ")
+  useEffect(() => {
+    // Get clientId from params
+    const id = params.clientId as string
+    if (!id) return
+
+    setClientId(id)
+
+    // TEMPORARY: Bypass the impersonation check for testing
+    // Comment this out to test the actual impersonation flow
+    // return
+
+    // Check if agent has impersonation token
+    if (!hasClientImpersonation()) {
+      console.log("No impersonation token found in page, redirecting to dashboard")
+      router.push("/dashboard")
+      return
+    }
+
+    // Format client name for display
+    setClientName(
+      id
+        .split("-")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" "),
+    )
+  }, [params, router])
+
+  // Don't render anything until clientId is set
+  if (!clientId) {
+    return null
+  }
 
   return (
     <div className="p-6 md:p-8">
-      <h1 className="text-3xl font-bold mb-8">Welcome to {clientName}&apos;s Dashboard</h1>
+      <h1 className="text-3xl font-bold mb-8">Welcome to {clientName || "Client"}'s Dashboard</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Link href={`/client-dashboard/${clientId}/products`}>
@@ -92,19 +121,31 @@ export default function ClientDashboard() {
             <CardDescription>Frequently used actions</CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-4">
-            <Button className="bg-blue hover:bg-blue/90">
+            <Button
+              className="bg-blue hover:bg-blue/90"
+              onClick={() => router.push(`/client-dashboard/${clientId}/cart`)}
+            >
               <ShoppingCart className="h-4 w-4 mr-2" />
               View Cart
             </Button>
-            <Button className="bg-blue hover:bg-blue/90">
+            <Button
+              className="bg-blue hover:bg-blue/90"
+              onClick={() => router.push(`/client-dashboard/${clientId}/wishlist`)}
+            >
               <Heart className="h-4 w-4 mr-2" />
               Wishlist
             </Button>
-            <Button className="bg-blue hover:bg-blue/90">
+            <Button
+              className="bg-blue hover:bg-blue/90"
+              onClick={() => router.push(`/client-dashboard/${clientId}/scan`)}
+            >
               <QrCode className="h-4 w-4 mr-2" />
               Scan QR
             </Button>
-            <Button className="bg-blue hover:bg-blue/90">
+            <Button
+              className="bg-blue hover:bg-blue/90"
+              onClick={() => router.push(`/client-dashboard/${clientId}/products`)}
+            >
               <Package className="h-4 w-4 mr-2" />
               Products
             </Button>
@@ -114,4 +155,3 @@ export default function ClientDashboard() {
     </div>
   )
 }
-

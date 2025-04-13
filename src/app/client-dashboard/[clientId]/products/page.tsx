@@ -2,11 +2,12 @@
 
 import type React from "react"
 import { useState, useEffect, useCallback } from "react"
-import { useParams } from "next/navigation"
+import { useRouter, useParams } from "next/navigation"
 import Link from "next/link"
-import { Search, Loader2, Heart, ShoppingCart } from "lucide-react"
+import { Search, Loader2, Heart, ShoppingCart, AlertCircle } from "lucide-react"
 import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 // Define the Product interface
 interface Product {
@@ -27,6 +28,7 @@ export default function ProductsPage() {
   const params = useParams()
   const clientId = params.clientId as string
 
+  const router = useRouter()
   const { toast } = useToast()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
@@ -35,6 +37,8 @@ export default function ProductsPage() {
   // Wishlist and cart state
   const [wishlist, setWishlist] = useState<string[]>([])
   const [cart, setCart] = useState<string[]>([])
+  const [addingToCart, setAddingToCart] = useState<Record<string, boolean>>({})
+  const [error, setError] = useState<string | null>(null)
 
   // Load wishlist and cart from localStorage
   useEffect(() => {
@@ -67,6 +71,7 @@ export default function ProductsPage() {
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true)
+      setError(null)
 
       // Use environment variable if available, otherwise use a default URL
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
@@ -103,8 +108,9 @@ export default function ProductsPage() {
       } else {
         throw new Error(data.msg || "Invalid API response format")
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching products:", error)
+      setError(error.message || "Failed to load products")
 
       // Show error toast
       toast({
@@ -151,22 +157,103 @@ export default function ProductsPage() {
 
   // Add to cart function
   const addToCart = useCallback(
-    (e: React.MouseEvent, productId: string, productName: string) => {
+    async (e: React.MouseEvent, productId: string, productName: string) => {
       e.preventDefault() // Prevent navigation
 
-      if (!cart.includes(productId)) {
-        setCart((prev) => [...prev, productId])
-        toast({
-          title: "Added to cart",
-          description: `${productName} has been added to your cart`,
-          variant: "default",
-        })
-      } else {
+      if (cart.includes(productId)) {
         toast({
           title: "Already in cart",
           description: "This item is already in your cart",
           variant: "default",
         })
+        return
+      }
+
+      try {
+        // Set loading state for this specific product
+        setAddingToCart((prev) => ({ ...prev, [productId]: true }))
+
+        console.log("Adding to cart:", productId, productName)
+
+        // Get the token
+        const token = localStorage.getItem("clientImpersonationToken")
+
+        if (!token) {
+          console.error("No impersonation token found")
+          toast({
+            title: "Authentication Error",
+            description: "Please refresh your token using the debug panel above",
+            variant: "destructive",
+          })
+          throw new Error("No authentication token found")
+        }
+
+        console.log("Using token:", token.substring(0, 15) + "...")
+        console.log("Full request details:", {
+          url: "http://localhost:8000/api/addToCart",
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ productId }),
+        })
+
+        // Make a direct fetch request with the token
+        const response = await fetch("http://localhost:8000/api/addToCart", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ productId }),
+        })
+
+        console.log("Response status:", response.status, response.statusText)
+
+        // Get the response text for debugging
+        const responseText = await response.text()
+        console.log("Response text:", responseText)
+
+        // Try to parse the response as JSON
+        let data
+        try {
+          data = JSON.parse(responseText)
+          console.log("Parsed response data:", data)
+        } catch (e) {
+          console.error("Failed to parse response as JSON:", e)
+          throw new Error(`Invalid response format: ${responseText}`)
+        }
+
+        // Check for errors
+        if (!response.ok) {
+          if (response.status === 401) {
+            throw new Error("Authentication failed. Please refresh the token using the debug panel above.")
+          } else {
+            throw new Error(`API error: ${response.status} ${response.statusText}. Details: ${responseText}`)
+          }
+        }
+
+        if (data.success) {
+          toast({
+            title: "Added to cart",
+            description: `${productName} has been added to your cart`,
+            variant: "default",
+          })
+          setCart((prev) => [...prev, productId])
+        } else {
+          throw new Error(data.message || "Failed to add to cart")
+        }
+      } catch (error: any) {
+        console.error("Error adding to cart:", error)
+        toast({
+          title: "Error adding to cart",
+          description: error.message || "Failed to add item to cart. Please try again.",
+          variant: "destructive",
+        })
+      } finally {
+        // Clear loading state
+        setAddingToCart((prev) => ({ ...prev, [productId]: false }))
       }
     },
     [cart, toast],
@@ -196,6 +283,13 @@ export default function ProductsPage() {
 
   return (
     <div className="p-6 md:p-8">
+      {error && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">Products</h1>
 
@@ -274,7 +368,9 @@ export default function ProductsPage() {
                   type="button"
                 >
                   <Heart
-                    className={`h-5 w-5 ${wishlist.includes(product.postId) ? "text-red-500 fill-red-500" : "text-gray-600"}`}
+                    className={`h-5 w-5 ${
+                      wishlist.includes(product.postId) ? "text-red-500 fill-red-500" : "text-gray-600"
+                    }`}
                   />
                 </button>
               </div>
@@ -301,15 +397,20 @@ export default function ProductsPage() {
                             transition-colors`}
                   disabled={
                     cart.includes(product.postId) ||
+                    addingToCart[product.postId] ||
                     (product.quantityAvailable !== undefined && product.quantityAvailable <= 0)
                   }
                   type="button"
                 >
-                  {cart.includes(product.postId)
-                    ? "Added to Cart"
-                    : product.quantityAvailable !== undefined && product.quantityAvailable <= 0
-                      ? "Out of Stock"
-                      : "Add to Cart"}
+                  {addingToCart[product.postId] ? (
+                    <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                  ) : cart.includes(product.postId) ? (
+                    "Added to Cart"
+                  ) : product.quantityAvailable !== undefined && product.quantityAvailable <= 0 ? (
+                    "Out of Stock"
+                  ) : (
+                    "Add to Cart"
+                  )}
                 </button>
               </div>
             </div>
@@ -319,4 +420,3 @@ export default function ProductsPage() {
     </div>
   )
 }
-

@@ -10,7 +10,7 @@ export default function Home() {
           <Image src="/logo.png" alt="Evershine Logo" width={200} height={120} priority />
         </div>
 
-        <h1 className="text-4xl md:text-5xl font-bold text-dark mb-12 text-center">Welcome, Rahul</h1>
+        <h1 className="text-4xl md:text-5xl font-bold text-dark mb-12 text-center">Welcome to Evershine</h1>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
           <Link href="/register-client" className="w-full">
@@ -25,15 +25,15 @@ export default function Home() {
             </Button>
           </Link>
 
-          <Link href="/scan-qr" className="w-full">
-            <Button className="w-full h-24 text-lg font-medium bg-blue hover:bg-blue/90 text-white rounded-lg">
-              Scan QR Code
+          <Link href="/register-agent" className="w-full">
+            <Button className="w-full h-24 text-lg font-medium bg-coral hover:bg-coral/90 text-white rounded-lg">
+              Register New Agent
             </Button>
           </Link>
 
-          <Link href="/reminders" className="w-full">
+          <Link href="/agent-login" className="w-full">
             <Button className="w-full h-24 text-lg font-medium bg-blue hover:bg-blue/90 text-white rounded-lg">
-              Follow-up Reminders
+              Agent Login
             </Button>
           </Link>
         </div>
@@ -41,4 +41,3 @@ export default function Home() {
     </main>
   )
 }
-
