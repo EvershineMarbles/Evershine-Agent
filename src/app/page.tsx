@@ -8,17 +8,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Package, QrCode, Heart, ShoppingCart } from "lucide-react"
 import { hasClientImpersonation } from "@/lib/auth-utils"
 
-interface ClientError {
-  message: string
-  code?: number
-}
+// Remove the unused interface
+// interface ClientError {
+//   message: string
+//   code?: number
+// }
 
 export default function ClientDashboard() {
   const router = useRouter()
   const params = useParams()
   const [clientName, setClientName] = useState("")
   const [clientId, setClientId] = useState("")
-  const [error, setError] = useState<ClientError | null>(null)
+  // Remove the unused error state
+  // const [error, setError] = useState<ClientError | null>(null)
 
   useEffect(() => {
     // Get clientId from params
