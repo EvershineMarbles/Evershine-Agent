@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Package, QrCode, Heart, ShoppingCart } from "lucide-react"
 
-interface ClientError {
-  message: string
-  code?: number
-}
+// Remove the unused interface
+// interface ClientError {
+//   message: string
+//   code?: number
+// }
 
 const ClientDashboard = () => {
   const { clientId } = useParams()
