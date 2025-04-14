@@ -33,11 +33,11 @@ export const agentAPI = {
       } else {
         throw new Error(data.message || "Failed to login")
       }
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
       console.error("Login error:", error)
       return {
         success: false,
-        message: error.message || "An error occurred during login",
+        message: error instanceof Error ? error.message : "An error occurred during login",
       }
     }
   },
@@ -72,9 +72,12 @@ export const agentAPI = {
       } else {
         return { success: false, message: data.message }
       }
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
       console.error("API Error:", error)
-      return { success: false, message: "Failed to register" }
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : "Failed to register",
+      }
     }
   },
   getClients: async () => {

@@ -148,12 +148,13 @@ export default function RegisterClient() {
       } else {
         throw new Error(response.data.message || "Failed to send OTP")
       }
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
       console.error("Error sending OTP:", error)
-      setApiError(error.response?.data?.message || error.message || "Failed to send OTP")
+      const errorResponse = error instanceof Error ? error.message : "Failed to send OTP"
+      setApiError(errorResponse)
       toast({
         title: "Error",
-        description: error.response?.data?.message || error.message || "Failed to send OTP",
+        description: errorResponse,
         variant: "destructive",
       })
     } finally {
@@ -214,12 +215,13 @@ export default function RegisterClient() {
       } else {
         throw new Error(response.data.message || "Failed to verify OTP")
       }
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
       console.error("Error verifying OTP:", error)
-      setApiError(error.response?.data?.message || error.message || "Failed to verify OTP")
+      const errorMessage = error instanceof Error ? error.message : "Failed to verify OTP"
+      setApiError(errorMessage)
       toast({
         title: "Error",
-        description: error.response?.data?.message || error.message || "Invalid OTP. Please try again.",
+        description: errorMessage || "Invalid OTP. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -289,11 +291,12 @@ export default function RegisterClient() {
 
       // Redirect to dashboard
       router.push("/dashboard")
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
       console.error("Error creating client:", error)
+      const errorMessage = error instanceof Error ? error.message : "An error occurred while creating the client"
       toast({
         title: "Error",
-        description: error.message || "An error occurred while creating the client",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {
@@ -397,7 +400,8 @@ export default function RegisterClient() {
               <form onSubmit={handleVerifyOTP} className="space-y-4">
                 <div className="text-center mb-6">
                   <p className="text-muted-foreground">
-                    We've sent a 6-digit OTP to <span className="font-medium text-foreground">{formData.mobile}</span>
+                    We&apos;ve sent a 6-digit OTP to{" "}
+                    <span className="font-medium text-foreground">{formData.mobile}</span>
                   </p>
                 </div>
 
@@ -422,7 +426,7 @@ export default function RegisterClient() {
 
                 <div className="text-center mt-4">
                   <p className="text-sm text-muted-foreground">
-                    Didn't receive OTP?{" "}
+                    Didn&apos;t receive OTP?{" "}
                     <Button
                       variant="link"
                       className="p-0 h-auto text-blue"
@@ -439,10 +443,11 @@ export default function RegisterClient() {
                               description: "A new verification code has been sent to your mobile number",
                             })
                           }
-                        } catch (error: any) {
+                        } catch (error: Error | unknown) {
+                          const errorMessage = error instanceof Error ? error.message : "Failed to resend OTP"
                           toast({
                             title: "Error",
-                            description: error.response?.data?.message || error.message || "Failed to resend OTP",
+                            description: errorMessage,
                             variant: "destructive",
                           })
                         } finally {

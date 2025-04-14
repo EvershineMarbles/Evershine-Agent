@@ -10,7 +10,12 @@ import Link from "next/link"
 
 interface Order {
   orderId: string
-  items: any[]
+  items: {
+    name: string
+    category: string
+    price: number
+    quantity: number
+  }[]
   totalAmount: number
   status: string
   paymentStatus: string
@@ -83,12 +88,13 @@ export default function OrdersPage() {
             setOrders([])
           }
         }
-      } catch (error: any) {
+      } catch (error: Error | unknown) {
+        const errorMessage = error instanceof Error ? error.message : "Failed to load orders. Please try again."
         console.error("Error fetching orders:", error)
-        setError(error.message || "Failed to load orders. Please try again.")
+        setError(errorMessage)
         toast({
           title: "Error",
-          description: error.message || "Failed to load orders. Please try again.",
+          description: errorMessage,
           variant: "destructive",
         })
       } finally {
@@ -174,7 +180,7 @@ export default function OrdersPage() {
         <div className="text-center py-12 bg-muted/20 rounded-lg">
           <Package className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
           <p className="text-xl font-medium mb-4">No orders found</p>
-          <p className="text-muted-foreground mb-6">You haven't placed any orders yet</p>
+          <p className="text-muted-foreground mb-6">You haven&apos;t placed any orders yet</p>
           <Button
             onClick={() => router.push(`/client-dashboard/${clientId}/products`)}
             className="bg-primary hover:bg-primary/90"

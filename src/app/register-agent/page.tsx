@@ -106,9 +106,10 @@ export default function RegisterAgent() {
       } else {
         throw new Error(response.message || "Failed to register agent")
       }
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
       console.error("Registration error:", error)
-      setApiError(error.message || "An error occurred during registration")
+      const errorMessage = error instanceof Error ? error.message : "An error occurred during registration"
+      setApiError(errorMessage)
     } finally {
       setIsLoading(false)
     }

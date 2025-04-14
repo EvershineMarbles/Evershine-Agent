@@ -2,6 +2,18 @@ import axios from "axios"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
+// Define interfaces for the client data
+interface ClientData {
+  name: string
+  mobile: string
+  email?: string
+  city?: string
+  profession?: string
+  address?: string
+  businessName?: string
+  [key: string]: any // For any additional fields
+}
+
 export const clientAPI = {
   // Send OTP to phone number
   sendOTP: async (phoneNumber: string) => {
@@ -18,11 +30,18 @@ export const clientAPI = {
         message: response.data.message,
         formattedPhone,
       }
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
       console.error("Error sending OTP:", error)
+      const errorMessage =
+        axios.isAxiosError(error) && error.response?.data?.message
+          ? error.response.data.message
+          : error instanceof Error
+            ? error.message
+            : "Failed to send OTP"
+
       return {
         success: false,
-        message: error.response?.data?.message || error.message || "Failed to send OTP",
+        message: errorMessage,
       }
     }
   },
@@ -40,17 +59,24 @@ export const clientAPI = {
         message: response.data.message,
         data: response.data.data,
       }
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
       console.error("Error verifying OTP:", error)
+      const errorMessage =
+        axios.isAxiosError(error) && error.response?.data?.message
+          ? error.response.data.message
+          : error instanceof Error
+            ? error.message
+            : "Failed to verify OTP"
+
       return {
         success: false,
-        message: error.response?.data?.message || error.message || "Failed to verify OTP",
+        message: errorMessage,
       }
     }
   },
 
   // Register new client (for agent flow)
-  registerClient: async (clientData: any, agentToken: string) => {
+  registerClient: async (clientData: ClientData, agentToken: string) => {
     try {
       const response = await axios.post(`${API_BASE_URL}/api/create-client`, clientData, {
         headers: {
@@ -64,17 +90,24 @@ export const clientAPI = {
         message: response.data.message || "Client registered successfully",
         data: response.data.data,
       }
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
       console.error("Error registering client:", error)
+      const errorMessage =
+        axios.isAxiosError(error) && error.response?.data?.message
+          ? error.response.data.message
+          : error instanceof Error
+            ? error.message
+            : "Failed to register client"
+
       return {
         success: false,
-        message: error.response?.data?.message || error.message || "Failed to register client",
+        message: errorMessage,
       }
     }
   },
 
   // Update client details
-  updateClientDetails: async (clientData: any, clientToken: string) => {
+  updateClientDetails: async (clientData: Partial<ClientData>, clientToken: string) => {
     try {
       const response = await axios.post(`${API_BASE_URL}/api/update-client`, clientData, {
         headers: {
@@ -88,11 +121,18 @@ export const clientAPI = {
         message: response.data.message || "Client details updated successfully",
         data: response.data.data,
       }
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
       console.error("Error updating client details:", error)
+      const errorMessage =
+        axios.isAxiosError(error) && error.response?.data?.message
+          ? error.response.data.message
+          : error instanceof Error
+            ? error.message
+            : "Failed to update client details"
+
       return {
         success: false,
-        message: error.response?.data?.message || error.message || "Failed to update client details",
+        message: errorMessage,
       }
     }
   },

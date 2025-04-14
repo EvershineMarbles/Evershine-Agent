@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
@@ -31,22 +31,8 @@ export default function Dashboard() {
   const [clients, setClients] = useState<Client[]>([])
   const [showDebug, setShowDebug] = useState(false)
 
-  useEffect(() => {
-    // Check if agent is logged in
-    if (!isAgentAuthenticated()) {
-      router.push("/agent-login")
-      return
-    }
-
-    // Fetch agent email from localStorage
-    const email = localStorage.getItem("agentEmail")
-    setAgentEmail(email)
-
-    // Fetch clients
-    fetchClients()
-  }, [router])
-
-  const fetchClients = async () => {
+  // Wrap fetchClients in useCallback to prevent it from being recreated on every render
+  const fetchClients = useCallback(async () => {
     setIsLoading(true)
     try {
       const response = await agentAPI.getClients()
@@ -72,7 +58,22 @@ export default function Dashboard() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [toast]) // Add toast as a dependency
+
+  useEffect(() => {
+    // Check if agent is logged in
+    if (!isAgentAuthenticated()) {
+      router.push("/agent-login")
+      return
+    }
+
+    // Fetch agent email from localStorage
+    const email = localStorage.getItem("agentEmail")
+    setAgentEmail(email)
+
+    // Fetch clients
+    fetchClients()
+  }, [router, fetchClients]) // Add fetchClients to the dependency array
 
   const handleClientSelect = async (clientId: string) => {
     try {

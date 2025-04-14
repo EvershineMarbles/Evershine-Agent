@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect, useCallback } from "react"
-import { useRouter, useParams } from "next/navigation"
+import { useParams } from "next/navigation"
 import Link from "next/link"
 import { Search, Loader2, Heart, ShoppingCart, AlertCircle } from "lucide-react"
 import Image from "next/image"
@@ -28,7 +28,8 @@ export default function ProductsPage() {
   const params = useParams()
   const clientId = params.clientId as string
 
-  const router = useRouter()
+  // Remove the unused router variable
+  // const router = useRouter()
   const { toast } = useToast()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
@@ -108,9 +109,10 @@ export default function ProductsPage() {
       } else {
         throw new Error(data.msg || "Invalid API response format")
       }
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to load products"
       console.error("Error fetching products:", error)
-      setError(error.message || "Failed to load products")
+      setError(errorMessage)
 
       // Show error toast
       toast({
@@ -244,11 +246,12 @@ export default function ProductsPage() {
         } else {
           throw new Error(data.message || "Failed to add to cart")
         }
-      } catch (error: any) {
+      } catch (error: Error | unknown) {
+        const errorMessage = error instanceof Error ? error.message : "Failed to add item to cart. Please try again."
         console.error("Error adding to cart:", error)
         toast({
           title: "Error adding to cart",
-          description: error.message || "Failed to add item to cart. Please try again.",
+          description: errorMessage,
           variant: "destructive",
         })
       } finally {
