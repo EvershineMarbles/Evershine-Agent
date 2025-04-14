@@ -22,8 +22,8 @@ const ACTION_TYPES = {
   REMOVE_TOAST: "REMOVE_TOAST",
 } as const
 
-// Extract the literal types from the constants
-type ActionType = (typeof ACTION_TYPES)[keyof typeof ACTION_TYPES]
+// We can remove this unused type definition
+// type ActionType = (typeof ACTION_TYPES)[keyof typeof ACTION_TYPES]
 
 let count = 0
 
