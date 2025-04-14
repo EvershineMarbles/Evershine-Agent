@@ -1,6 +1,6 @@
 "use client"
 
-import type * as React from "react"
+import * as React from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { DayPicker } from "react-day-picker"
 
@@ -10,6 +10,21 @@ import { buttonVariants } from "@/components/ui/button"
 export type CalendarProps = React.ComponentProps<typeof DayPicker>
 
 function Calendar({ className, classNames, showOutsideDays = true, ...props }: CalendarProps) {
+  // Create custom navigation components
+  const IconLeft = React.forwardRef<HTMLButtonElement>((props, ref) => (
+    <button ref={ref} {...props} className="p-1">
+      <ChevronLeft className="h-4 w-4" />
+    </button>
+  ))
+  IconLeft.displayName = "IconLeft"
+
+  const IconRight = React.forwardRef<HTMLButtonElement>((props, ref) => (
+    <button ref={ref} {...props} className="p-1">
+      <ChevronRight className="h-4 w-4" />
+    </button>
+  ))
+  IconRight.displayName = "IconRight"
+
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
@@ -43,10 +58,8 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
         day_hidden: "invisible",
         ...classNames,
       }}
-      components={{
-        IconLeft: () => <ChevronLeft className="h-4 w-4" />,
-        IconRight: () => <ChevronRight className="h-4 w-4" />,
-      }}
+      // Alternative approach: don't use the components prop at all
+      // and let the default navigation buttons use our CSS
       {...props}
     />
   )
@@ -54,4 +67,3 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
 Calendar.displayName = "Calendar"
 
 export { Calendar }
-
