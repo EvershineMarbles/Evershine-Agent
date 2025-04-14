@@ -1,71 +1,48 @@
 "use client"
 
 import * as React from "react"
-import { OTPInput, OTPInputContext } from "input-otp"
-import { Dot } from "lucide-react"
+import OtpInput from "react-otp-input"
 
 import { cn } from "@/lib/utils"
 
 const InputOTP = React.forwardRef<
-  React.ElementRef<typeof OTPInput>,
-  React.ComponentPropsWithoutRef<typeof OTPInput>
->(({ className, containerClassName, ...props }, ref) => (
-  <OTPInput
-    ref={ref}
-    containerClassName={cn(
-      "flex items-center gap-2 has-[:disabled]:opacity-50",
-      containerClassName
-    )}
-    className={cn("disabled:cursor-not-allowed", className)}
-    {...props}
-  />
-))
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement> & {
+    value: string
+    onChange: (value: string) => void
+    numInputs?: number
+    renderSeparator?: React.ReactNode
+    renderInput?: (props: any) => React.ReactNode
+    containerStyle?: React.CSSProperties
+    inputStyle?: React.CSSProperties
+  }
+>(
+  (
+    { className, value, onChange, numInputs = 6, renderSeparator, renderInput, containerStyle, inputStyle, ...props },
+    ref,
+  ) => (
+    <div ref={ref} className={cn("flex w-full", className)} {...props}>
+      <OtpInput
+        value={value}
+        onChange={onChange}
+        numInputs={numInputs}
+        renderSeparator={renderSeparator}
+        renderInput={renderInput}
+        containerStyle={containerStyle || { width: "100%", justifyContent: "space-between" }}
+        inputStyle={
+          inputStyle || {
+            width: "40px",
+            height: "40px",
+            margin: "0 4px",
+            fontSize: "16px",
+            borderRadius: "4px",
+            border: "1px solid #d1d5db",
+          }
+        }
+      />
+    </div>
+  ),
+)
 InputOTP.displayName = "InputOTP"
 
-const InputOTPGroup = React.forwardRef<
-  React.ElementRef<"div">,
-  React.ComponentPropsWithoutRef<"div">
->(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("flex items-center", className)} {...props} />
-))
-InputOTPGroup.displayName = "InputOTPGroup"
-
-const InputOTPSlot = React.forwardRef<
-  React.ElementRef<"div">,
-  React.ComponentPropsWithoutRef<"div"> & { index: number }
->(({ index, className, ...props }, ref) => {
-  const inputOTPContext = React.useContext(OTPInputContext)
-  const { char, hasFakeCaret, isActive } = inputOTPContext.slots[index]
-
-  return (
-    <div
-      ref={ref}
-      className={cn(
-        "relative flex h-10 w-10 items-center justify-center border-y border-r border-input text-sm transition-all first:rounded-l-md first:border-l last:rounded-r-md",
-        isActive && "z-10 ring-2 ring-ring ring-offset-background",
-        className
-      )}
-      {...props}
-    >
-      {char}
-      {hasFakeCaret && (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div className="h-4 w-px animate-caret-blink bg-foreground duration-1000" />
-        </div>
-      )}
-    </div>
-  )
-})
-InputOTPSlot.displayName = "InputOTPSlot"
-
-const InputOTPSeparator = React.forwardRef<
-  React.ElementRef<"div">,
-  React.ComponentPropsWithoutRef<"div">
->(({ ...props }, ref) => (
-  <div ref={ref} role="separator" {...props}>
-    <Dot />
-  </div>
-))
-InputOTPSeparator.displayName = "InputOTPSeparator"
-
-export { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator }
+export { InputOTP }
