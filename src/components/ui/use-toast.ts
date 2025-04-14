@@ -14,19 +14,16 @@ type ToasterToast = ToastProps & {
   action?: ToastActionElement
 }
 
-// Convert actionTypes from a value to a type
-type ActionTypes = {
-  ADD_TOAST: "ADD_TOAST"
-  UPDATE_TOAST: "UPDATE_TOAST"
-  DISMISS_TOAST: "DISMISS_TOAST"
-  REMOVE_TOAST: "REMOVE_TOAST"
-}
+// Define action type constants as a const assertion for type safety
+const ACTION_TYPES = {
+  ADD_TOAST: "ADD_TOAST",
+  UPDATE_TOAST: "UPDATE_TOAST",
+  DISMISS_TOAST: "DISMISS_TOAST",
+  REMOVE_TOAST: "REMOVE_TOAST",
+} as const
 
-// Define the action type constants
-const ADD_TOAST = "ADD_TOAST"
-const UPDATE_TOAST = "UPDATE_TOAST"
-const DISMISS_TOAST = "DISMISS_TOAST"
-const REMOVE_TOAST = "REMOVE_TOAST"
+// Extract the literal types from the constants
+type ActionType = (typeof ACTION_TYPES)[keyof typeof ACTION_TYPES]
 
 let count = 0
 
@@ -37,19 +34,19 @@ function genId() {
 
 type Action =
   | {
-      type: "ADD_TOAST"
+      type: typeof ACTION_TYPES.ADD_TOAST
       toast: ToasterToast
     }
   | {
-      type: "UPDATE_TOAST"
+      type: typeof ACTION_TYPES.UPDATE_TOAST
       toast: Partial<ToasterToast>
     }
   | {
-      type: "DISMISS_TOAST"
+      type: typeof ACTION_TYPES.DISMISS_TOAST
       toastId?: string
     }
   | {
-      type: "REMOVE_TOAST"
+      type: typeof ACTION_TYPES.REMOVE_TOAST
       toastId?: string
     }
 
@@ -61,19 +58,19 @@ const toastTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
 
 const reducer = (state: State, action: Action): State => {
   switch (action.type) {
-    case ADD_TOAST:
+    case ACTION_TYPES.ADD_TOAST:
       return {
         ...state,
         toasts: [action.toast, ...state.toasts].slice(0, TOAST_LIMIT),
       }
 
-    case UPDATE_TOAST:
+    case ACTION_TYPES.UPDATE_TOAST:
       return {
         ...state,
         toasts: state.toasts.map((t) => (t.id === action.toast.id ? { ...t, ...action.toast } : t)),
       }
 
-    case DISMISS_TOAST: {
+    case ACTION_TYPES.DISMISS_TOAST: {
       const { toastId } = action
 
       // ! Side effects ! - This could be extracted into a dismissToast() action,
@@ -98,7 +95,7 @@ const reducer = (state: State, action: Action): State => {
         ),
       }
     }
-    case REMOVE_TOAST:
+    case ACTION_TYPES.REMOVE_TOAST:
       if (action.toastId === undefined) {
         return {
           ...state,
@@ -130,13 +127,13 @@ function toast({ ...props }: Toast) {
 
   const update = (props: ToasterToast) =>
     dispatch({
-      type: UPDATE_TOAST,
+      type: ACTION_TYPES.UPDATE_TOAST,
       toast: { ...props, id },
     })
-  const dismiss = () => dispatch({ type: DISMISS_TOAST, toastId: id })
+  const dismiss = () => dispatch({ type: ACTION_TYPES.DISMISS_TOAST, toastId: id })
 
   dispatch({
-    type: ADD_TOAST,
+    type: ACTION_TYPES.ADD_TOAST,
     toast: {
       ...props,
       id,
@@ -170,7 +167,7 @@ function useToast() {
   return {
     ...state,
     toast,
-    dismiss: (toastId?: string) => dispatch({ type: DISMISS_TOAST, toastId }),
+    dismiss: (toastId?: string) => dispatch({ type: ACTION_TYPES.DISMISS_TOAST, toastId }),
   }
 }
 
@@ -182,7 +179,7 @@ function addToRemoveQueue(toastId: string) {
   const timeout = setTimeout(() => {
     toastTimeouts.delete(toastId)
     dispatch({
-      type: REMOVE_TOAST,
+      type: ACTION_TYPES.REMOVE_TOAST,
       toastId,
     })
   }, TOAST_REMOVE_DELAY)

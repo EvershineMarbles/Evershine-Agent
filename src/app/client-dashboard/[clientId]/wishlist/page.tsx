@@ -65,9 +65,10 @@ export default function WishlistPage() {
           setWishlistItems(items)
         }
       } catch (error: Error | unknown) {
-        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
+        // Use the error message directly in the toast instead of storing it in an unused variable
+        const message = error instanceof Error ? error.message : "An unknown error occurred"
         console.error("Error fetching wishlist items:", error)
-        toast.error("Failed to load wishlist items")
+        toast.error(`Failed to load wishlist items: ${message}`)
       } finally {
         setLoading(false)
       }

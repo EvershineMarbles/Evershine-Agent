@@ -10,7 +10,6 @@ import { ArrowLeft, Users, Package, Bell, Settings, LogOut, UserPlus, Loader2 } 
 import { agentAPI } from "@/lib/api-utils"
 import { isAgentAuthenticated, storeClientImpersonationToken, clearAllTokens } from "@/lib/auth-utils"
 import { useToast } from "@/components/ui/use-toast"
-import DebugPanel from "@/components/debug-panel"
 
 // Define client interface
 interface Client {
@@ -145,11 +144,6 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {showDebug && (
-        <div className="container mx-auto mt-4">
-          <DebugPanel />
-        </div>
-      )}
 
       <main className="container mx-auto py-8 px-4">
         <div className="flex justify-between items-center mb-8">

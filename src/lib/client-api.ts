@@ -11,7 +11,8 @@ interface ClientData {
   profession?: string
   address?: string
   businessName?: string
-  [key: string]: any // For any additional fields
+  // Replace 'any' with a more specific type for additional fields
+  [key: string]: string | number | boolean | undefined
 }
 
 export const clientAPI = {
