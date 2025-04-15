@@ -217,7 +217,7 @@ export default function ProductsPage() {
         const responseText = await response.text()
         console.log("Response text:", responseText)
 
-        // Try to parse the response as JSON
+        // Try to parse the response a JSON
         let data
         try {
           data = JSON.parse(responseText)
