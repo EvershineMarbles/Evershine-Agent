@@ -160,7 +160,7 @@ export default function ProductsPage() {
   // Add to cart function
   const addToCart = useCallback(
     async (e: React.MouseEvent, productId: string, productName: string) => {
-      e.preventDefault() // Prevent navigation
+      e.preventDefault() // Prevent navigatio
 
       if (cart.includes(productId)) {
         toast({
