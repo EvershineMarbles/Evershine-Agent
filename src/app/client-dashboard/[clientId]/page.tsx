@@ -25,7 +25,7 @@ const ClientDashboard = () => {
       setLoading(true)
       try {
         // Replace with your actual API endpoint
-        const response = await fetch(`/api/clients/${clientId}`)
+        const response = await fetch(`https://evershinebackend-2.onrender.com/api/clients/${clientId}`)
 
         if (!response.ok) {
           throw new Error(`Failed to fetch client data: ${response.status}`)
