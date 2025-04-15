@@ -132,7 +132,7 @@ export default function RegisterClient() {
       const phoneNumber = formData.mobile.startsWith("+") ? formData.mobile : `+91${formData.mobile}` // Assuming India country code, adjust as needed
 
       // Call the OTP send API
-      const response = await axios.post("http://localhost:8000/api/otp/send", {
+      const response = await axios.post("https://evershinebackend-2.onrender.com/api/otp/send", {
         phoneNumber,
       })
 
