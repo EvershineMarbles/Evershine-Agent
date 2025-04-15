@@ -182,7 +182,7 @@ export default function RegisterClient() {
 
     try {
       // Call the OTP verify API
-      const response = await axios.post("http://localhost:8000/api/otp/verify", {
+      const response = await axios.post("https://evershinebackend-2.onrender.com/api/otp/verify", {
         phoneNumber: formattedPhone,
         otp: otpValue,
       })
@@ -260,7 +260,7 @@ export default function RegisterClient() {
       }
 
       // Make the API request with fetch instead of axios
-      const response = await fetch("http://localhost:8000/api/create-client", {
+      const response = await fetch("https://evershinebackend-2.onrender.com/api/create-client", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -433,7 +433,7 @@ export default function RegisterClient() {
                       onClick={async () => {
                         try {
                           setIsSubmitting(true)
-                          const response = await axios.post("http://localhost:8000/api/otp/send", {
+                          const response = await axios.post("https://evershinebackend-2.onrender.com/api/otp/send", {
                             phoneNumber: formattedPhone,
                           })
 

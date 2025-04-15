@@ -54,7 +54,7 @@ export default function OrdersPage() {
 
         console.log("Fetching orders with token:", token.substring(0, 15) + "...")
 
-        const response = await fetch(`http://localhost:8000/api/clients/${clientId}/orders`, {
+        const response = await fetch(`https://evershinebackend-2.onrender.com/api/clients/${clientId}/orders`, {
           method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,

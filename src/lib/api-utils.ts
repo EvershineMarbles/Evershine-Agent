@@ -2,7 +2,7 @@ export const agentAPI = {
   login: async (email: string, password: string) => {
     try {
       console.log("Logging in agent:", { email })
-      const response = await fetch("http://localhost:8000/api/agentLogin", {
+      const response = await fetch("https://evershinebackend-2.onrender.com/api/agentLogin", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -43,7 +43,7 @@ export const agentAPI = {
   },
   register: async (name: string, email: string, password: string) => {
     try {
-      const response = await fetch("http://localhost:8000/api/create-agent", {
+      const response = await fetch("https://evershinebackend-2.onrender.com/api/create-agent", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -90,7 +90,7 @@ export const agentAPI = {
       }
 
       // Change this URL to match your backend route
-      const response = await fetch("http://localhost:8000/api/agent/clients", {
+      const response = await fetch("https://evershinebackend-2.onrender.com/api/agent/clients", {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -126,7 +126,7 @@ export const agentAPI = {
       console.log(`Making API request to impersonate client ${clientId}`)
 
       // Change the endpoint to match your backend route
-      const response = await fetch(`http://localhost:8000/api/agent/impersonate/${clientId}`, {
+      const response = await fetch(`https://evershinebackend-2.onrender.com/api/agent/impersonate/${clientId}`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
