@@ -192,7 +192,7 @@ export default function ProductsPage() {
 
         console.log("Using token:", token.substring(0, 15) + "...")
         console.log("Full request details:", {
-          url: "http://localhost:8000/api/addToCart",
+          url: "https://evershinebackend-2.onrender.com/api/addToCart",
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -202,7 +202,7 @@ export default function ProductsPage() {
         })
 
         // Make a direct fetch request with the token
-        const response = await fetch("http://localhost:8000/api/addToCart", {
+        const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
