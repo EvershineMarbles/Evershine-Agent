@@ -1,48 +1,28 @@
 "use client"
 
 import * as React from "react"
-import OtpInput from "react-otp-input"
 
-import { cn } from "@/lib/utils"
+// Simple stub components that can be imported but don't do anything
+// This prevents import errors in files that might be using the OTP component
 
-const InputOTP = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement> & {
-    value: string
-    onChange: (value: string) => void
-    numInputs?: number
-    renderSeparator?: React.ReactNode
-    renderInput?: (props: any) => React.ReactNode
-    containerStyle?: React.CSSProperties
-    inputStyle?: React.CSSProperties
-  }
->(
-  (
-    { className, value, onChange, numInputs = 6, renderSeparator, renderInput, containerStyle, inputStyle, ...props },
-    ref,
-  ) => (
-    <div ref={ref} className={cn("flex w-full", className)} {...props}>
-      <OtpInput
-        value={value}
-        onChange={onChange}
-        numInputs={numInputs}
-        renderSeparator={renderSeparator}
-        renderInput={renderInput}
-        containerStyle={containerStyle || { width: "100%", justifyContent: "space-between" }}
-        inputStyle={
-          inputStyle || {
-            width: "40px",
-            height: "40px",
-            margin: "0 4px",
-            fontSize: "16px",
-            borderRadius: "4px",
-            border: "1px solid #d1d5db",
-          }
-        }
-      />
-    </div>
-  ),
-)
+const InputOTP = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>((props, ref) => {
+  return <div ref={ref} {...props} />
+})
 InputOTP.displayName = "InputOTP"
 
-export { InputOTP }
+const InputOTPGroup = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>((props, ref) => {
+  return <div ref={ref} {...props} />
+})
+InputOTPGroup.displayName = "InputOTPGroup"
+
+const InputOTPSlot = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>((props, ref) => {
+  return <div ref={ref} {...props} />
+})
+InputOTPSlot.displayName = "InputOTPSlot"
+
+const InputOTPSeparator = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>((props, ref) => {
+  return <div ref={ref} {...props} />
+})
+InputOTPSeparator.displayName = "InputOTPSeparator"
+
+export { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator }
