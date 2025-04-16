@@ -1,171 +1,137 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useParams, useRouter } from "next/navigation"
-import Link from "next/link"
+import { useParams } from "next/navigation"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Package, QrCode, Heart, ShoppingCart } from "lucide-react"
+import { Loader2, AlertCircle } from "lucide-react"
+import { useToast } from "@/components/ui/use-toast"
 
-// Remove the unused interface
-// interface ClientError {
-//   message: string
-//   code?: number
-// }
-
-const ClientDashboard = () => {
-  const { clientId } = useParams()
-  const [clientName, setClientName] = useState<string | null>(null)
+export default function ClientDashboard() {
+  const params = useParams()
+  const { toast } = useToast()
+  const clientId = params.clientId as string
+  const [clientData, setClientData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const router = useRouter()
 
   useEffect(() => {
     const fetchClientData = async () => {
       setLoading(true)
       try {
-        // Replace with your actual API endpoint
-        const response = await fetch(`https://evershinebackend-2.onrender.com/api/clients/${clientId}`)
+        // Get the token
+        const token = localStorage.getItem("clientImpersonationToken")
+
+        if (!token) {
+          throw new Error("No authentication token found. Please refresh the page and try again.")
+        }
+
+        // Use the correct API endpoint
+        const response = await fetch(`https://evershinebackend-2.onrender.com/api/getClientDetails/${clientId}`, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        })
 
         if (!response.ok) {
-          throw new Error(`Failed to fetch client data: ${response.status}`)
+          if (response.status === 404) {
+            throw new Error("Client not found. Please check the client ID.")
+          } else if (response.status === 401) {
+            throw new Error("Authentication failed. Please refresh the token and try again.")
+          } else {
+            throw new Error(`API error: ${response.status} ${response.statusText}`)
+          }
         }
 
         const data = await response.json()
-        setClientName(data.name) // Assuming the API returns a 'name' field
-      } catch (err: Error | unknown) {
-        // Handle the error properly by checking its type
-        const errorMessage = err instanceof Error ? err.message : "An error occurred while fetching client data."
+
+        if (data.data) {
+          setClientData(data.data)
+        } else {
+          throw new Error("Invalid response format from server")
+        }
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
+        console.error("Error fetching client data:", error)
         setError(errorMessage)
+        toast({
+          title: "Error",
+          description: errorMessage,
+          variant: "destructive",
+        })
       } finally {
         setLoading(false)
       }
     }
 
-    if (clientId) {
-      fetchClientData()
-    } else {
-      setError("Client ID is missing.")
-      setLoading(false)
-    }
-  }, [clientId])
+    fetchClientData()
+  }, [clientId, toast])
 
   if (loading) {
-    return <div>Loading client data...</div>
+    return (
+      <div className="flex flex-col items-center justify-center h-[80vh]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+        <p className="text-muted-foreground">Loading client data...</p>
+      </div>
+    )
   }
 
   if (error) {
-    return <div>Error: {error}</div>
+    return (
+      <div className="p-6 md:p-8">
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="p-6 flex flex-col items-center">
+            <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
+            <h2 className="text-xl font-semibold text-red-800 mb-2">Error Loading Client Data</h2>
+            <p className="text-red-700 mb-4 text-center">{error}</p>
+            <Button onClick={() => window.location.reload()} className="bg-red-600 hover:bg-red-700 text-white">
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
     <div className="p-6 md:p-8">
-      <h1 className="text-3xl font-bold mb-8">Welcome to {clientName || "Client"}&apos;s Dashboard</h1>
+      <h1 className="text-3xl font-bold mb-8">Welcome to {clientData?.name || "Client"}&apos;s Dashboard</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Link href={`/client-dashboard/${clientId}/products`}>
-          <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
-            <CardHeader className="pb-2">
-              <Package className="h-8 w-8 text-blue mb-2" />
-              <CardTitle>Products</CardTitle>
-              <CardDescription>Browse all available products</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full bg-blue hover:bg-blue/90 mt-2">View Products</Button>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <Link href={`/client-dashboard/${clientId}/scan`}>
-          <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
-            <CardHeader className="pb-2">
-              <QrCode className="h-8 w-8 text-blue mb-2" />
-              <CardTitle>Scan Products</CardTitle>
-              <CardDescription>Scan QR codes to view products</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full bg-blue hover:bg-blue/90 mt-2">Scan Now</Button>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <Link href={`/client-dashboard/${clientId}/wishlist`}>
-          <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
-            <CardHeader className="pb-2">
-              <Heart className="h-8 w-8 text-blue mb-2" />
-              <CardTitle>Wishlist</CardTitle>
-              <CardDescription>View your saved products</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full bg-blue hover:bg-blue/90 mt-2">View Wishlist</Button>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <Link href={`/client-dashboard/${clientId}/cart`}>
-          <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
-            <CardHeader className="pb-2">
-              <ShoppingCart className="h-8 w-8 text-blue mb-2" />
-              <CardTitle>Cart</CardTitle>
-              <CardDescription>View your cart and checkout</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full bg-blue hover:bg-blue/90 mt-2">View Cart</Button>
-            </CardContent>
-          </Card>
-        </Link>
-      </div>
-
-      <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <Card>
-          <CardHeader>
-            <CardTitle>Recent Orders</CardTitle>
-            <CardDescription>Your latest orders</CardDescription>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">Client Information</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-center py-8 text-muted-foreground">No recent orders found</div>
+            <dl className="space-y-2">
+              <div>
+                <dt className="text-sm text-muted-foreground">Name</dt>
+                <dd className="font-medium">{clientData?.name || "N/A"}</dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted-foreground">Mobile</dt>
+                <dd className="font-medium">{clientData?.mobile || "N/A"}</dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted-foreground">Email</dt>
+                <dd className="font-medium">{clientData?.email || "N/A"}</dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted-foreground">City</dt>
+                <dd className="font-medium">{clientData?.city || "N/A"}</dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted-foreground">Profession</dt>
+                <dd className="font-medium">{clientData?.profession || "N/A"}</dd>
+              </div>
+            </dl>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Action</CardTitle>
-            <CardDescription>Frequently used actions</CardDescription>
-          </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4">
-            <Button
-              className="bg-blue hover:bg-blue/90"
-              onClick={() => router.push(`/client-dashboard/${clientId}/cart`)}
-            >
-              <ShoppingCart className="h-4 w-4 mr-2" />
-              View Cart
-            </Button>
-            <Button
-              className="bg-blue hover:bg-blue/90"
-              onClick={() => router.push(`/client-dashboard/${clientId}/wishlist`)}
-            >
-              <Heart className="h-4 w-4 mr-2" />
-              Wishlist
-            </Button>
-            <Button
-              className="bg-blue hover:bg-blue/90"
-              onClick={() => router.push(`/client-dashboard/${clientId}/scan`)}
-            >
-              <QrCode className="h-4 w-4 mr-2" />
-              Scan QR
-            </Button>
-            <Button
-              className="bg-blue hover:bg-blue/90"
-              onClick={() => router.push(`/client-dashboard/${clientId}/products`)}
-            >
-              <Package className="h-4 w-4 mr-2" />
-              Products
-            </Button>
-          </CardContent>
-        </Card>
+        {/* Additional dashboard cards can be added here */}
       </div>
     </div>
   )
 }
-
-export default ClientDashboard
