@@ -131,24 +131,80 @@ export default function ProductsPage() {
     fetchProducts()
   }, [fetchProducts])
 
-  // Toggle wishlist function
+  // Update the toggleWishlist function to make an API call instead of just updating local state
   const toggleWishlist = useCallback(
-    (e: React.MouseEvent, productId: string) => {
+    async (e: React.MouseEvent, productId: string) => {
       e.preventDefault() // Prevent navigation
 
-      if (wishlist.includes(productId)) {
-        setWishlist((prev) => prev.filter((id) => id !== productId))
+      try {
+        // Get the token
+        const token = localStorage.getItem("clientImpersonationToken")
+
+        if (!token) {
+          throw new Error("No authentication token found. Please refresh the token using the debug panel above")
+        }
+
+        if (wishlist.includes(productId)) {
+          // Remove from wishlist
+          const response = await fetch("https://evershinebackend-2.onrender.com/api/deleteUserWishlistItem", {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ productId }),
+          })
+
+          if (!response.ok) {
+            throw new Error(`API error: ${response.status} ${response.statusText}`)
+          }
+
+          const data = await response.json()
+
+          if (data.success) {
+            setWishlist((prev) => prev.filter((id) => id !== productId))
+            toast({
+              title: "Removed from wishlist",
+              description: "Item has been removed from your wishlist",
+              variant: "default",
+            })
+          } else {
+            throw new Error(data.message || "Failed to remove from wishlist")
+          }
+        } else {
+          // Add to wishlist
+          const response = await fetch("https://evershinebackend-2.onrender.com/api/addToWishlist", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ productId }),
+          })
+
+          if (!response.ok) {
+            throw new Error(`API error: ${response.status} ${response.statusText}`)
+          }
+
+          const data = await response.json()
+
+          if (data.success) {
+            setWishlist((prev) => [...prev, productId])
+            toast({
+              title: "Added to wishlist",
+              description: "Item has been added to your wishlist",
+              variant: "default",
+            })
+          } else {
+            throw new Error(data.message || "Failed to add to wishlist")
+          }
+        }
+      } catch (error: any) {
+        console.error("Error updating wishlist:", error)
         toast({
-          title: "Removed from wishlist",
-          description: "Item has been removed from your wishlist",
-          variant: "default",
-        })
-      } else {
-        setWishlist((prev) => [...prev, productId])
-        toast({
-          title: "Added to wishlist",
-          description: "Item has been added to your wishlist",
-          variant: "default",
+          title: "Error",
+          description: error.message || "Failed to update wishlist. Please try again.",
+          variant: "destructive",
         })
       }
     },

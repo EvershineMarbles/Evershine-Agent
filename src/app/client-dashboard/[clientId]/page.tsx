@@ -174,22 +174,78 @@ export default function ClientDashboard() {
   }, [wishlist, cart])
 
   // Toggle wishlist function
-  const toggleWishlist = (e: React.MouseEvent, productId: string) => {
+  const toggleWishlist = async (e: React.MouseEvent, productId: string) => {
     e.preventDefault() // Prevent navigation
 
-    if (wishlist.includes(productId)) {
-      setWishlist((prev) => prev.filter((id) => id !== productId))
+    try {
+      // Get the token
+      const token = localStorage.getItem("clientImpersonationToken")
+
+      if (!token) {
+        throw new Error("No authentication token found. Please refresh the token and try again.")
+      }
+
+      if (wishlist.includes(productId)) {
+        // Remove from wishlist
+        const response = await fetch("https://evershinebackend-2.onrender.com/api/deleteUserWishlistItem", {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ productId }),
+        })
+
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status} ${response.statusText}`)
+        }
+
+        const data = await response.json()
+
+        if (data.success) {
+          setWishlist((prev) => prev.filter((id) => id !== productId))
+          toast({
+            title: "Removed from wishlist",
+            description: "Item has been removed from your wishlist",
+            variant: "default",
+          })
+        } else {
+          throw new Error(data.message || "Failed to remove from wishlist")
+        }
+      } else {
+        // Add to wishlist
+        const response = await fetch("https://evershinebackend-2.onrender.com/api/addToWishlist", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ productId }),
+        })
+
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status} ${response.statusText}`)
+        }
+
+        const data = await response.json()
+
+        if (data.success) {
+          setWishlist((prev) => [...prev, productId])
+          toast({
+            title: "Added to wishlist",
+            description: "Item has been added to your wishlist",
+            variant: "default",
+          })
+        } else {
+          throw new Error(data.message || "Failed to add to wishlist")
+        }
+      }
+    } catch (error: any) {
+      console.error("Error updating wishlist:", error)
       toast({
-        title: "Removed from wishlist",
-        description: "Item has been removed from your wishlist",
-        variant: "default",
-      })
-    } else {
-      setWishlist((prev) => [...prev, productId])
-      toast({
-        title: "Added to wishlist",
-        description: "Item has been added to your wishlist",
-        variant: "default",
+        title: "Error",
+        description: error.message || "Failed to update wishlist. Please try again.",
+        variant: "destructive",
       })
     }
   }
@@ -357,6 +413,84 @@ export default function ClientDashboard() {
             </Link>
           </div>
         </div>
+
+        <Button
+          onClick={handleScanQrCode}
+          className="w-full md:w-auto bg-blue-700 hover:bg-blue-800 flex items-center justify-center gap-2"
+        >
+          <QrCode className="h-5 w-5" />
+          <span>Scan QR code</span>
+        </Button>
+      </div>
+
+      {/* Client Information Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-100">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Package className="h-5 w-5 text-blue-600" />
+              Quick Actions
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="outline" size="sm" onClick={() => router.push(`/client-dashboard/${clientId}/products`)}>
+                Browse Products
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => router.push(`/client-dashboard/${clientId}/orders`)}>
+                View Orders
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => router.push(`/client-dashboard/${clientId}/wishlist`)}>
+                My Wishlist
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => router.push(`/client-dashboard/${clientId}/settings`)}>
+                Settings
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-amber-50 to-orange-50 border-amber-100">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">Your Profile</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <dl className="space-y-1 text-sm">
+              <div className="flex justify-between">
+                <dt className="text-muted-foreground">Name:</dt>
+                <dd className="font-medium">{clientData?.name || "N/A"}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-muted-foreground">Mobile:</dt>
+                <dd className="font-medium">{clientData?.mobile || "N/A"}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-muted-foreground">City:</dt>
+                <dd className="font-medium">{clientData?.city || "N/A"}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-muted-foreground">Profession:</dt>
+                <dd className="font-medium">{clientData?.profession || "N/A"}</dd>
+              </div>
+            </dl>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-100">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">Cart Summary</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-4">You have {cart.length} item(s) in your cart</p>
+            <Button
+              className="w-full"
+              variant={cart.length > 0 ? "default" : "outline"}
+              onClick={() => router.push(`/client-dashboard/${clientId}/cart`)}
+            >
+              {cart.length > 0 ? "View Cart" : "Browse Products"}
+            </Button>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Products Section */}
@@ -406,6 +540,7 @@ export default function ClientDashboard() {
                     alt={product.name}
                     fill
                     className="object-cover transition-transform group-hover:scale-105 duration-300"
+                    unoptimized={true}
                   />
 
                   {/* Wishlist button overlay */}

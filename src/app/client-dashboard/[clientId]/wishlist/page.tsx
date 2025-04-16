@@ -1,14 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowLeft, Trash2, Loader2, Heart, ShoppingCart } from "lucide-react"
+import { ArrowLeft, Trash2, Loader2, Heart, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Card, CardContent } from "@/components/ui/card"
 
 interface WishlistItem {
   _id: string
@@ -19,6 +18,8 @@ interface WishlistItem {
   category: string
   quantity: number
   description?: string
+  applicationAreas?: string[]
+  quantityAvailable?: number
 }
 
 export default function WishlistPage() {
@@ -32,6 +33,29 @@ export default function WishlistPage() {
   const [removing, setRemoving] = useState<Record<string, boolean>>({})
   const [addingToCart, setAddingToCart] = useState<Record<string, boolean>>({})
   const [error, setError] = useState<string | null>(null)
+  const [imageError, setImageError] = useState<Record<string, boolean>>({})
+  const [cart, setCart] = useState<string[]>([])
+
+  // Load cart from localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const savedCart = localStorage.getItem("cart")
+        if (savedCart) {
+          setCart(JSON.parse(savedCart))
+        }
+      } catch (e) {
+        console.error("Error loading cart from localStorage:", e)
+      }
+    }
+  }, [])
+
+  // Save cart to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("cart", JSON.stringify(cart))
+    }
+  }, [cart])
 
   // Fetch wishlist items
   useEffect(() => {
@@ -66,23 +90,29 @@ export default function WishlistPage() {
 
         const data = await response.json()
 
-        if (data.data) {
-          // Filter out any items with null or undefined postId
-          const validItems = (data.data.items || []).filter(
-            (item: WishlistItem) => item.postId && typeof item.postId === "string",
-          )
-          setWishlistItems(validItems)
+        if (data.data && data.data.items) {
+          // Process the image URLs to ensure they're valid
+          const processedItems = data.data.items.map((item: WishlistItem) => ({
+            ...item,
+            image:
+              Array.isArray(item.image) && item.image.length > 0
+                ? item.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
+                : ["/placeholder.svg?height=300&width=300"],
+          }))
 
-          // Check if any items were filtered out
-          if (validItems.length < (data.data.items || []).length) {
-            console.warn("Some items were filtered out due to missing postId")
-          }
+          setWishlistItems(processedItems)
         } else {
           setWishlistItems([])
         }
       } catch (error: any) {
         console.error("Error fetching wishlist:", error)
         setError(error.message || "Failed to load your wishlist. Please try again.")
+        toast({
+          title: "Error",
+          description: error.message || "Failed to load your wishlist. Please try again.",
+          variant: "destructive",
+        })
+        setWishlistItems([])
       } finally {
         setLoading(false)
       }
@@ -100,7 +130,7 @@ export default function WishlistPage() {
       const token = localStorage.getItem("clientImpersonationToken")
 
       if (!token) {
-        throw new Error("No authentication token found. Please refresh the token and try again.")
+        throw new Error("No authentication token found. Please refresh the page and try again.")
       }
 
       const response = await fetch("https://evershinebackend-2.onrender.com/api/deleteUserWishlistItem", {
@@ -157,6 +187,15 @@ export default function WishlistPage() {
 
   // Add to cart function
   const addToCart = async (productId: string, productName: string) => {
+    if (cart.includes(productId)) {
+      toast({
+        title: "Already in cart",
+        description: "This item is already in your cart",
+        variant: "default",
+      })
+      return
+    }
+
     try {
       setAddingToCart((prev) => ({ ...prev, [productId]: true }))
 
@@ -164,10 +203,9 @@ export default function WishlistPage() {
       const token = localStorage.getItem("clientImpersonationToken")
 
       if (!token) {
-        throw new Error("No authentication token found. Please refresh the token and try again.")
+        throw new Error("No authentication token found. Please refresh the page and try again.")
       }
 
-      // Make a direct fetch request with the token
       const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
         method: "POST",
         headers: {
@@ -215,16 +253,7 @@ export default function WishlistPage() {
           description: `${productName} has been added to your cart`,
           variant: "default",
         })
-
-        // Update localStorage cart
-        if (typeof window !== "undefined") {
-          const savedCart = localStorage.getItem("cart")
-          const cartArray = savedCart ? JSON.parse(savedCart) : []
-          if (!cartArray.includes(productId)) {
-            cartArray.push(productId)
-            localStorage.setItem("cart", JSON.stringify(cartArray))
-          }
-        }
+        setCart((prev) => [...prev, productId])
       } else {
         throw new Error(data.message || "Failed to add to cart")
       }
@@ -239,6 +268,11 @@ export default function WishlistPage() {
       setAddingToCart((prev) => ({ ...prev, [productId]: false }))
     }
   }
+
+  // Handle image loading errors
+  const handleImageError = useCallback((itemId: string) => {
+    setImageError((prev) => ({ ...prev, [itemId]: true }))
+  }, [])
 
   if (loading) {
     return (
@@ -260,6 +294,7 @@ export default function WishlistPage() {
 
       {error && (
         <Alert variant="destructive" className="mb-6">
+          <AlertCircle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
@@ -268,7 +303,7 @@ export default function WishlistPage() {
         <div className="text-center py-12 bg-muted/20 rounded-lg">
           <Heart className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
           <p className="text-xl font-medium mb-4">Your wishlist is empty</p>
-          <p className="text-muted-foreground mb-6">Add some products to your wishlist to see them here</p>
+          <p className="text-muted-foreground mb-6">Save items you like to your wishlist</p>
           <Button
             onClick={() => router.push(`/client-dashboard/${clientId}/products`)}
             className="bg-primary hover:bg-primary/90"
@@ -277,57 +312,83 @@ export default function WishlistPage() {
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {wishlistItems.map((item) => (
-            <Card key={item._id || item.postId} className="overflow-hidden">
-              <div className="relative aspect-video">
+            <div
+              key={item._id || item.postId}
+              className="group relative bg-card rounded-lg overflow-hidden border border-border hover:border-primary transition-all hover:shadow-md"
+            >
+              <div className="relative aspect-square">
                 <Image
-                  src={item.image && item.image.length > 0 ? item.image[0] : "/placeholder.svg?height=300&width=300"}
+                  src={
+                    imageError[item._id]
+                      ? "/placeholder.svg?height=300&width=300"
+                      : item.image && item.image.length > 0 && item.image[0]
+                        ? item.image[0]
+                        : "/placeholder.svg?height=300&width=300"
+                  }
                   alt={item.name}
                   fill
-                  className="object-cover"
+                  className="object-cover transition-transform group-hover:scale-105 duration-300"
+                  onError={() => handleImageError(item._id)}
+                  unoptimized={true}
                 />
-              </div>
-              <CardContent className="p-4">
-                <div className="flex flex-col h-full">
-                  <div>
-                    <h3 className="font-semibold text-lg mb-1">{item.name}</h3>
-                    <p className="text-sm text-muted-foreground mb-2">{item.category}</p>
-                    <p className="text-lg font-bold mb-4">₹{item.price.toLocaleString()}</p>
-                  </div>
 
-                  <div className="flex gap-2 mt-auto">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => addToCart(item.postId, item.name)}
-                      disabled={addingToCart[item.postId]}
-                    >
-                      {addingToCart[item.postId] ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      ) : (
-                        <ShoppingCart className="h-4 w-4 mr-2" />
-                      )}
-                      Add to Cart
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                      onClick={() => removeFromWishlist(item.postId)}
-                      disabled={removing[item.postId]}
-                    >
-                      {removing[item.postId] ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                {/* Remove button overlay */}
+                <button
+                  onClick={() => removeFromWishlist(item.postId)}
+                  disabled={removing[item.postId]}
+                  className="absolute top-2 right-2 p-2 rounded-full bg-white/80 hover:bg-white transition-colors z-10 text-red-500 hover:text-red-700"
+                  aria-label="Remove from wishlist"
+                  type="button"
+                >
+                  {removing[item.postId] ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
+
+              <div className="p-4">
+                <h3 className="font-semibold text-lg text-foreground line-clamp-1">{item.name}</h3>
+                <p className="text-lg font-bold mt-2">₹{item.price.toLocaleString()}</p>
+                <p className="text-sm text-muted-foreground mt-1">{item.category}</p>
+
+                {item.quantityAvailable !== undefined && (
+                  <p className="text-sm mt-1">
+                    {item.quantityAvailable > 0 ? `In stock: ${item.quantityAvailable}` : "Out of stock"}
+                  </p>
+                )}
+
+                <button
+                  onClick={() => addToCart(item.postId, item.name)}
+                  className={`mt-4 w-full py-2 rounded-lg text-sm font-medium
+                            ${
+                              cart.includes(item.postId)
+                                ? "bg-muted text-muted-foreground"
+                                : "bg-primary hover:bg-primary/90 text-primary-foreground"
+                            } 
+                            transition-colors`}
+                  disabled={
+                    cart.includes(item.postId) ||
+                    addingToCart[item.postId] ||
+                    (item.quantityAvailable !== undefined && item.quantityAvailable <= 0)
+                  }
+                  type="button"
+                >
+                  {addingToCart[item.postId] ? (
+                    <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                  ) : cart.includes(item.postId) ? (
+                    "Added to Cart"
+                  ) : item.quantityAvailable !== undefined && item.quantityAvailable <= 0 ? (
+                    "Out of Stock"
+                  ) : (
+                    "Add to Cart"
+                  )}
+                </button>
+              </div>
+            </div>
           ))}
         </div>
       )}
