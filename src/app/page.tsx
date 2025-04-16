@@ -7,7 +7,7 @@ export default function Home() {
     <main className="flex min-h-screen flex-col items-center justify-center p-6 md:p-12">
       <div className="w-full max-w-3xl flex flex-col items-center">
         <div className="mb-8">
-          <Image src="/public/logo.png" alt="Evershine Logo" width={200} height={120} priority />
+          <Image src="/assets/logo2.png" alt="Evershine Logo" width={200} height={120} priority/>
         </div>
 
         <h1 className="text-4xl md:text-5xl font-bold text-dark mb-12 text-center">Welcome to Evershine</h1>
