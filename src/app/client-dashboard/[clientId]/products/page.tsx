@@ -1,226 +1,407 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import axios from "axios"
-import { useRouter } from "next/navigation"
+import type React from "react"
+import { useState, useEffect, useCallback } from "react"
+import { useParams } from "next/navigation"
 import Link from "next/link"
-import { Search, Pencil, ArrowLeft, Loader2 } from 'lucide-react'
+import { Search, Loader2, Heart, ShoppingCart, AlertCircle } from "lucide-react"
 import Image from "next/image"
+import { useToast } from "@/components/ui/use-toast"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-
+// Define the Product interface
 interface Product {
   _id: string
   name: string
   price: number
   image: string[]
   postId: string
-  status?: 'draft' | 'pending' | 'approved'
+  category: string
+  description: string
+  status?: "draft" | "pending" | "approved"
+  applicationAreas?: string
+  quantityAvailable?: number
 }
 
-export default function Products() {
-  const router = useRouter()
+export default function ProductsPage() {
+  // Use the useParams hook to get the clientId
+  const params = useParams()
+  const clientId = params.clientId as string
+
+  const { toast } = useToast()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'approved' | 'draft'>('all')
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchQuery, setSearchQuery] = useState("")
   const [imageError, setImageError] = useState<Record<string, boolean>>({})
-  const [editLoading, setEditLoading] = useState<string | null>(null)
+  // Wishlist and cart state
+  const [wishlist, setWishlist] = useState<string[]>([])
+  const [cart, setCart] = useState<string[]>([])
+  const [addingToCart, setAddingToCart] = useState<Record<string, boolean>>({})
+  const [error, setError] = useState<string | null>(null)
 
+  // Load wishlist and cart from localStorage
   useEffect(() => {
-    fetchProducts()
+    if (typeof window !== "undefined") {
+      try {
+        const savedWishlist = localStorage.getItem("wishlist")
+        if (savedWishlist) {
+          setWishlist(JSON.parse(savedWishlist))
+        }
+
+        const savedCart = localStorage.getItem("cart")
+        if (savedCart) {
+          setCart(JSON.parse(savedCart))
+        }
+      } catch (e) {
+        console.error("Error loading data from localStorage:", e)
+      }
+    }
   }, [])
 
-  const fetchProducts = async () => {
+  // Save wishlist and cart to localStorage whenever they change
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("wishlist", JSON.stringify(wishlist))
+      localStorage.setItem("cart", JSON.stringify(cart))
+    }
+  }, [wishlist, cart])
+
+  // Fetch products function
+  const fetchProducts = useCallback(async () => {
     try {
       setLoading(true)
-      const response = await axios.get(`${API_URL}/api/getAllProducts`)
-      if (response.data.success) {
-        setProducts(response.data.data)
+      setError(null)
+
+      // Use environment variable if available, otherwise use a default URL
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
+      console.log("Fetching products from:", `${apiUrl}/api/getAllProducts`)
+
+      const response = await fetch(`${apiUrl}/api/getAllProducts`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        // Add a timeout to prevent long waiting times
+        signal: AbortSignal.timeout(8000), // 8 second timeout
+      })
+
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`)
       }
-    } catch (error) {
+
+      const data = await response.json()
+
+      if (data.success && Array.isArray(data.data)) {
+        console.log("Products fetched successfully:", data.data)
+
+        // Process the image URLs to ensure they're valid
+        const processedProducts = data.data.map((product: Product) => ({
+          ...product,
+          image:
+            Array.isArray(product.image) && product.image.length > 0
+              ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
+              : ["/placeholder.svg"],
+        }))
+
+        setProducts(processedProducts)
+      } else {
+        throw new Error(data.msg || "Invalid API response format")
+      }
+    } catch (error: Error | unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to load products"
       console.error("Error fetching products:", error)
+      setError(errorMessage)
+
+      // Show error toast
+      toast({
+        title: "Error fetching products",
+        description: "Could not load products from the server. Please try again later.",
+        variant: "destructive",
+      })
+
+      // Set empty products array
+      setProducts([])
     } finally {
       setLoading(false)
     }
-  }
+  }, [toast])
 
-  const handleEdit = async (e: React.MouseEvent, productId: string) => {
-    e.preventDefault()
-    try {
-      setEditLoading(productId)
-      const response = await axios.get(`${API_URL}/api/getPostDataById?id=${productId}`)
-      if (response.data.success) {
-        router.push(`/edit-product/${productId}`)
+  // Fetch products on component mount
+  useEffect(() => {
+    fetchProducts()
+  }, [fetchProducts])
+
+  // Toggle wishlist function
+  const toggleWishlist = useCallback(
+    (e: React.MouseEvent, productId: string) => {
+      e.preventDefault() // Prevent navigation
+
+      if (wishlist.includes(productId)) {
+        setWishlist((prev) => prev.filter((id) => id !== productId))
+        toast({
+          title: "Removed from wishlist",
+          description: "Item has been removed from your wishlist",
+          variant: "default",
+        })
       } else {
-        throw new Error("Product not found")
+        setWishlist((prev) => [...prev, productId])
+        toast({
+          title: "Added to wishlist",
+          description: "Item has been added to your wishlist",
+          variant: "default",
+        })
       }
-    } catch (error) {
-      console.error("Error accessing product:", error)
-      alert("Unable to edit product at this time")
-    } finally {
-      setEditLoading(null)
-    }
-  }
+    },
+    [wishlist, toast],
+  )
 
-  const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesTab = activeTab === 'all' || product.status === activeTab
-    return matchesSearch && matchesTab
-  })
+  // Add to cart function
+  const addToCart = useCallback(
+    async (e: React.MouseEvent, productId: string, productName: string) => {
+      e.preventDefault() // Prevent navigation
 
-  const handleImageError = (productId: string) => {
-    setImageError(prev => ({ ...prev, [productId]: true }))
-  }
+      if (cart.includes(productId)) {
+        toast({
+          title: "Already in cart",
+          description: "This item is already in your cart",
+          variant: "default",
+        })
+        return
+      }
 
+      try {
+        // Set loading state for this specific product
+        setAddingToCart((prev) => ({ ...prev, [productId]: true }))
+
+        console.log("Adding to cart:", productId, productName)
+
+        // Get the token
+        const token = localStorage.getItem("clientImpersonationToken")
+
+        if (!token) {
+          console.error("No impersonation token found")
+          toast({
+            title: "Authentication Error",
+            description: "Please refresh your token using the debug panel above",
+            variant: "destructive",
+          })
+          throw new Error("No authentication token found")
+        }
+
+        // Make a direct fetch request with the token
+        const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ productId }),
+        })
+
+        // Get the response text for debugging
+        const responseText = await response.text()
+
+        // Try to parse the response as JSON
+        let data
+        try {
+          data = JSON.parse(responseText)
+        } catch (e) {
+          console.error("Failed to parse response as JSON:", e)
+          throw new Error(`Invalid response format: ${responseText}`)
+        }
+
+        // Check for errors
+        if (!response.ok) {
+          if (response.status === 401) {
+            throw new Error("Authentication failed. Please refresh the token using the debug panel above.")
+          } else {
+            throw new Error(`API error: ${response.status} ${response.statusText}`)
+          }
+        }
+
+        if (data.success) {
+          toast({
+            title: "Added to cart",
+            description: `${productName} has been added to your cart`,
+            variant: "default",
+          })
+          setCart((prev) => [...prev, productId])
+        } else {
+          throw new Error(data.message || "Failed to add to cart")
+        }
+      } catch (error: Error | unknown) {
+        const errorMessage = error instanceof Error ? error.message : "Failed to add item to cart. Please try again."
+        console.error("Error adding to cart:", error)
+        toast({
+          title: "Error adding to cart",
+          description: errorMessage,
+          variant: "destructive",
+        })
+      } finally {
+        // Clear loading state
+        setAddingToCart((prev) => ({ ...prev, [productId]: false }))
+      }
+    },
+    [cart, toast],
+  )
+
+  // Filter products based on search query
+  const filteredProducts = products.filter(
+    (product) =>
+      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      product.category.toLowerCase().includes(searchQuery.toLowerCase()),
+  )
+
+  // Handle image loading errors
+  const handleImageError = useCallback((productId: string) => {
+    console.log("Image error for product:", productId)
+    setImageError((prev) => ({ ...prev, [productId]: true }))
+  }, [])
+
+  // Loading state
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <Loader2 className="h-12 w-12 animate-spin text-[#194a95]" />
+      <div className="flex flex-col items-center justify-center h-[80vh]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+        <p className="text-muted-foreground">Loading products...</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Back Button Header */}
-      <div className="sticky top-0 z-10 bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
-          <div className="py-4">
-            <button 
-              onClick={() => router.push('/admin-panel')}
-              className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              <ArrowLeft className="h-6 w-6" />
-            </button>
-          </div>
+    <div className="p-6 md:p-8">
+      {error && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold">Products</h1>
+
+        <div className="flex items-center gap-4">
+          <Link href={`/client-dashboard/${clientId}/wishlist`} className="relative">
+            <Heart className="h-6 w-6 text-gray-600" />
+            {wishlist.length > 0 && (
+              <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                {wishlist.length}
+              </span>
+            )}
+          </Link>
+
+          <Link href={`/client-dashboard/${clientId}/cart`} className="relative">
+            <ShoppingCart className="h-6 w-6 text-gray-600" />
+            {cart.length > 0 && (
+              <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                {cart.length}
+              </span>
+            )}
+          </Link>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-6">
-        {/* Header with Search */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-          <h1 className="text-4xl font-bold text-[#181818]">All Products</h1>
-          <div className="relative w-full md:w-auto">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-              <input
-                type="text"
-                placeholder="Search Product..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-3 w-full md:w-[300px] rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#194a95] focus:border-transparent"
-              />
-            </div>
-          </div>
-        </div>
+      <div className="relative mb-6">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Search products by name or category..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10 pr-4 py-2 w-full rounded-lg border border-input focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+        />
+      </div>
 
-        {/* Filter Tabs and Add Button */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-          <div className="flex flex-wrap gap-2">
-            {(['all', 'pending', 'approved', 'draft'] as const).map((tab) => (
-              <button 
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2 rounded-lg transition-colors ${
-                  activeTab === tab 
-                    ? "bg-[#194a95] text-white" 
-                    : "bg-gray-50 text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
-              </button>
-            ))}
-          </div>
-          <button 
-            onClick={() => router.push('/add-product')}
-            className="px-6 py-3 rounded-lg bg-[#194a95] text-white w-full md:w-auto justify-center
-                     hover:bg-[#0f3a7a] transition-colors active:transform active:scale-95"
+      {filteredProducts.length === 0 ? (
+        <div className="text-center py-12">
+          <p className="text-xl font-medium mb-4">No products found</p>
+          <p className="text-muted-foreground mb-6">
+            {searchQuery ? "Try a different search term" : "No products are currently available"}
+          </p>
+          <button
+            onClick={fetchProducts}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
           >
-            Add New Product
+            Refresh Products
           </button>
         </div>
-
-        {/* Products Count */}
-        <p className="text-gray-600 mb-6">
-          Showing {filteredProducts.length} of {products.length} products
-        </p>
-
-        {/* Products Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 lg:gap-6 mb-8">
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProducts.map((product) => (
-            <div key={product._id} className="group relative bg-white rounded-2xl overflow-hidden border border-gray-200/80 hover:border-gray-300/80 transition-colors">
-              <Link 
-                href={`/product/${product.postId}`}
-                className="block"
-              >
-                <div className="p-3">
-                  <div className="relative w-full overflow-hidden rounded-xl bg-gray-50
-                              aspect-[4/3] sm:aspect-[4/3] md:aspect-[4/3] lg:aspect-square">
-                    <Image
-                      src={imageError[product._id] ? "/placeholder.svg" : (product.image[0] || "/placeholder.svg")}
-                      alt={product.name}
-                      fill
-                      className="object-cover transition-transform group-hover:scale-105 duration-300"
-                      onError={() => handleImageError(product._id)}
+            <div
+              key={product._id}
+              className="group relative bg-card rounded-lg overflow-hidden border border-border hover:border-primary transition-all hover:shadow-md"
+            >
+              <div className="p-3">
+                <div className="relative w-full overflow-hidden rounded-xl bg-gray-50 aspect-square">
+                  {/* The key change is here - adding unoptimized={true} */}
+                  <Image
+                    src={imageError[product._id] ? "/placeholder.svg" : product.image?.[0] || "/placeholder.svg"}
+                    alt={product.name}
+                    fill
+                    unoptimized={true} // This bypasses Vercel's image optimization
+                    className="object-cover transition-transform group-hover:scale-105 duration-300"
+                    onError={() => handleImageError(product._id)}
+                  />
+
+                  {/* Wishlist button overlay */}
+                  <button
+                    onClick={(e) => toggleWishlist(e, product.postId)}
+                    className="absolute top-2 right-2 p-2 rounded-full bg-white/80 hover:bg-white transition-colors z-10"
+                    aria-label={wishlist.includes(product.postId) ? "Remove from wishlist" : "Add to wishlist"}
+                    type="button"
+                  >
+                    <Heart
+                      className={`h-5 w-5 ${
+                        wishlist.includes(product.postId) ? "text-red-500 fill-red-500" : "text-gray-600"
+                      }`}
                     />
-                  </div>
+                  </button>
                 </div>
-                <div className="px-4 pb-4">
-                  <div className="flex justify-between items-start gap-2">
-                    <h3 className="font-semibold text-lg text-gray-900 line-clamp-1">
-                      {product.name}
-                    </h3>
-                    <div className="relative z-10 -mt-1 -mr-1 flex-shrink-0" onClick={(e) => e.preventDefault()}>
-                      <button 
-                        onClick={(e) => handleEdit(e, product.postId)}
-                        className="p-1.5 rounded-full hover:bg-gray-100 disabled:opacity-50"
-                        disabled={editLoading === product.postId}
-                      >
-                        {editLoading === product.postId ? (
-                          <Loader2 className="h-4 w-4 animate-spin text-[#194a95]" />
-                        ) : (
-                          <Pencil className="h-4 w-4 text-gray-500" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                  <p className="text-gray-600 mt-0.5">Rs. {product.price}/per sqft</p>
-                  {product.status && (
-                    <span className={`inline-block mt-2 px-2 py-1 rounded-full text-xs ${
-                      product.status === 'approved' ? 'bg-green-100 text-green-800' :
-                      product.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {product.status.charAt(0).toUpperCase() + product.status.slice(1)}
-                    </span>
+              </div>
+
+              <div className="p-4">
+                <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
+                <p className="text-lg font-bold mt-2">₹{product.price.toLocaleString()}</p>
+                <p className="text-sm text-muted-foreground mt-1">{product.category}</p>
+
+                {product.quantityAvailable !== undefined && (
+                  <p className="text-sm mt-1">
+                    {product.quantityAvailable > 0 ? `In stock: ${product.quantityAvailable}` : "Out of stock"}
+                  </p>
+                )}
+
+                <button
+                  onClick={(e) => addToCart(e, product.postId, product.name)}
+                  className={`mt-4 w-full py-2 rounded-lg text-sm font-medium
+                            ${
+                              cart.includes(product.postId)
+                                ? "bg-muted text-muted-foreground"
+                                : "bg-primary hover:bg-primary/90 text-primary-foreground"
+                            } 
+                            transition-colors`}
+                  disabled={
+                    cart.includes(product.postId) ||
+                    addingToCart[product.postId] ||
+                    (product.quantityAvailable !== undefined && product.quantityAvailable <= 0)
+                  }
+                  type="button"
+                >
+                  {addingToCart[product.postId] ? (
+                    <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                  ) : cart.includes(product.postId) ? (
+                    "Added to Cart"
+                  ) : product.quantityAvailable !== undefined && product.quantityAvailable <= 0 ? (
+                    "Out of Stock"
+                  ) : (
+                    "Add to Cart"
                   )}
-                </div>
-              </Link>
+                </button>
+              </div>
             </div>
           ))}
         </div>
-
-        {/* Empty State */}
-        {filteredProducts.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-500 text-lg">No products found</p>
-          </div>
-        )}
-
-        {/* Pagination */}
-        {filteredProducts.length > 0 && (
-          <div className="flex justify-end gap-4 mt-8">
-            <button className="px-6 py-3 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors w-32">
-              Previous
-            </button>
-            <button className="px-6 py-3 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors w-32">
-              Next
-            </button>
-          </div>
-        )}
-      </div>
+      )}
     </div>
   )
 }
