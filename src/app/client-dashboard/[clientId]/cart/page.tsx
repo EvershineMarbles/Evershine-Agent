@@ -68,12 +68,11 @@ export default function CartPage() {
         } else {
           setCartItems([])
         }
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
+      } catch (error: any) {
         console.error("Error fetching cart:", error)
         toast({
           title: "Error",
-          description: errorMessage || "Failed to load your cart. Please try again.",
+          description: error.message || "Failed to load your cart. Please try again.",
           variant: "destructive",
         })
         setCartItems([])
@@ -139,12 +138,11 @@ export default function CartPage() {
       } else {
         throw new Error(data.message || "Failed to remove item")
       }
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
+    } catch (error: any) {
       console.error("Error removing item from cart:", error)
       toast({
         title: "Error",
-        description: errorMessage || "Failed to remove item from cart. Please try again.",
+        description: error.message || "Failed to remove item from cart. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -178,9 +176,9 @@ export default function CartPage() {
         country: "India",
       }
 
-      // Make API request to create order - ensure method is POST and use the correct endpoint
+      // Make API request to create order
       const response = await fetch("https://evershinebackend-2.onrender.com/api/createOrder", {
-        method: "POST", // Ensure this is POST
+        method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -192,10 +190,6 @@ export default function CartPage() {
         }),
       })
 
-      // Log the response for debugging
-      console.log("Checkout response status:", response.status)
-      console.log("Checkout response status text:", response.statusText)
-
       // Check for errors
       if (!response.ok) {
         const errorText = await response.text()
@@ -204,7 +198,7 @@ export default function CartPage() {
         try {
           const errorData = JSON.parse(errorText)
           throw new Error(errorData.message || `API error: ${response.status} ${response.statusText}`)
-        } catch {
+        } catch (e) {
           throw new Error(`API error: ${response.status} ${response.statusText}`)
         }
       }
@@ -233,12 +227,11 @@ export default function CartPage() {
       } else {
         throw new Error(data.message || "Failed to place order")
       }
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
+    } catch (error: any) {
       console.error("Error during checkout:", error)
       toast({
         title: "Checkout Failed",
-        description: errorMessage || "Failed to place your order. Please try again.",
+        description: error.message || "Failed to place your order. Please try again.",
         variant: "destructive",
       })
     } finally {
