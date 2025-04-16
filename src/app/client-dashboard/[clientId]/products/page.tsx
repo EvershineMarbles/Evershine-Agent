@@ -408,7 +408,7 @@ export default function ProductsPage() {
                   {addingToCart[product.postId] ? (
                     <Loader2 className="h-4 w-4 animate-spin mx-auto" />
                   ) : cart.includes(product.postId) ? (
-                    "Added to Carts"
+                    "Added to Cart"
                   ) : product.quantityAvailable !== undefined && product.quantityAvailable <= 0 ? (
                     "Out of Stock"
                   ) : (
