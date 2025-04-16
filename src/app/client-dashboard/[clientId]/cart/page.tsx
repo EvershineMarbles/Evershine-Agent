@@ -27,10 +27,6 @@ export default function CartPage() {
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [loading, setLoading] = useState(true)
   const [removing, setRemoving] = useState<Record<string, boolean>>({})
-  const [isCheckingOut, setIsCheckingOut] = useState(false)
-
-  // API base URL
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
 
   // Fetch cart items
   useEffect(() => {
@@ -47,7 +43,7 @@ export default function CartPage() {
 
         console.log("Fetching cart with token:", token.substring(0, 15) + "...")
 
-        const response = await fetch(`${API_BASE_URL}/getUserCart`, {
+        const response = await fetch("https://evershinebackend-2.onrender.com/api/getUserCart", {
           method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -72,12 +68,11 @@ export default function CartPage() {
         } else {
           setCartItems([])
         }
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
+      } catch (error: any) {
         console.error("Error fetching cart:", error)
         toast({
           title: "Error",
-          description: errorMessage || "Failed to load your cart. Please try again.",
+          description: error.message || "Failed to load your cart. Please try again.",
           variant: "destructive",
         })
         setCartItems([])
@@ -87,7 +82,7 @@ export default function CartPage() {
     }
 
     fetchCart()
-  }, [toast, API_BASE_URL])
+  }, [toast])
 
   // Remove item from cart
   const removeFromCart = async (productId: string) => {
@@ -103,7 +98,7 @@ export default function CartPage() {
 
       console.log("Removing item from cart with token:", token.substring(0, 15) + "...")
 
-      const response = await fetch(`${API_BASE_URL}/deleteUserCartItem`, {
+      const response = await fetch("https://evershinebackend-2.onrender.com/api/deleteUserCartItem", {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -143,12 +138,11 @@ export default function CartPage() {
       } else {
         throw new Error(data.message || "Failed to remove item")
       }
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
+    } catch (error: any) {
       console.error("Error removing item from cart:", error)
       toast({
         title: "Error",
-        description: errorMessage || "Failed to remove item from cart. Please try again.",
+        description: error.message || "Failed to remove item from cart. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -164,7 +158,7 @@ export default function CartPage() {
   // Handle checkout
   const handleCheckout = async () => {
     try {
-      setIsCheckingOut(true)
+      setLoading(true)
 
       // Get the token
       const token = localStorage.getItem("clientImpersonationToken")
@@ -182,29 +176,19 @@ export default function CartPage() {
         country: "India",
       }
 
-      // Create the request payload
-      const payload = {
-        shippingAddress,
-        paymentMethod: "bank_transfer",
-        notes: "Order placed via agent dashboard",
-      }
-
-      console.log("Sending checkout request to:", `${API_BASE_URL}/createOrder`)
-      console.log("Request payload:", payload)
-
       // Make API request to create order
-      const response = await fetch(`${API_BASE_URL}/createOrder`, {
+      const response = await fetch("https://evershinebackend-2.onrender.com/createOrder", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          shippingAddress,
+          paymentMethod: "bank_transfer", // Default payment method
+          notes: "Order placed via agent dashboard",
+        }),
       })
-
-      // Log the response for debugging
-      console.log("Checkout response status:", response.status)
-      console.log("Checkout response status text:", response.statusText)
 
       // Check for errors
       if (!response.ok) {
@@ -214,7 +198,7 @@ export default function CartPage() {
         try {
           const errorData = JSON.parse(errorText)
           throw new Error(errorData.message || `API error: ${response.status} ${response.statusText}`)
-        } catch {
+        } catch (e) {
           throw new Error(`API error: ${response.status} ${response.statusText}`)
         }
       }
@@ -243,16 +227,15 @@ export default function CartPage() {
       } else {
         throw new Error(data.message || "Failed to place order")
       }
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
+    } catch (error: any) {
       console.error("Error during checkout:", error)
       toast({
         title: "Checkout Failed",
-        description: errorMessage || "Failed to place your order. Please try again.",
+        description: error.message || "Failed to place your order. Please try again.",
         variant: "destructive",
       })
     } finally {
-      setIsCheckingOut(false)
+      setLoading(false)
     }
   }
 
@@ -362,19 +345,8 @@ export default function CartPage() {
                   </div>
                 </div>
 
-                <Button
-                  onClick={handleCheckout}
-                  className="w-full mt-6 bg-primary hover:bg-primary/90"
-                  disabled={isCheckingOut}
-                >
-                  {isCheckingOut ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    "Proceed to Checkout"
-                  )}
+                <Button onClick={handleCheckout} className="w-full mt-6 bg-primary hover:bg-primary/90">
+                  Proceed to Checkout
                 </Button>
 
                 <div className="mt-4 text-center">
