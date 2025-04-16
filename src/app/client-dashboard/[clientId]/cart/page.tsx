@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowLeft, Trash2, Loader2, ShoppingBag, AlertCircle } from "lucide-react"
+import { ArrowLeft, Trash2, Loader2, ShoppingBag, Plus, Minus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -19,23 +19,6 @@ interface CartItem {
   quantity: number
 }
 
-// Define the debug info type to fix TypeScript errors
-interface DebugInfo {
-  requestUrl: string
-  requestMethod: string
-  requestPayload: any
-  responseStatus: number
-  responseStatusText: string
-  errorResponse?: string
-  secondAttemptUrl?: string
-  secondAttemptStatus?: number
-  secondAttemptStatusText?: string
-  secondAttemptErrorResponse?: string
-  responseData?: any
-  error?: string
-  errorStack?: string
-}
-
 export default function CartPage() {
   const params = useParams()
   const router = useRouter()
@@ -45,8 +28,8 @@ export default function CartPage() {
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [loading, setLoading] = useState(true)
   const [removing, setRemoving] = useState<Record<string, boolean>>({})
+  const [updating, setUpdating] = useState<Record<string, boolean>>({})
   const [isCheckingOut, setIsCheckingOut] = useState(false)
-  const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null)
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
 
   // Fetch cart items
@@ -61,8 +44,6 @@ export default function CartPage() {
         if (!token) {
           throw new Error("No authentication token found. Please refresh the page and try again.")
         }
-
-        console.log("Fetching cart with token:", token.substring(0, 15) + "...")
 
         const response = await fetch("https://evershinebackend-2.onrender.com/api/getUserCart", {
           method: "GET",
@@ -84,7 +65,6 @@ export default function CartPage() {
         const data = await response.json()
 
         if (data.data) {
-          console.log("Cart data:", data.data)
           // Filter out any items with null or undefined postId
           const validItems = (data.data.items || []).filter(
             (item: CartItem) => item.postId && typeof item.postId === "string",
@@ -114,6 +94,73 @@ export default function CartPage() {
     fetchCart()
   }, [toast])
 
+  // Update item quantity
+  const updateQuantity = async (productId: string, newQuantity: number) => {
+    if (newQuantity < 1) return
+
+    try {
+      setUpdating((prev) => ({ ...prev, [productId]: true }))
+
+      // Get the token
+      const token = localStorage.getItem("clientImpersonationToken")
+
+      if (!token) {
+        throw new Error("No authentication token found. Please refresh the page and try again.")
+      }
+
+      // First remove the item
+      const removeResponse = await fetch("https://evershinebackend-2.onrender.com/api/deleteUserCartItem", {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ productId }),
+      })
+
+      if (!removeResponse.ok) {
+        throw new Error(`Failed to update quantity: ${removeResponse.status}`)
+      }
+
+      // Then add it back with the new quantity
+      // For this to work properly, we need to add the item back multiple times
+      for (let i = 0; i < newQuantity; i++) {
+        const addResponse = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ productId }),
+        })
+
+        if (!addResponse.ok) {
+          throw new Error(`Failed to update quantity: ${addResponse.status}`)
+        }
+      }
+
+      // Update local state
+      setCartItems((prev) =>
+        prev.map((item) => (item.postId === productId ? { ...item, quantity: newQuantity } : item)),
+      )
+
+      toast({
+        title: "Quantity Updated",
+        description: "Item quantity has been updated",
+        variant: "default",
+      })
+    } catch (error: any) {
+      console.error("Error updating quantity:", error)
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update quantity. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setUpdating((prev) => ({ ...prev, [productId]: false }))
+    }
+  }
+
   // Remove item from cart
   const removeFromCart = async (productId: string) => {
     try {
@@ -125,8 +172,6 @@ export default function CartPage() {
       if (!token) {
         throw new Error("No authentication token found. Please refresh the page and try again.")
       }
-
-      console.log("Removing item from cart with token:", token.substring(0, 15) + "...")
 
       const response = await fetch("https://evershinebackend-2.onrender.com/api/deleteUserCartItem", {
         method: "DELETE",
@@ -189,7 +234,6 @@ export default function CartPage() {
   const handleCheckout = async () => {
     try {
       setIsCheckingOut(true)
-      setDebugInfo(null)
       setCheckoutError(null)
 
       // Validate cart has items
@@ -225,16 +269,7 @@ export default function CartPage() {
         notes: "Order placed via agent dashboard",
       }
 
-      // Initialize debug data with the correct URL
-      const debugData: DebugInfo = {
-        requestUrl: "https://evershinebackend-2.onrender.com/api/createOrder",
-        requestMethod: "POST",
-        requestPayload: payload,
-        responseStatus: 0,
-        responseStatusText: "",
-      }
-
-      // Make API request to create order - ensure we're using /api/ in the URL
+      // Make API request to create order
       const response = await fetch("https://evershinebackend-2.onrender.com/api/createOrder", {
         method: "POST",
         headers: {
@@ -244,28 +279,19 @@ export default function CartPage() {
         body: JSON.stringify(payload),
       })
 
-      // Log response details
-      console.log("Response Status:", response.status, response.statusText)
-      debugData.responseStatus = response.status
-      debugData.responseStatusText = response.statusText
-
       // Get response text first to handle both JSON and non-JSON responses
       const responseText = await response.text()
-      debugData.errorResponse = responseText
 
       let data
       try {
         // Try to parse as JSON
         data = JSON.parse(responseText)
-        debugData.responseData = data
       } catch (e) {
-        console.log("Response is not JSON:", responseText)
+        // Not JSON, handle as text
       }
 
       // Special case: If we get a 500 error but the order might have been created
       if (response.status === 500) {
-        console.log("Received 500 error, checking if order was still created...")
-
         try {
           // Wait a moment to ensure any database operations complete
           await new Promise((resolve) => setTimeout(resolve, 1500))
@@ -279,18 +305,11 @@ export default function CartPage() {
             },
           })
 
-          debugData.secondAttemptUrl = "https://evershinebackend-2.onrender.com/api/getUserCart"
-          debugData.secondAttemptStatus = cartCheckResponse.status
-          debugData.secondAttemptStatusText = cartCheckResponse.statusText
-
           if (cartCheckResponse.ok) {
             const cartData = await cartCheckResponse.json()
-            console.log("Cart check after 500 error:", cartData)
 
             // If the cart is now empty, the order probably succeeded despite the error
             if (cartData.data && (!cartData.data.items || cartData.data.items.length === 0)) {
-              console.log("Cart is empty after 500 error, assuming order was successful")
-
               // Clear local cart state
               setCartItems([])
 
@@ -299,31 +318,13 @@ export default function CartPage() {
                 localStorage.removeItem("cart")
               }
 
-              toast({
-                title: "Order Successfully Placed",
-                description:
-                  "Your order has been placed successfully despite a server error. You can view it in your orders.",
-                variant: "default",
-              })
-
-              // Redirect to orders page
-              setTimeout(() => {
-                router.push(`/client-dashboard/${clientId}/orders`)
-              }, 2000)
-
+              // Redirect directly to orders page
+              router.push(`/client-dashboard/${clientId}/orders`)
               return
-            } else {
-              console.log("Cart still has items after 500 error, order likely failed")
-              debugData.secondAttemptErrorResponse = "Cart still contains items after order attempt"
             }
-          } else {
-            const errorText = await cartCheckResponse.text()
-            debugData.secondAttemptErrorResponse = errorText
-            console.log("Failed to check cart after 500 error:", errorText)
           }
         } catch (cartCheckError: any) {
-          console.error("Error checking cart after order attempt:", cartCheckError)
-          debugData.secondAttemptErrorResponse = cartCheckError.message
+          // Handle error silently
         }
 
         // If we get here, the cart check didn't confirm success
@@ -353,16 +354,8 @@ export default function CartPage() {
           localStorage.removeItem("cart")
         }
 
-        toast({
-          title: "Order Placed Successfully",
-          description: "Your order has been placed and is being processed.",
-          variant: "default",
-        })
-
-        // Redirect to orders page or confirmation page
-        setTimeout(() => {
-          router.push(`/client-dashboard/${clientId}/orders`)
-        }, 2000)
+        // Redirect directly to orders page
+        router.push(`/client-dashboard/${clientId}/orders`)
       } else if (data) {
         // We have data but success is false
         throw new Error(data.message || "Failed to place order")
@@ -370,23 +363,9 @@ export default function CartPage() {
         // No parseable data
         throw new Error("Received an invalid response from the server")
       }
-
-      // Store final debug info
-      setDebugInfo(debugData)
     } catch (error: any) {
       console.error("Error during checkout:", error)
       setCheckoutError(error.message || "An unknown error occurred during checkout")
-
-      // Add error to debug info
-      setDebugInfo((prev) =>
-        prev
-          ? {
-              ...prev,
-              error: error.message,
-              errorStack: error.stack,
-            }
-          : null,
-      )
 
       toast({
         title: "Checkout Failed",
@@ -418,7 +397,6 @@ export default function CartPage() {
 
       {checkoutError && (
         <Alert variant="destructive" className="mb-6">
-          <AlertCircle className="h-4 w-4" />
           <AlertDescription>{checkoutError}</AlertDescription>
         </Alert>
       )}
@@ -461,7 +439,28 @@ export default function CartPage() {
                       <div className="flex items-center justify-between mt-2">
                         <p className="font-semibold">₹{item.price.toLocaleString()}</p>
                         <div className="flex items-center">
-                          <span className="mx-2">Qty: {item.quantity}</span>
+                          {/* Quantity controls */}
+                          <div className="flex items-center border rounded-md mr-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 p-0"
+                              onClick={() => updateQuantity(item.postId, item.quantity - 1)}
+                              disabled={updating[item.postId] || item.quantity <= 1}
+                            >
+                              <Minus className="h-3 w-3" />
+                            </Button>
+                            <span className="w-8 text-center">{item.quantity}</span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 p-0"
+                              onClick={() => updateQuantity(item.postId, item.quantity + 1)}
+                              disabled={updating[item.postId]}
+                            >
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                          </div>
                           <Button
                             variant="ghost"
                             size="icon"
@@ -469,7 +468,7 @@ export default function CartPage() {
                             disabled={removing[item.postId]}
                             className="text-red-500 hover:text-red-700 hover:bg-red-50"
                           >
-                            {removing[item.postId] ? (
+                            {removing[item.postId] || updating[item.postId] ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
                               <Trash2 className="h-4 w-4" />
@@ -482,16 +481,6 @@ export default function CartPage() {
                 ))}
               </div>
             </div>
-
-            {/* Debug information section */}
-            {debugInfo && (
-              <div className="mt-6 p-4 bg-gray-100 rounded-lg border border-gray-300">
-                <h3 className="font-bold mb-2">Debug Information</h3>
-                <pre className="text-xs overflow-auto max-h-60 p-2 bg-gray-200 rounded">
-                  {JSON.stringify(debugInfo, null, 2)}
-                </pre>
-              </div>
-            )}
           </div>
 
           <div className="lg:col-span-1">
