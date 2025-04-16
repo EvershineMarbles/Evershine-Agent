@@ -1,146 +1,225 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect, useCallback } from "react"
-import { useParams } from "next/navigation"
+import { useState, useEffect } from "react"
+import axios from "axios"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
+import { Search, Pencil, ArrowLeft, Loader2 } from 'lucide-react'
 import Image from "next/image"
-import { Heart } from "lucide-react"
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 interface Product {
   _id: string
   name: string
-  description: string
   price: number
   image: string[]
   postId: string
-}
-
-async function fetchProducts(clientId: string): Promise<Product[]> {
-  try {
-    const response = await fetch(`/api/client-dashboard/${clientId}/products`)
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
-    }
-    const data = await response.json()
-    return data
-  } catch (error) {
-    console.error("Failed to fetch products:", error)
-    return []
-  }
-}
-
-function getImageUrl(imageUrl: string | undefined): string {
-  if (!imageUrl) return "/placeholder.svg"
-
-  // Check if it's an S3 URL
-  if (imageUrl.includes("s3.") && imageUrl.includes("amazonaws.com")) {
-    console.log("Using direct S3 URL:", imageUrl)
-    // Use the direct S3 URL instead of letting Next.js try to optimize it
-    return imageUrl
-  }
-
-  return imageUrl || "/placeholder.svg"
+  status?: 'draft' | 'pending' | 'approved'
 }
 
 export default function Products() {
-  const params = useParams()
-  const clientId = Array.isArray(params.clientId) ? params.clientId[0] : (params.clientId as string)
+  const router = useRouter()
   const [products, setProducts] = useState<Product[]>([])
-  const [wishlist, setWishlist] = useState<string[]>([])
-  const [imageError, setImageError] = useState<{ [key: string]: boolean }>({})
-  const [imageLoadErrors, setImageLoadErrors] = useState<Record<string, boolean>>({})
+  const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'approved' | 'draft'>('all')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [imageError, setImageError] = useState<Record<string, boolean>>({})
+  const [editLoading, setEditLoading] = useState<string | null>(null)
 
   useEffect(() => {
-    if (clientId) {
-      fetchProducts(clientId).then((fetchedProducts) => {
-        setProducts(fetchedProducts)
-      })
-    }
-  }, [clientId])
-
-  useEffect(() => {
-    // Load wishlist from localStorage on component mount
-    const storedWishlist = localStorage.getItem("wishlist")
-    if (storedWishlist) {
-      setWishlist(JSON.parse(storedWishlist))
-    }
+    fetchProducts()
   }, [])
 
-  useEffect(() => {
-    // Save wishlist to localStorage whenever it changes
-    localStorage.setItem("wishlist", JSON.stringify(wishlist))
-  }, [wishlist])
-
-  const toggleWishlist = (e: React.MouseEvent, postId: string) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setWishlist((prevWishlist) => {
-      if (prevWishlist.includes(postId)) {
-        return prevWishlist.filter((id) => id !== postId)
-      } else {
-        return [...prevWishlist, postId]
+  const fetchProducts = async () => {
+    try {
+      setLoading(true)
+      const response = await axios.get(`${API_URL}/api/getAllProducts`)
+      if (response.data.success) {
+        setProducts(response.data.data)
       }
-    })
+    } catch (error) {
+      console.error("Error fetching products:", error)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleImageError = useCallback((productId: string) => {
-    console.log("Image error for product:", productId)
-    setImageLoadErrors((prev) => ({ ...prev, [productId]: true }))
-  }, [])
-
-  useEffect(() => {
-    if (products.length > 0) {
-      console.log(
-        "Sample image URLs:",
-        products.slice(0, 3).map((p) => p.image?.[0] || "no image"),
-      )
+  const handleEdit = async (e: React.MouseEvent, productId: string) => {
+    e.preventDefault()
+    try {
+      setEditLoading(productId)
+      const response = await axios.get(`${API_URL}/api/getPostDataById?id=${productId}`)
+      if (response.data.success) {
+        router.push(`/edit-product/${productId}`)
+      } else {
+        throw new Error("Product not found")
+      }
+    } catch (error) {
+      console.error("Error accessing product:", error)
+      alert("Unable to edit product at this time")
+    } finally {
+      setEditLoading(null)
     }
-  }, [products])
+  }
+
+  const filteredProducts = products.filter(product => {
+    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesTab = activeTab === 'all' || product.status === activeTab
+    return matchesSearch && matchesTab
+  })
+
+  const handleImageError = (productId: string) => {
+    setImageError(prev => ({ ...prev, [productId]: true }))
+  }
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <Loader2 className="h-12 w-12 animate-spin text-[#194a95]" />
+      </div>
+    )
+  }
 
   return (
-    <div className="container mx-auto py-8">
-      <h1 className="text-2xl font-bold mb-4">Products</h1>
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {products.map((product) => (
-          <a
-            key={product._id}
-            href={`/product/${product.postId}`}
-            className="group relative block rounded-md overflow-hidden"
-          >
-            <div className="relative aspect-square">
-              {/* Add a key to force re-render when the image source changes */}
-              <Image
-                src={imageLoadErrors[product._id] ? "/placeholder.svg" : getImageUrl(product.image?.[0])}
-                alt={product.name}
-                fill
-                className="object-cover transition-transform group-hover:scale-105 duration-300"
-                onError={() => handleImageError(product._id)}
-                unoptimized={true} // This is crucial - bypass Next.js image optimization
-                loading="lazy"
-              />
-            </div>
-            <div className="p-4 bg-white">
-              <h2 className="text-lg font-semibold">{product.name}</h2>
-              <p className="text-gray-600">${product.price}</p>
-            </div>
-            <button
-              onClick={(e) => toggleWishlist(e, product.postId)}
-              className="absolute top-2 right-2 p-2 rounded-full bg-white/80 hover:bg-white transition-colors z-10"
-              aria-label={wishlist.includes(product.postId) ? "Remove from wishlist" : "Add to wishlist"}
-              type="button"
+    <div className="min-h-screen bg-white">
+      {/* Back Button Header */}
+      <div className="sticky top-0 z-10 bg-white border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+          <div className="py-4">
+            <button 
+              onClick={() => router.push('/admin-panel')}
+              className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
             >
-              <Heart
-                className={`h-5 w-5 ${
-                  wishlist.includes(product.postId) ? "text-red-500 fill-red-500" : "text-gray-600"
-                }`}
-              />
-              <span className="sidebar-tooltip absolute left-full ml-2 px-2 py-1 bg-black text-white text-xs rounded whitespace-nowrap z-50">
-                {wishlist.includes(product.postId) ? "Remove from wishlist" : "Add to wishlist"}
-              </span>
+              <ArrowLeft className="h-6 w-6" />
             </button>
-          </a>
-        ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-6">
+        {/* Header with Search */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+          <h1 className="text-4xl font-bold text-[#181818]">All Products</h1>
+          <div className="relative w-full md:w-auto">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+              <input
+                type="text"
+                placeholder="Search Product..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 pr-4 py-3 w-full md:w-[300px] rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#194a95] focus:border-transparent"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Filter Tabs and Add Button */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+          <div className="flex flex-wrap gap-2">
+            {(['all', 'pending', 'approved', 'draft'] as const).map((tab) => (
+              <button 
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  activeTab === tab 
+                    ? "bg-[#194a95] text-white" 
+                    : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+                }`}
+              >
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </button>
+            ))}
+          </div>
+          <button 
+            onClick={() => router.push('/add-product')}
+            className="px-6 py-3 rounded-lg bg-[#194a95] text-white w-full md:w-auto justify-center
+                     hover:bg-[#0f3a7a] transition-colors active:transform active:scale-95"
+          >
+            Add New Product
+          </button>
+        </div>
+
+        {/* Products Count */}
+        <p className="text-gray-600 mb-6">
+          Showing {filteredProducts.length} of {products.length} products
+        </p>
+
+        {/* Products Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 lg:gap-6 mb-8">
+          {filteredProducts.map((product) => (
+            <div key={product._id} className="group relative bg-white rounded-2xl overflow-hidden border border-gray-200/80 hover:border-gray-300/80 transition-colors">
+              <Link 
+                href={`/product/${product.postId}`}
+                className="block"
+              >
+                <div className="p-3">
+                  <div className="relative w-full overflow-hidden rounded-xl bg-gray-50
+                              aspect-[4/3] sm:aspect-[4/3] md:aspect-[4/3] lg:aspect-square">
+                    <Image
+                      src={imageError[product._id] ? "/placeholder.svg" : (product.image[0] || "/placeholder.svg")}
+                      alt={product.name}
+                      fill
+                      className="object-cover transition-transform group-hover:scale-105 duration-300"
+                      onError={() => handleImageError(product._id)}
+                    />
+                  </div>
+                </div>
+                <div className="px-4 pb-4">
+                  <div className="flex justify-between items-start gap-2">
+                    <h3 className="font-semibold text-lg text-gray-900 line-clamp-1">
+                      {product.name}
+                    </h3>
+                    <div className="relative z-10 -mt-1 -mr-1 flex-shrink-0" onClick={(e) => e.preventDefault()}>
+                      <button 
+                        onClick={(e) => handleEdit(e, product.postId)}
+                        className="p-1.5 rounded-full hover:bg-gray-100 disabled:opacity-50"
+                        disabled={editLoading === product.postId}
+                      >
+                        {editLoading === product.postId ? (
+                          <Loader2 className="h-4 w-4 animate-spin text-[#194a95]" />
+                        ) : (
+                          <Pencil className="h-4 w-4 text-gray-500" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-gray-600 mt-0.5">Rs. {product.price}/per sqft</p>
+                  {product.status && (
+                    <span className={`inline-block mt-2 px-2 py-1 rounded-full text-xs ${
+                      product.status === 'approved' ? 'bg-green-100 text-green-800' :
+                      product.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {product.status.charAt(0).toUpperCase() + product.status.slice(1)}
+                    </span>
+                  )}
+                </div>
+              </Link>
+            </div>
+          ))}
+        </div>
+
+        {/* Empty State */}
+        {filteredProducts.length === 0 && (
+          <div className="text-center py-12">
+            <p className="text-gray-500 text-lg">No products found</p>
+          </div>
+        )}
+
+        {/* Pagination */}
+        {filteredProducts.length > 0 && (
+          <div className="flex justify-end gap-4 mt-8">
+            <button className="px-6 py-3 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors w-32">
+              Previous
+            </button>
+            <button className="px-6 py-3 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors w-32">
+              Next
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
