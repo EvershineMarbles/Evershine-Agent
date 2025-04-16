@@ -43,7 +43,7 @@ export default function CartPage() {
 
         console.log("Fetching cart with token:", token.substring(0, 15) + "...")
 
-        const response = await fetch("http://localhost:8000/api/getUserCart", {
+        const response = await fetch("https://evershinebackend-2.onrender.com/api/getUserCart", {
           method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,
