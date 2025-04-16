@@ -177,7 +177,7 @@ export default function CartPage() {
       }
 
       // Make API request to create order
-      const response = await fetch("https://evershinebackend-2.onrender.com/createOrder", {
+      const response = await fetch("https://evershinebackend-2.onrender.com/api/createOrder", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
