@@ -225,22 +225,9 @@ export default function CartPage() {
         notes: "Order placed via agent dashboard",
       }
 
-      // Debug logging
-      console.log("=== CHECKOUT DEBUG INFO ===")
-      console.log("1. Request URL:", "https://evershinebackend-2.onrender.com/api/createOrder")
-      console.log("2. Request Method:", "POST")
-      console.log("3. Request Headers:", {
-        Authorization: `Bearer ${token.substring(0, 15)}...`,
-        "Content-Type": "application/json",
-      })
-      console.log("4. Request Payload:", payload)
-      console.log("5. Client ID from params:", clientId)
-      console.log("6. Cart Items Count:", cartItems.length)
-      console.log("7. Total Amount:", calculateTotal())
-
       // Initialize debug data
       const debugData: DebugInfo = {
-        requestUrl: "https://evershinebackend-2.onrender.com/api/createOrder",
+        requestUrl: "https://evershinebackend-2.onrender.com/createOrder",
         requestMethod: "POST",
         requestPayload: payload,
         responseStatus: 0,
@@ -248,7 +235,7 @@ export default function CartPage() {
       }
 
       // Make API request to create order - use the direct endpoint without /api prefix
-      const response = await fetch("https://evershinebackend-2.onrender.com/api/createOrder", {
+      const response = await fetch("https://evershinebackend-2.onrender.com/createOrder", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -258,29 +245,89 @@ export default function CartPage() {
       })
 
       // Log response details
-      console.log("8. Response Status:", response.status, response.statusText)
+      console.log("Response Status:", response.status, response.statusText)
       debugData.responseStatus = response.status
       debugData.responseStatusText = response.statusText
 
-      // Check for errors
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error("9. Error Response Body:", errorText)
-        debugData.errorResponse = errorText
+      // Get response text first to handle both JSON and non-JSON responses
+      const responseText = await response.text()
+      debugData.errorResponse = responseText
 
+      let data
+      try {
+        // Try to parse as JSON
+        data = JSON.parse(responseText)
+        debugData.responseData = data
+      } catch (e) {
+        console.log("Response is not JSON:", responseText)
+      }
+
+      // Special case: If we get a 500 error but the order might have been created
+      if (response.status === 500) {
+        // Check if the order was actually created despite the 500 error
         try {
-          const errorData = JSON.parse(errorText)
-          throw new Error(errorData.message || `API error: ${response.status} ${response.statusText}`)
+          // Wait a moment to ensure any database operations complete
+          await new Promise((resolve) => setTimeout(resolve, 1000))
+
+          // Fetch the cart again to see if it was cleared by the server
+          const cartCheckResponse = await fetch("https://evershinebackend-2.onrender.com/api/getUserCart", {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          })
+
+          if (cartCheckResponse.ok) {
+            const cartData = await cartCheckResponse.json()
+
+            // If the cart is now empty, the order probably succeeded despite the error
+            if (cartData.data && (!cartData.data.items || cartData.data.items.length === 0)) {
+              // Clear local cart state
+              setCartItems([])
+
+              // Clear localStorage cart
+              if (typeof window !== "undefined") {
+                localStorage.removeItem("cart")
+              }
+
+              toast({
+                title: "Order Likely Placed",
+                description: "Your order may have been placed despite an error. Please check your orders page.",
+                variant: "default",
+              })
+
+              // Redirect to orders page
+              setTimeout(() => {
+                router.push(`/client-dashboard/${clientId}/orders`)
+              }, 2000)
+
+              return
+            }
+          }
+        } catch (cartCheckError) {
+          console.error("Error checking cart after order attempt:", cartCheckError)
+        }
+
+        // If we get here, the cart check didn't confirm success
+        throw new Error("Server error occurred. The order may or may not have been placed. Please check your orders.")
+      }
+
+      // Normal error handling for non-500 errors
+      if (!response.ok) {
+        try {
+          if (data && data.message) {
+            throw new Error(data.message)
+          } else {
+            throw new Error(`API error: ${response.status} ${response.statusText}`)
+          }
         } catch (e) {
           throw new Error(`API error: ${response.status} ${response.statusText}`)
         }
       }
 
-      const data = await response.json()
-      console.log("10. Response Data:", data)
-      debugData.responseData = data
-
-      if (data.success) {
+      // If we have data and it indicates success
+      if (data && data.success) {
         // Clear cart items from state
         setCartItems([])
 
@@ -299,14 +346,18 @@ export default function CartPage() {
         setTimeout(() => {
           router.push(`/client-dashboard/${clientId}/orders`)
         }, 2000)
-      } else {
+      } else if (data) {
+        // We have data but success is false
         throw new Error(data.message || "Failed to place order")
+      } else {
+        // No parseable data
+        throw new Error("Received an invalid response from the server")
       }
 
       // Store final debug info
       setDebugInfo(debugData)
     } catch (error: any) {
-      console.error("11. Error during checkout:", error)
+      console.error("Error during checkout:", error)
       setCheckoutError(error.message || "An unknown error occurred during checkout")
 
       // Add error to debug info
