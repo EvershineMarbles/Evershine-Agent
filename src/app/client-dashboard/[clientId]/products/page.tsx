@@ -75,7 +75,7 @@ export default function ProductsPage() {
       setError(null)
 
       // Use environment variable if available, otherwise use a default URL
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
       console.log("Fetching products from:", `${apiUrl}/api/getAllProducts`)
 
       const response = await fetch(`${apiUrl}/api/getAllProducts`, {
