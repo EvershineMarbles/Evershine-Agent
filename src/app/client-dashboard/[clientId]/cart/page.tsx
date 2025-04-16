@@ -43,7 +43,7 @@ export default function CartPage() {
 
         console.log("Fetching cart with token:", token.substring(0, 15) + "...")
 
-        const response = await fetch("https://evershinebackend-2.onrender.com/api/getUserCart", {
+        const response = await fetch("http://localhost:8000/api/getUserCart", {
           method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -99,7 +99,7 @@ export default function CartPage() {
 
       console.log("Removing item from cart with token:", token.substring(0, 15) + "...")
 
-      const response = await fetch("https://evershinebackend-2.onrender.com/api/deleteUserCartItem", {
+      const response = await fetch("http://localhost:8000/api/deleteUserCartItem", {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -178,9 +178,9 @@ export default function CartPage() {
         country: "India",
       }
 
-      // Make API request to create order
+      // Make API request to create order - ensure method is POST
       const response = await fetch("https://evershinebackend-2.onrender.com/api/createOrder", {
-        method: "POST",
+        method: "POST", // Ensure this is POST, not GET
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
