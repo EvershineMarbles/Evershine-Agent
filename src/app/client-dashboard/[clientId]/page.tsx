@@ -129,7 +129,7 @@ const ClientDashboard = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
+            <CardTitle>Quick Action</CardTitle>
             <CardDescription>Frequently used actions</CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-4">
