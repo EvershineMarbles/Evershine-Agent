@@ -28,8 +28,6 @@ export default function ProductsPage() {
   const params = useParams()
   const clientId = params.clientId as string
 
-  // Remove the unused router variable
-  // const router = useRouter()
   const { toast } = useToast()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
@@ -102,7 +100,7 @@ export default function ProductsPage() {
           image:
             Array.isArray(product.image) && product.image.length > 0
               ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
-              : ["/placeholder.svg?height=300&width=300"],
+              : ["/placeholder.svg"],
         }))
 
         setProducts(processedProducts)
@@ -160,7 +158,7 @@ export default function ProductsPage() {
   // Add to cart function
   const addToCart = useCallback(
     async (e: React.MouseEvent, productId: string, productName: string) => {
-      e.preventDefault() // Prevent navigati
+      e.preventDefault() // Prevent navigation
 
       if (cart.includes(productId)) {
         toast({
@@ -190,17 +188,6 @@ export default function ProductsPage() {
           throw new Error("No authentication token found")
         }
 
-        console.log("Using token:", token.substring(0, 15) + "...")
-        console.log("Full request details:", {
-          url: "https://evershinebackend-2.onrender.com/api/addToCart",
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ productId }),
-        })
-
         // Make a direct fetch request with the token
         const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
           method: "POST",
@@ -211,17 +198,13 @@ export default function ProductsPage() {
           body: JSON.stringify({ productId }),
         })
 
-        console.log("Response status:", response.status, response.statusText)
-
         // Get the response text for debugging
         const responseText = await response.text()
-        console.log("Response text:", responseText)
 
-        // Try to parse the response a JSON
+        // Try to parse the response as JSON
         let data
         try {
           data = JSON.parse(responseText)
-          console.log("Parsed response data:", data)
         } catch (e) {
           console.error("Failed to parse response as JSON:", e)
           throw new Error(`Invalid response format: ${responseText}`)
@@ -232,7 +215,7 @@ export default function ProductsPage() {
           if (response.status === 401) {
             throw new Error("Authentication failed. Please refresh the token using the debug panel above.")
           } else {
-            throw new Error(`API error: ${response.status} ${response.statusText}. Details: ${responseText}`)
+            throw new Error(`API error: ${response.status} ${response.statusText}`)
           }
         }
 
@@ -271,6 +254,7 @@ export default function ProductsPage() {
 
   // Handle image loading errors
   const handleImageError = useCallback((productId: string) => {
+    console.log("Image error for product:", productId)
     setImageError((prev) => ({ ...prev, [productId]: true }))
   }, [])
 
@@ -279,7 +263,7 @@ export default function ProductsPage() {
     return (
       <div className="flex flex-col items-center justify-center h-[80vh]">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-muted-foreground">Loading products..</p>
+        <p className="text-muted-foreground">Loading products...</p>
       </div>
     )
   }
@@ -348,34 +332,30 @@ export default function ProductsPage() {
               key={product._id}
               className="group relative bg-card rounded-lg overflow-hidden border border-border hover:border-primary transition-all hover:shadow-md"
             >
-              <div className="relative aspect-square">
-                <Image
-                  src={
-                    imageError[product._id]
-                      ? "/placeholder.svg?height=300&width=300"
-                      : product.image && product.image.length > 0 && product.image[0]
-                        ? product.image[0]
-                        : "/placeholder.svg?height=300&width=300"
-                  }
-                  alt={product.name}
-                  fill
-                  className="object-cover transition-transform group-hover:scale-105 duration-300"
-                  onError={() => handleImageError(product._id)}
-                />
-
-                {/* Wishlist button overlay */}
-                <button
-                  onClick={(e) => toggleWishlist(e, product.postId)}
-                  className="absolute top-2 right-2 p-2 rounded-full bg-white/80 hover:bg-white transition-colors z-10"
-                  aria-label={wishlist.includes(product.postId) ? "Remove from wishlist" : "Add to wishlist"}
-                  type="button"
-                >
-                  <Heart
-                    className={`h-5 w-5 ${
-                      wishlist.includes(product.postId) ? "text-red-500 fill-red-500" : "text-gray-600"
-                    }`}
+              <div className="p-3">
+                <div className="relative w-full overflow-hidden rounded-xl bg-gray-50 aspect-square">
+                  <Image
+                    src={imageError[product._id] ? "/placeholder.svg" : product.image?.[0] || "/placeholder.svg"}
+                    alt={product.name}
+                    fill
+                    className="object-cover transition-transform group-hover:scale-105 duration-300"
+                    onError={() => handleImageError(product._id)}
                   />
-                </button>
+
+                  {/* Wishlist button overlay */}
+                  <button
+                    onClick={(e) => toggleWishlist(e, product.postId)}
+                    className="absolute top-2 right-2 p-2 rounded-full bg-white/80 hover:bg-white transition-colors z-10"
+                    aria-label={wishlist.includes(product.postId) ? "Remove from wishlist" : "Add to wishlist"}
+                    type="button"
+                  >
+                    <Heart
+                      className={`h-5 w-5 ${
+                        wishlist.includes(product.postId) ? "text-red-500 fill-red-500" : "text-gray-600"
+                      }`}
+                    />
+                  </button>
+                </div>
               </div>
 
               <div className="p-4">

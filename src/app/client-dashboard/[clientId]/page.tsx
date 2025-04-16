@@ -9,7 +9,7 @@ import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Loader2, AlertCircle, Search, Heart } from "lucide-react"
+import { Loader2, AlertCircle, Search, Heart, QrCode, ShoppingCart, Package } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 
 interface Product {
@@ -39,6 +39,7 @@ export default function ClientDashboard() {
   const [wishlist, setWishlist] = useState<string[]>([])
   const [cart, setCart] = useState<string[]>([])
   const [addingToCart, setAddingToCart] = useState<Record<string, boolean>>({})
+  const [showQrScanner, setShowQrScanner] = useState(false)
 
   // Fetch client data
   useEffect(() => {
@@ -116,8 +117,6 @@ export default function ClientDashboard() {
         const data = await response.json()
 
         if (data.success && Array.isArray(data.data)) {
-          console.log("Products fetched successfully:", data.data)
-
           // Process the image URLs to ensure they're valid
           const processedProducts = data.data.map((product: Product) => ({
             ...product,
@@ -212,8 +211,6 @@ export default function ClientDashboard() {
       // Set loading state for this specific product
       setAddingToCart((prev) => ({ ...prev, [productId]: true }))
 
-      console.log("Adding to cart:", productId, productName)
-
       // Get the token
       const token = localStorage.getItem("clientImpersonationToken")
 
@@ -237,7 +234,6 @@ export default function ClientDashboard() {
 
         try {
           const errorText = await response.text()
-          console.error("Error response body:", errorText)
 
           // Try to parse as JSON if possible
           try {
@@ -263,7 +259,6 @@ export default function ClientDashboard() {
       }
 
       const data = await response.json()
-      console.log("Add to cart response:", data)
 
       if (data.success) {
         toast({
@@ -286,6 +281,16 @@ export default function ClientDashboard() {
       // Clear loading state
       setAddingToCart((prev) => ({ ...prev, [productId]: false }))
     }
+  }
+
+  // Handle QR code scanning
+  const handleScanQrCode = () => {
+    setShowQrScanner(true)
+    // In a real implementation, you would open a camera view or QR scanner here
+    toast({
+      title: "QR Scanner",
+      description: "QR code scanner would open here in a real implementation",
+    })
   }
 
   // Filter products based on search query
@@ -323,96 +328,130 @@ export default function ClientDashboard() {
 
   return (
     <div className="p-6 md:p-8">
-      <h1 className="text-3xl font-bold mb-8">Welcome, {clientData?.name?.split(" ")[0] || "Client"}</h1>
+      {/* Header Section with Welcome, Search and QR Code */}
+      <div className="mb-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+          <h1 className="text-3xl font-bold">Welcome, {clientData?.name?.split(" ")[0] || "Client"}</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-        <Card>
+          <div className="flex items-center gap-4 w-full md:w-auto">
+            <div className="relative flex-grow md:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                type="text"
+                placeholder="Search products..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+
+            <Link href={`/client-dashboard/${clientId}/cart`} className="relative">
+              <Button variant="outline" size="icon" className="rounded-full h-10 w-10">
+                <ShoppingCart className="h-5 w-5" />
+                {cart.length > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-primary text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                    {cart.length}
+                  </span>
+                )}
+              </Button>
+            </Link>
+          </div>
+        </div>
+
+        <Button
+          onClick={handleScanQrCode}
+          className="w-full md:w-auto bg-blue-700 hover:bg-blue-800 flex items-center justify-center gap-2"
+        >
+          <QrCode className="h-5 w-5" />
+          <span>Scan QR code</span>
+        </Button>
+      </div>
+
+      {/* Client Information Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-100">
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Client Information</CardTitle>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Package className="h-5 w-5 text-blue-600" />
+              Quick Actions
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <dl className="space-y-2">
-              <div>
-                <dt className="text-sm text-muted-foreground">Name</dt>
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="outline" size="sm" onClick={() => router.push(`/client-dashboard/${clientId}/products`)}>
+                Browse Products
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => router.push(`/client-dashboard/${clientId}/orders`)}>
+                View Orders
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => router.push(`/client-dashboard/${clientId}/wishlist`)}>
+                My Wishlist
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => router.push(`/client-dashboard/${clientId}/settings`)}>
+                Settings
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-amber-50 to-orange-50 border-amber-100">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">Your Profile</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <dl className="space-y-1 text-sm">
+              <div className="flex justify-between">
+                <dt className="text-muted-foreground">Name:</dt>
                 <dd className="font-medium">{clientData?.name || "N/A"}</dd>
               </div>
-              <div>
-                <dt className="text-sm text-muted-foreground">Mobile</dt>
+              <div className="flex justify-between">
+                <dt className="text-muted-foreground">Mobile:</dt>
                 <dd className="font-medium">{clientData?.mobile || "N/A"}</dd>
               </div>
-              <div>
-                <dt className="text-sm text-muted-foreground">Email</dt>
-                <dd className="font-medium">{clientData?.email || "N/A"}</dd>
-              </div>
-              <div>
-                <dt className="text-sm text-muted-foreground">City</dt>
+              <div className="flex justify-between">
+                <dt className="text-muted-foreground">City:</dt>
                 <dd className="font-medium">{clientData?.city || "N/A"}</dd>
               </div>
-              <div>
-                <dt className="text-sm text-muted-foreground">Profession</dt>
+              <div className="flex justify-between">
+                <dt className="text-muted-foreground">Profession:</dt>
                 <dd className="font-medium">{clientData?.profession || "N/A"}</dd>
               </div>
             </dl>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Quick Links</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4">
-              <Link href={`/client-dashboard/${clientId}/products`}>
-                <Button variant="outline" className="w-full">
-                  Browse Products
-                </Button>
-              </Link>
-              <Link href={`/client-dashboard/${clientId}/cart`}>
-                <Button variant="outline" className="w-full">
-                  View Cart
-                </Button>
-              </Link>
-              <Link href={`/client-dashboard/${clientId}/wishlist`}>
-                <Button variant="outline" className="w-full">
-                  My Wishlist
-                </Button>
-              </Link>
-              <Link href={`/client-dashboard/${clientId}/orders`}>
-                <Button variant="outline" className="w-full">
-                  Order History
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
+        <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-100">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg">Cart Summary</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="mb-4">You have {cart.length} item(s) in your cart</p>
-            <Link href={`/client-dashboard/${clientId}/cart`}>
-              <Button className="w-full">View Cart</Button>
-            </Link>
+            <Button
+              className="w-full"
+              variant={cart.length > 0 ? "default" : "outline"}
+              onClick={() => router.push(`/client-dashboard/${clientId}/cart`)}
+            >
+              {cart.length > 0 ? "View Cart" : "Browse Products"}
+            </Button>
           </CardContent>
         </Card>
       </div>
 
       {/* Products Section */}
-      <div className="mt-12">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold">Featured Products</h2>
-          <div className="relative w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              type="text"
-              placeholder="Search products..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
+      <div className="mt-8">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold">Featured Products</h2>
+          <Link href={`/client-dashboard/${clientId}/products`}>
+            <Button variant="link" className="text-primary">
+              View All
+            </Button>
+          </Link>
+        </div>
+
+        <div className="mb-4">
+          <p className="text-sm text-muted-foreground">
+            Showing 1-{Math.min(filteredProducts.length, 8)} of {products.length} products
+          </p>
         </div>
 
         {productsLoading ? (
@@ -502,14 +541,6 @@ export default function ClientDashboard() {
                 </div>
               </div>
             ))}
-          </div>
-        )}
-
-        {filteredProducts.length > 8 && (
-          <div className="mt-8 text-center">
-            <Link href={`/client-dashboard/${clientId}/products`}>
-              <Button variant="outline">View All Products</Button>
-            </Link>
           </div>
         )}
       </div>

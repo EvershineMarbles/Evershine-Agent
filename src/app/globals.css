@@ -70,7 +70,8 @@
   text-xs font-bold transition-all duration-100 scale-0 origin-left;
 }
 
-.sidebar-icon:hover .sidebar-tooltip {
+/* Add this to make the tooltip appear on hover */
+button:hover .sidebar-tooltip {
   @apply scale-100;
 }
 
