@@ -4,9 +4,10 @@ import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowLeft, Trash2, Loader2, ShoppingBag } from "lucide-react"
+import { ArrowLeft, Trash2, Loader2, ShoppingBag, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 interface CartItem {
   _id: string
@@ -18,6 +19,23 @@ interface CartItem {
   quantity: number
 }
 
+// Define the debug info type to fix TypeScript errors
+interface DebugInfo {
+  requestUrl: string
+  requestMethod: string
+  requestPayload: any
+  responseStatus: number
+  responseStatusText: string
+  errorResponse?: string
+  secondAttemptUrl?: string
+  secondAttemptStatus?: number
+  secondAttemptStatusText?: string
+  secondAttemptErrorResponse?: string
+  responseData?: any
+  error?: string
+  errorStack?: string
+}
+
 export default function CartPage() {
   const params = useParams()
   const router = useRouter()
@@ -27,6 +45,9 @@ export default function CartPage() {
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [loading, setLoading] = useState(true)
   const [removing, setRemoving] = useState<Record<string, boolean>>({})
+  const [isCheckingOut, setIsCheckingOut] = useState(false)
+  const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null)
+  const [checkoutError, setCheckoutError] = useState<string | null>(null)
 
   // Fetch cart items
   useEffect(() => {
@@ -64,7 +85,16 @@ export default function CartPage() {
 
         if (data.data) {
           console.log("Cart data:", data.data)
-          setCartItems(data.data.items || [])
+          // Filter out any items with null or undefined postId
+          const validItems = (data.data.items || []).filter(
+            (item: CartItem) => item.postId && typeof item.postId === "string",
+          )
+          setCartItems(validItems)
+
+          // Check if any items were filtered out
+          if (validItems.length < (data.data.items || []).length) {
+            console.warn("Some items were filtered out due to missing postId")
+          }
         } else {
           setCartItems([])
         }
@@ -158,7 +188,20 @@ export default function CartPage() {
   // Handle checkout
   const handleCheckout = async () => {
     try {
-      setLoading(true)
+      setIsCheckingOut(true)
+      setDebugInfo(null)
+      setCheckoutError(null)
+
+      // Validate cart has items
+      if (cartItems.length === 0) {
+        throw new Error("Your cart is empty. Please add items before checking out.")
+      }
+
+      // Check for any items with null or undefined postId
+      const invalidItems = cartItems.filter((item) => !item.postId || typeof item.postId !== "string")
+      if (invalidItems.length > 0) {
+        throw new Error("Some items in your cart are invalid. Please remove them and try again.")
+      }
 
       // Get the token
       const token = localStorage.getItem("clientImpersonationToken")
@@ -176,24 +219,54 @@ export default function CartPage() {
         country: "India",
       }
 
-      // Make API request to create order
-      const response = await fetch("https://evershinebackend-2.onrender.com/api/createOrder", {
+      const payload = {
+        shippingAddress,
+        paymentMethod: "bank_transfer", // Default payment method
+        notes: "Order placed via agent dashboard",
+      }
+
+      // Debug logging
+      console.log("=== CHECKOUT DEBUG INFO ===")
+      console.log("1. Request URL:", "https://evershinebackend-2.onrender.com/createOrder")
+      console.log("2. Request Method:", "POST")
+      console.log("3. Request Headers:", {
+        Authorization: `Bearer ${token.substring(0, 15)}...`,
+        "Content-Type": "application/json",
+      })
+      console.log("4. Request Payload:", payload)
+      console.log("5. Client ID from params:", clientId)
+      console.log("6. Cart Items Count:", cartItems.length)
+      console.log("7. Total Amount:", calculateTotal())
+
+      // Initialize debug data
+      const debugData: DebugInfo = {
+        requestUrl: "https://evershinebackend-2.onrender.com/createOrder",
+        requestMethod: "POST",
+        requestPayload: payload,
+        responseStatus: 0,
+        responseStatusText: "",
+      }
+
+      // Make API request to create order - use the direct endpoint without /api prefix
+      const response = await fetch("https://evershinebackend-2.onrender.com/createOrder", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          shippingAddress,
-          paymentMethod: "bank_transfer", // Default payment method
-          notes: "Order placed via agent dashboard",
-        }),
+        body: JSON.stringify(payload),
       })
+
+      // Log response details
+      console.log("8. Response Status:", response.status, response.statusText)
+      debugData.responseStatus = response.status
+      debugData.responseStatusText = response.statusText
 
       // Check for errors
       if (!response.ok) {
         const errorText = await response.text()
-        console.error("Checkout error response:", errorText)
+        console.error("9. Error Response Body:", errorText)
+        debugData.errorResponse = errorText
 
         try {
           const errorData = JSON.parse(errorText)
@@ -204,6 +277,8 @@ export default function CartPage() {
       }
 
       const data = await response.json()
+      console.log("10. Response Data:", data)
+      debugData.responseData = data
 
       if (data.success) {
         // Clear cart items from state
@@ -227,15 +302,31 @@ export default function CartPage() {
       } else {
         throw new Error(data.message || "Failed to place order")
       }
+
+      // Store final debug info
+      setDebugInfo(debugData)
     } catch (error: any) {
-      console.error("Error during checkout:", error)
+      console.error("11. Error during checkout:", error)
+      setCheckoutError(error.message || "An unknown error occurred during checkout")
+
+      // Add error to debug info
+      setDebugInfo((prev) =>
+        prev
+          ? {
+              ...prev,
+              error: error.message,
+              errorStack: error.stack,
+            }
+          : null,
+      )
+
       toast({
         title: "Checkout Failed",
         description: error.message || "Failed to place your order. Please try again.",
         variant: "destructive",
       })
     } finally {
-      setLoading(false)
+      setIsCheckingOut(false)
     }
   }
 
@@ -256,6 +347,13 @@ export default function CartPage() {
         </Button>
         <h1 className="text-3xl font-bold">Your Cart</h1>
       </div>
+
+      {checkoutError && (
+        <Alert variant="destructive" className="mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{checkoutError}</AlertDescription>
+        </Alert>
+      )}
 
       {cartItems.length === 0 ? (
         <div className="text-center py-12 bg-muted/20 rounded-lg">
@@ -278,7 +376,7 @@ export default function CartPage() {
               </div>
               <div className="divide-y divide-border">
                 {cartItems.map((item) => (
-                  <div key={item.postId} className="p-4 flex items-center">
+                  <div key={item._id || item.postId} className="p-4 flex items-center">
                     <div className="relative h-20 w-20 rounded-md overflow-hidden flex-shrink-0">
                       <Image
                         src={
@@ -316,6 +414,16 @@ export default function CartPage() {
                 ))}
               </div>
             </div>
+
+            {/* Debug information section */}
+            {debugInfo && (
+              <div className="mt-6 p-4 bg-gray-100 rounded-lg border border-gray-300">
+                <h3 className="font-bold mb-2">Debug Information</h3>
+                <pre className="text-xs overflow-auto max-h-60 p-2 bg-gray-200 rounded">
+                  {JSON.stringify(debugInfo, null, 2)}
+                </pre>
+              </div>
+            )}
           </div>
 
           <div className="lg:col-span-1">
@@ -345,8 +453,19 @@ export default function CartPage() {
                   </div>
                 </div>
 
-                <Button onClick={handleCheckout} className="w-full mt-6 bg-primary hover:bg-primary/90">
-                  Proceed to Checkout
+                <Button
+                  onClick={handleCheckout}
+                  className="w-full mt-6 bg-primary hover:bg-primary/90"
+                  disabled={isCheckingOut || cartItems.length === 0}
+                >
+                  {isCheckingOut ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    "Proceed to Checkout"
+                  )}
                 </Button>
 
                 <div className="mt-4 text-center">
