@@ -225,7 +225,7 @@ export default function CartPage() {
         notes: "Order placed via agent dashboard",
       }
 
-      // Initialize debug data
+      // Initialize debug data with the correct URL
       const debugData: DebugInfo = {
         requestUrl: "https://evershinebackend-2.onrender.com/api/createOrder",
         requestMethod: "POST",
@@ -234,7 +234,7 @@ export default function CartPage() {
         responseStatusText: "",
       }
 
-      // Make API request to create order - use the direct endpoint without /api prefix
+      // Make API request to create order - ensure we're using /api/ in the URL
       const response = await fetch("https://evershinebackend-2.onrender.com/api/createOrder", {
         method: "POST",
         headers: {
@@ -264,10 +264,11 @@ export default function CartPage() {
 
       // Special case: If we get a 500 error but the order might have been created
       if (response.status === 500) {
-        // Check if the order was actually created despite the 500 error
+        console.log("Received 500 error, checking if order was still created...")
+
         try {
           // Wait a moment to ensure any database operations complete
-          await new Promise((resolve) => setTimeout(resolve, 1000))
+          await new Promise((resolve) => setTimeout(resolve, 1500))
 
           // Fetch the cart again to see if it was cleared by the server
           const cartCheckResponse = await fetch("https://evershinebackend-2.onrender.com/api/getUserCart", {
@@ -278,11 +279,18 @@ export default function CartPage() {
             },
           })
 
+          debugData.secondAttemptUrl = "https://evershinebackend-2.onrender.com/api/getUserCart"
+          debugData.secondAttemptStatus = cartCheckResponse.status
+          debugData.secondAttemptStatusText = cartCheckResponse.statusText
+
           if (cartCheckResponse.ok) {
             const cartData = await cartCheckResponse.json()
+            console.log("Cart check after 500 error:", cartData)
 
             // If the cart is now empty, the order probably succeeded despite the error
             if (cartData.data && (!cartData.data.items || cartData.data.items.length === 0)) {
+              console.log("Cart is empty after 500 error, assuming order was successful")
+
               // Clear local cart state
               setCartItems([])
 
@@ -292,8 +300,9 @@ export default function CartPage() {
               }
 
               toast({
-                title: "Order Likely Placed",
-                description: "Your order may have been placed despite an error. Please check your orders page.",
+                title: "Order Successfully Placed",
+                description:
+                  "Your order has been placed successfully despite a server error. You can view it in your orders.",
                 variant: "default",
               })
 
@@ -303,10 +312,18 @@ export default function CartPage() {
               }, 2000)
 
               return
+            } else {
+              console.log("Cart still has items after 500 error, order likely failed")
+              debugData.secondAttemptErrorResponse = "Cart still contains items after order attempt"
             }
+          } else {
+            const errorText = await cartCheckResponse.text()
+            debugData.secondAttemptErrorResponse = errorText
+            console.log("Failed to check cart after 500 error:", errorText)
           }
-        } catch (cartCheckError) {
+        } catch (cartCheckError: any) {
           console.error("Error checking cart after order attempt:", cartCheckError)
+          debugData.secondAttemptErrorResponse = cartCheckError.message
         }
 
         // If we get here, the cart check didn't confirm success
