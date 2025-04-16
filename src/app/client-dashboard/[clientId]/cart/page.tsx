@@ -43,7 +43,7 @@ export default function CartPage() {
 
         console.log("Fetching cart with token:", token.substring(0, 15) + "...")
 
-        const response = await fetch("https://evershinebackend-2.onrender.com/api/getUserCart", {
+        const response = await fetch("http://localhost:8000/api/getUserCart", {
           method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -178,9 +178,9 @@ export default function CartPage() {
         country: "India",
       }
 
-      // Make API request to create order - ensure method is POST
+      // Make API request to create order - ensure method is POST and use the correct endpoint
       const response = await fetch("https://evershinebackend-2.onrender.com/api/createOrder", {
-        method: "POST", // Ensure this is POST, not GET
+        method: "POST", // Ensure this is POST
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -191,6 +191,10 @@ export default function CartPage() {
           notes: "Order placed via agent dashboard",
         }),
       })
+
+      // Log the response for debugging
+      console.log("Checkout response status:", response.status)
+      console.log("Checkout response status text:", response.statusText)
 
       // Check for errors
       if (!response.ok) {
