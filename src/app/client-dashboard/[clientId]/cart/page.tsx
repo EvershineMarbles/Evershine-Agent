@@ -227,7 +227,7 @@ export default function CartPage() {
 
       // Initialize debug data
       const debugData: DebugInfo = {
-        requestUrl: "https://evershinebackend-2.onrender.com/createOrder",
+        requestUrl: "https://evershinebackend-2.onrender.com/api/createOrder",
         requestMethod: "POST",
         requestPayload: payload,
         responseStatus: 0,
@@ -235,7 +235,7 @@ export default function CartPage() {
       }
 
       // Make API request to create order - use the direct endpoint without /api prefix
-      const response = await fetch("https://evershinebackend-2.onrender.com/createOrder", {
+      const response = await fetch("https://evershinebackend-2.onrender.com/api/createOrder", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
