@@ -28,15 +28,25 @@ export interface Product {
     return true
   }
   
-  // Replace the validateWishlistItem function with this implementation:
+  // Update the validateWishlistItem function to be more lenient with validation
   export function validateWishlistItem(item: any): item is WishlistItem {
-    // First check if it's a valid product
-    if (!validateProduct(item)) return false
+    // Basic validation to ensure we have an item
+    if (!item) return false
   
-    // Then check wishlist-specific fields
-    // Use a type assertion to tell TypeScript we're checking for a WishlistItem
-    const wishlistItem = item as Partial<WishlistItem>
-    if (typeof wishlistItem.quantity !== "number" || wishlistItem.quantity < 1) return false
+    // Check for essential properties
+    if (!item.postId || typeof item.postId !== "string") return false
+    if (!item.name || typeof item.name !== "string") return false
+    if (typeof item.price !== "number") return false
+  
+    // For quantity, accept any number or default to 1
+    if (item.quantity === undefined || item.quantity === null) {
+      item.quantity = 1
+    }
+  
+    // For quantityAvailable, accept any number or default to 0
+    if (item.quantityAvailable === undefined || item.quantityAvailable === null) {
+      item.quantityAvailable = 0
+    }
   
     return true
   }
@@ -48,10 +58,24 @@ export interface Product {
     return products.filter(validateProduct)
   }
   
-  /**
-   * Ensures an array of wishlist items only contains valid items
-   */
+  // Update the filterValidWishlistItems function to provide better logging
   export function filterValidWishlistItems(items: any[]): WishlistItem[] {
-    return items.filter(validateWishlistItem)
+    if (!items || !Array.isArray(items)) {
+      console.warn("filterValidWishlistItems received invalid input:", items)
+      return []
+    }
+  
+    console.log(`Filtering ${items.length} wishlist items`)
+  
+    const validItems = items.filter((item) => {
+      const isValid = validateWishlistItem(item)
+      if (!isValid) {
+        console.warn("Invalid wishlist item:", item)
+      }
+      return isValid
+    })
+  
+    console.log(`Found ${validItems.length} valid wishlist items`)
+    return validItems
   }
   
