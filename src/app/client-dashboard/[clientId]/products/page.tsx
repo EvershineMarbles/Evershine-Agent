@@ -37,6 +37,7 @@ export default function ProductsPage() {
   const [wishlist, setWishlist] = useState<string[]>([])
   const [cart, setCart] = useState<string[]>([])
   const [addingToCart, setAddingToCart] = useState<Record<string, boolean>>({})
+  const [addingToWishlist, setAddingToWishlist] = useState<Record<string, boolean>>({})
   const [error, setError] = useState<string | null>(null)
 
   // Load wishlist and cart from localStorage
@@ -94,8 +95,17 @@ export default function ProductsPage() {
       if (data.success && Array.isArray(data.data)) {
         console.log("Products fetched successfully:", data.data)
 
+        // Filter out products with missing or invalid postId
+        const validProducts = data.data.filter(
+          (product: Product) => product.postId && typeof product.postId === "string",
+        )
+
+        if (validProducts.length < data.data.length) {
+          console.warn(`Filtered out ${data.data.length - validProducts.length} products with invalid postId`)
+        }
+
         // Process the image URLs to ensure they're valid
-        const processedProducts = data.data.map((product: Product) => ({
+        const processedProducts = validProducts.map((product: Product) => ({
           ...product,
           image:
             Array.isArray(product.image) && product.image.length > 0
@@ -135,6 +145,19 @@ export default function ProductsPage() {
   const toggleWishlist = useCallback(
     async (e: React.MouseEvent, productId: string) => {
       e.preventDefault() // Prevent navigation
+
+      // Add validation here
+      if (!productId || typeof productId !== "string") {
+        toast({
+          title: "Error",
+          description: "Invalid product ID. Cannot update wishlist.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Set loading state for this specific product
+      setAddingToWishlist((prev) => ({ ...prev, [productId]: true }))
 
       try {
         // Get the token
@@ -206,6 +229,8 @@ export default function ProductsPage() {
           description: error.message || "Failed to update wishlist. Please try again.",
           variant: "destructive",
         })
+      } finally {
+        setAddingToWishlist((prev) => ({ ...prev, [productId]: false }))
       }
     },
     [wishlist, toast],
@@ -215,6 +240,16 @@ export default function ProductsPage() {
   const addToCart = useCallback(
     async (e: React.MouseEvent, productId: string, productName: string) => {
       e.preventDefault() // Prevent navigation
+
+      // Add validation here
+      if (!productId || typeof productId !== "string") {
+        toast({
+          title: "Error",
+          description: "Invalid product ID. Cannot add to cart.",
+          variant: "destructive",
+        })
+        return
+      }
 
       if (cart.includes(productId)) {
         toast({
@@ -314,6 +349,21 @@ export default function ProductsPage() {
     setImageError((prev) => ({ ...prev, [productId]: true }))
   }, [])
 
+  // Debug logging for products
+  useEffect(() => {
+    // Check for problematic products
+    const productsWithoutPostId = products.filter((product) => !product.postId)
+    const productsWithInvalidPostId = products.filter((product) => product.postId && typeof product.postId !== "string")
+
+    if (productsWithoutPostId.length > 0) {
+      console.warn("Products without postId:", productsWithoutPostId)
+    }
+
+    if (productsWithInvalidPostId.length > 0) {
+      console.warn("Products with invalid postId:", productsWithInvalidPostId)
+    }
+  }, [products])
+
   // Loading state
   if (loading) {
     return (
@@ -325,133 +375,143 @@ export default function ProductsPage() {
   }
 
   return (
-    <div className="p-6 md:p-8">
-      {error && (
-        <Alert variant="destructive" className="mb-4">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+      <div className="p-6 md:p-8">
+        {error && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">Products</h1>
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold">Products</h1>
 
-        <div className="flex items-center gap-4">
-          <Link href={`/client-dashboard/${clientId}/wishlist`} className="relative">
-            <Heart className="h-6 w-6 text-gray-600" />
-            {wishlist.length > 0 && (
-              <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                {wishlist.length}
-              </span>
-            )}
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link href={`/client-dashboard/${clientId}/wishlist`} className="relative">
+              <Heart className="h-6 w-6 text-gray-600" />
+              {wishlist.length > 0 && (
+                <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {wishlist.length}
+                </span>
+              )}
+            </Link>
 
-          <Link href={`/client-dashboard/${clientId}/cart`} className="relative">
-            <ShoppingCart className="h-6 w-6 text-gray-600" />
-            {cart.length > 0 && (
-              <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                {cart.length}
-              </span>
-            )}
-          </Link>
+            <Link href={`/client-dashboard/${clientId}/cart`} className="relative">
+              <ShoppingCart className="h-6 w-6 text-gray-600" />
+              {cart.length > 0 && (
+                <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {cart.length}
+                </span>
+              )}
+            </Link>
+          </div>
         </div>
-      </div>
 
-      <div className="relative mb-6">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-        <input
-          type="text"
-          placeholder="Search products by name or category..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10 pr-4 py-2 w-full rounded-lg border border-input focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-        />
-      </div>
-
-      {filteredProducts.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-xl font-medium mb-4">No products found</p>
-          <p className="text-muted-foreground mb-6">
-            {searchQuery ? "Try a different search term" : "No products are currently available"}
-          </p>
-          <button
-            onClick={fetchProducts}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
-          >
-            Refresh Products
-          </button>
+        <div className="relative mb-6">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search products by name or category..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 pr-4 py-2 w-full rounded-lg border border-input focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+          />
         </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredProducts.map((product) => (
-            <div
-              key={product._id}
-              className="group relative bg-card rounded-lg overflow-hidden border border-border hover:border-primary transition-all hover:shadow-md"
+
+        {filteredProducts.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-xl font-medium mb-4">No products found</p>
+            <p className="text-muted-foreground mb-6">
+              {searchQuery ? "Try a different search term" : "No products are currently available"}
+            </p>
+            <button
+              onClick={fetchProducts}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
             >
-              <div className="p-3">
-                <div className="relative w-full overflow-hidden rounded-xl bg-gray-50 aspect-square">
-                  {/* The key change is here - adding unoptimized={true} */}
-                  <Image
-                    src={imageError[product._id] ? "/placeholder.svg" : product.image?.[0] || "/placeholder.svg"}
-                    alt={product.name}
-                    fill
-                    unoptimized={true} // This bypasses Vercel's image optimization
-                    className="object-cover transition-transform group-hover:scale-105 duration-300"
-                    onError={() => handleImageError(product._id)}
-                  />
+              Refresh Products
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredProducts.map((product) => (
+              <div
+                key={product._id}
+                className="group relative bg-card rounded-lg overflow-hidden border border-border hover:border-primary transition-all hover:shadow-md"
+              >
+                <div className="p-3">
+                  <div className="relative w-full overflow-hidden rounded-xl bg-gray-50 aspect-square">
+                    <Image
+                      src={imageError[product._id] ? "/placeholder.svg" : product.image?.[0] || "/placeholder.svg"}
+                      alt={product.name}
+                      fill
+                      unoptimized={true} // This bypasses Vercel's image optimization
+                      className="object-cover transition-transform group-hover:scale-105 duration-300"
+                      onError={() => handleImageError(product._id)}
+                    />
 
-                  {/* Wishlist button overlay */}
+                    {/* Wishlist button overlay */}
+                    <button
+                      onClick={(e) => toggleWishlist(e, product.postId)}
+                      className="absolute top-2 right-2 p-2 rounded-full bg-white/80 hover:bg-white transition-colors z-10"
+                      aria-label={wishlist.includes(product.postId) ? "Remove from wishlist" : "Add to wishlist"}
+                      type="button"
+                      disabled={addingToWishlist[product.postId]}
+                    >
+                      {addingToWishlist[product.postId] ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : (
+                        <Heart
+                          className={`h-5 w-5 ${
+                            wishlist.includes(product.postId) ? "text-red-500 fill-red-500" : "text-gray-600"
+                          }`}
+                        />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-4">
+                  <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
+                  <p className="text-lg font-bold mt-2">₹{product.price.toLocaleString()}</p>
+                  <p className="text-sm text-muted-foreground mt-1">{product.category}</p>
+
+                  {product.quantityAvailable !== undefined && (
+                    <p className="text-sm mt-1">
+                      {product.quantityAvailable > 0 ? `In stock: ${product.quantityAvailable}` : "Out of stock"}
+                    </p>
+                  )}
+
                   <button
-                    onClick={(e) => toggleWishlist(e, product.postId)}
-                    className="absolute top-2 right-2 p-2 rounded-full bg-white/80 hover:bg-white transition-colors z-10"
-                    aria-label={wishlist.includes(product.postId) ? "Remove from wishlist" : "Add to wishlist"}
+                    onClick={(e) => addToCart(e, product.postId, product.name)}
+                    className={`mt-4 w-full py-2 rounded-lg text-sm font-medium
+                              ${
+                                cart.includes(product.postId)
+                                  ? "bg-muted text-muted-foreground"
+                                  : "bg-primary hover:bg-primary/90 text-primary-foreground"
+                              } 
+                              transition-colors`}
+                    disabled={
+                      cart.includes(product.postId) ||
+                      addingToCart[product.postId] ||
+                      (product.quantityAvailable !== undefined && product.quantityAvailable <= 0)
+                    }
                     type="button"
                   >
-                    <Heart
-                      className={`h-5 w-5 ${
-                        wishlist.includes(product.postId) ? "text-red-500 fill-red-500" : "text-gray-600"
-                      }`}
-                    />
+                    {addingToCart[product.postId] ? (
+                      <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                    ) : cart.includes(product.postId) ? (
+                      "Added to Cart"
+                    ) : product.quantityAvailable !== undefined && product.quantityAvailable <= 0 ? (
+                      "Out of Stock"
+                    ) : (
+                      "Add to Cart" // Fixed: Changed from "Add to Wishlist" to "Add to Cart"
+                    )}
                   </button>
                 </div>
               </div>
-
-              <div className="p-4">
-                <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
-                <p className="text-lg font-bold mt-2">₹{product.price.toLocaleString()}</p>
-                <p className="text-sm text-muted-foreground mt-1">{product.category}</p>
-
-                <button
-                  onClick={(e) => addToCart(e, product.postId, product.name)}
-                  className={`mt-4 w-full py-2 rounded-lg text-sm font-medium
-                            ${
-                              cart.includes(product.postId)
-                                ? "bg-muted text-muted-foreground"
-                                : "bg-primary hover:bg-primary/90 text-primary-foreground"
-                            } 
-                            transition-colors`}
-                  disabled={
-                    cart.includes(product.postId) ||
-                    addingToCart[product.postId] ||
-                    (product.quantityAvailable !== undefined && product.quantityAvailable <= 0)
-                  }
-                  type="button"
-                >
-                  {addingToCart[product.postId] ? (
-                    <Loader2 className="h-4 w-4 animate-spin mx-auto" />
-                  ) : cart.includes(product.postId) ? (
-                    "Added to Cart"
-                  ) : product.quantityAvailable !== undefined && product.quantityAvailable <= 0 ? (
-                    "Out of Stock"
-                  ) : (
-                    "Add to Wishlist"
-                  )}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+            ))}
+          </div>
+        )}
+      </div>
   )
 }
