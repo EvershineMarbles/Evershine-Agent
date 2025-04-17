@@ -8,7 +8,7 @@ import { ArrowLeft, Trash2, Loader2, Heart, AlertCircle, ShoppingCart } from "lu
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { addToCart, getWishlist, removeFromWishlist } from "@/lib/api-helpers"
+import { addToCart, removeFromWishlist } from "@/lib/api-helpers"
 import { filterValidWishlistItems, type WishlistItem } from "@/lib/validation"
 
 export default function WishlistPage() {
@@ -46,18 +46,42 @@ export default function WishlistPage() {
     }
   }, [cart])
 
-  // Fetch wishlist items
+  // Update the fetchWishlist function to add more debugging
   const fetchWishlist = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
 
       console.log("Fetching wishlist items...")
-      const response = await getWishlist()
+      const token = localStorage.getItem("clientImpersonationToken")
 
-      if (response.data && response.data.items) {
+      if (!token) {
+        throw new Error("No authentication token found")
+      }
+
+      // Log the token (first few characters only for security)
+      console.log(`Using token: ${token.substring(0, 10)}...`)
+
+      const response = await fetch("https://evershinebackend-2.onrender.com/api/getUserWishlist", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      console.log(`Wishlist API response status: ${response.status}`)
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      console.log("Wishlist API response data:", data)
+
+      if (data.success && data.data && data.data.items) {
         // Filter and validate wishlist items
-        const validItems = filterValidWishlistItems(response.data.items)
+        const validItems = filterValidWishlistItems(data.data.items)
 
         // Process the image URLs to ensure they're valid
         const processedItems = validItems.map((item) => ({
@@ -70,12 +94,8 @@ export default function WishlistPage() {
 
         console.log(`Found ${processedItems.length} valid wishlist items`)
         setWishlistItems(processedItems)
-
-        // Log if any items were filtered out
-        if (validItems.length < response.data.items.length) {
-          console.warn(`Filtered out ${response.data.items.length - validItems.length} invalid wishlist items`)
-        }
       } else {
+        console.warn("No items found in wishlist response:", data)
         setWishlistItems([])
       }
     } catch (error: any) {
