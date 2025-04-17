@@ -24,7 +24,7 @@ export default function ScanQRPage() {
   return (
     <div className="min-h-screen p-6 md:p-12 bg-gray-50">
       <div className="flex flex-col items-center relative mb-8">
-        <Link href="/" className="absolute left-6 md:left-12 top-6 inline-flex items-center text-dark hover:underline">
+        <Link href="/dashboard" className="absolute left-6 md:left-12 top-6 inline-flex items-center text-dark hover:underline">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Home
         </Link>

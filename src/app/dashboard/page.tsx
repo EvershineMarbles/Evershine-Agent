@@ -126,7 +126,7 @@ export default function Dashboard() {
       <header className="bg-white border-b p-4">
         <div className="container mx-auto flex justify-between items-center">
           <div className="flex items-center">
-            <Link href="/" className="mr-4">
+            <Link href="/dashboard" className="mr-4">
               <ArrowLeft className="h-5 w-5" />
             </Link>
             <Image src="/logo.png" alt="Evershine Logo" width={120} height={60} />
@@ -247,18 +247,6 @@ export default function Dashboard() {
                             onClick={() => handleClientSelect(client.clientId)}
                           >
                             Access Dashboard
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="border-coral text-coral hover:bg-coral/10"
-                            onClick={() => {
-                              handleClientSelect(client.clientId).then(() => {
-                                router.push(`/client-dashboard/${client.clientId}/products`)
-                              })
-                            }}
-                          >
-                            Place Order
                           </Button>
                         </td>
                       </tr>
