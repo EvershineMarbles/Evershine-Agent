@@ -444,7 +444,7 @@ export default function ProductsPage() {
                   ) : product.quantityAvailable !== undefined && product.quantityAvailable <= 0 ? (
                     "Out of Stock"
                   ) : (
-                    "Add to Cart"
+                    "Add to Wishlist"
                   )}
                 </button>
               </div>
