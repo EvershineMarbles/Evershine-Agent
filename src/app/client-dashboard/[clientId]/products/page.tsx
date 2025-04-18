@@ -486,7 +486,7 @@ export default function ProductsPage() {
                       <Loader2 className="h-4 w-4 animate-spin mr-1" />
                     ) : wishlist.includes(product.postId) ? (
                       <>
-                        <Heart className="h-4 w-4 fill-red-500 mr-1" />
+                          <Heart className="h-4 w-4 fill-gray-500 mr-1" />
                         Added to Wishlist
                       </>
                     ) : (
