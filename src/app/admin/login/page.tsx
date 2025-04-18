@@ -102,7 +102,7 @@ export default function AdminLogin() {
     <main className="flex min-h-screen flex-col items-center justify-center p-6 md:p-12 bg-gray-50">
       <div className="w-full max-w-md">
         <div className="w-full flex flex-col items-center relative mb-8">
-          <Link href="/" className="absolute left-0 top-0 inline-flex items-center text-dark hover:underline">
+          <Link href="https://evershine-two.vercel.app/" className="absolute left-0 top-0 inline-flex items-center text-dark hover:underline">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Home
           </Link>
