@@ -8,6 +8,7 @@ import { Search, Loader2, Heart, ShoppingCart, AlertCircle } from "lucide-react"
 import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { ErrorBoundary } from "@/components/error-boundary"
 
 // Define the Product interface
 interface Product {
@@ -159,6 +160,15 @@ export default function ProductsPage() {
       // Set loading state for this specific product
       setAddingToWishlist((prev) => ({ ...prev, [productId]: true }))
 
+      // Optimistically update UI
+      if (wishlist.includes(productId)) {
+        // Remove from wishlist
+        setWishlist((prev) => prev.filter((id) => id !== productId))
+      } else {
+        // Add to wishlist
+        setWishlist((prev) => [...prev, productId])
+      }
+
       try {
         // Get the token
         const token = localStorage.getItem("clientImpersonationToken")
@@ -185,7 +195,6 @@ export default function ProductsPage() {
           const data = await response.json()
 
           if (data.success) {
-            setWishlist((prev) => prev.filter((id) => id !== productId))
             toast({
               title: "Removed from wishlist",
               description: "Item has been removed from your wishlist",
@@ -212,7 +221,6 @@ export default function ProductsPage() {
           const data = await response.json()
 
           if (data.success) {
-            setWishlist((prev) => [...prev, productId])
             toast({
               title: "Added to wishlist",
               description: "Item has been added to your wishlist",
@@ -224,6 +232,16 @@ export default function ProductsPage() {
         }
       } catch (error: any) {
         console.error("Error updating wishlist:", error)
+
+        // Revert the optimistic update
+        if (wishlist.includes(productId)) {
+          // We were trying to remove, but failed, so add it back
+          setWishlist((prev) => [...prev, productId])
+        } else {
+          // We were trying to add, but failed, so remove it
+          setWishlist((prev) => prev.filter((id) => id !== productId))
+        }
+
         toast({
           title: "Error",
           description: error.message || "Failed to update wishlist. Please try again.",
@@ -237,104 +255,77 @@ export default function ProductsPage() {
   )
 
   // Add to cart function
-  const addToCart = useCallback(
-    async (e: React.MouseEvent, productId: string, productName: string) => {
-      e.preventDefault() // Prevent navigation
+  const addToCart = async (e: React.MouseEvent, productId: string, productName: string) => {
+    e.preventDefault() // Prevent navigation
 
-      // Add validation here
-      if (!productId || typeof productId !== "string") {
-        toast({
-          title: "Error",
-          description: "Invalid product ID. Cannot add to cart.",
-          variant: "destructive",
-        })
-        return
+    if (cart.includes(productId)) {
+      toast({
+        title: "Already in cart",
+        description: "This item is already in your cart",
+        variant: "default",
+      })
+      return
+    }
+
+    try {
+      // Set loading state for this specific product
+      setAddingToCart((prev) => ({ ...prev, [productId]: true }))
+
+      // Immediately update UI state to show item as added to cart
+      setCart((prev) => [...prev, productId])
+
+      // Update localStorage cart
+      const savedCart = localStorage.getItem("cart")
+      const cartItems = savedCart ? JSON.parse(savedCart) : []
+      localStorage.setItem("cart", JSON.stringify([...cartItems, productId]))
+
+      // Get the token
+      const token = localStorage.getItem("clientImpersonationToken")
+
+      if (!token) {
+        throw new Error("No authentication token found. Please refresh the token and try again.")
       }
 
-      if (cart.includes(productId)) {
+      // Make API request in background
+      const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ productId }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`)
+      }
+
+      const data = await response.json()
+
+      if (data.success) {
         toast({
-          title: "Already in cart",
-          description: "This item is already in your cart",
+          title: "Added to cart",
+          description: `${productName} has been added to your cart`,
           variant: "default",
         })
-        return
+      } else {
+        throw new Error(data.message || "Failed to add to cart")
       }
+    } catch (error: any) {
+      // If there was an error, revert the cart state
+      setCart((prev) => prev.filter((id) => id !== productId))
 
-      try {
-        // Set loading state for this specific product
-        setAddingToCart((prev) => ({ ...prev, [productId]: true }))
-
-        console.log("Adding to cart:", productId, productName)
-
-        // Get the token
-        const token = localStorage.getItem("clientImpersonationToken")
-
-        if (!token) {
-          console.error("No impersonation token found")
-          toast({
-            title: "Authentication Error",
-            description: "Please refresh your token using the debug panel above",
-            variant: "destructive",
-          })
-          throw new Error("No authentication token found")
-        }
-
-        // Make a direct fetch request with the token
-        const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ productId }),
-        })
-
-        // Get the response text for debugging
-        const responseText = await response.text()
-
-        // Try to parse the response as JSON
-        let data
-        try {
-          data = JSON.parse(responseText)
-        } catch (e) {
-          console.error("Failed to parse response as JSON:", e)
-          throw new Error(`Invalid response format: ${responseText}`)
-        }
-
-        // Check for errors
-        if (!response.ok) {
-          if (response.status === 401) {
-            throw new Error("Authentication failed. Please refresh the token using the debug panel above.")
-          } else {
-            throw new Error(`API error: ${response.status} ${response.statusText}`)
-          }
-        }
-
-        if (data.success) {
-          toast({
-            title: "Added to cart",
-            description: `${productName} has been added to your cart`,
-            variant: "default",
-          })
-          setCart((prev) => [...prev, productId])
-        } else {
-          throw new Error(data.message || "Failed to add to cart")
-        }
-      } catch (error: Error | unknown) {
-        const errorMessage = error instanceof Error ? error.message : "Failed to add item to cart. Please try again."
-        console.error("Error adding to cart:", error)
-        toast({
-          title: "Error adding to cart",
-          description: errorMessage,
-          variant: "destructive",
-        })
-      } finally {
-        // Clear loading state
-        setAddingToCart((prev) => ({ ...prev, [productId]: false }))
-      }
-    },
-    [cart, toast],
-  )
+      console.error("Error adding to cart:", error)
+      toast({
+        title: "Error adding to cart",
+        description: error.message || "Failed to add item to cart. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      // Clear loading state
+      setAddingToCart((prev) => ({ ...prev, [productId]: false }))
+    }
+  }
 
   // Filter products based on search query
   const filteredProducts = products.filter(
@@ -375,6 +366,7 @@ export default function ProductsPage() {
   }
 
   return (
+    <ErrorBoundary>
       <div className="p-6 md:p-8">
         {error && (
           <Alert variant="destructive" className="mb-4">
@@ -482,29 +474,31 @@ export default function ProductsPage() {
                   )}
 
                   <button
-                    onClick={(e) => addToCart(e, product.postId, product.name)}
-                    className={`mt-4 w-full py-2 rounded-lg text-sm font-medium
+                    onClick={(e) => toggleWishlist(e, product.postId)}
+                    className={`mt-4 w-full py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2
                               ${
-                                cart.includes(product.postId)
-                                  ? "bg-muted text-muted-foreground"
-                                  : "bg-primary hover:bg-primary/90 text-primary-foreground"
+                                wishlist.includes(product.postId)
+                                  ? "bg-red-100 text-red-600 border border-red-200"
+                                  : addingToWishlist[product.postId]
+                                    ? "bg-gray-200 text-gray-700"
+                                    : "bg-primary hover:bg-primary/90 text-primary-foreground"
                               } 
                               transition-colors`}
-                    disabled={
-                      cart.includes(product.postId) ||
-                      addingToCart[product.postId] ||
-                      (product.quantityAvailable !== undefined && product.quantityAvailable <= 0)
-                    }
+                    disabled={addingToWishlist[product.postId]}
                     type="button"
                   >
-                    {addingToCart[product.postId] ? (
-                      <Loader2 className="h-4 w-4 animate-spin mx-auto" />
-                    ) : cart.includes(product.postId) ? (
-                      "Added to Cart"
-                    ) : product.quantityAvailable !== undefined && product.quantityAvailable <= 0 ? (
-                      "Out of Stock"
+                    {addingToWishlist[product.postId] ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                    ) : wishlist.includes(product.postId) ? (
+                      <>
+                        <Heart className="h-4 w-4 fill-red-500 mr-1" />
+                        Added to Wishlist
+                      </>
                     ) : (
-                      "Add to Cart" // Fixed: Changed from "Add to Wishlist" to "Add to Cart"
+                      <>
+                        <Heart className="h-4 w-4 mr-1" />
+                        Add to Wishlist
+                      </>
                     )}
                   </button>
                 </div>
@@ -513,5 +507,6 @@ export default function ProductsPage() {
           </div>
         )}
       </div>
+    </ErrorBoundary>
   )
 }
