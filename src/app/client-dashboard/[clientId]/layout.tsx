@@ -51,44 +51,10 @@ export default function ClientDashboardLayout({
         <div className="ml-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <Home className="h-5 w-5" />
-            <span className="font-medium hidden sm:inline">Evershine</span>
+            <span className="font-medium hidden sm:inline">Back to</span>
           </Link>
 
-          <div className="flex items-center gap-4">
-            <Link href={`/client-dashboard/${clientId}/wishlist`} className="relative">
-              <button className="p-2 text-white hover:bg-white/20 rounded-full">
-                <Heart className="h-5 w-5" />
-                {wishlistCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
-                    {wishlistCount}
-                  </span>
-                )}
-              </button>
-            </Link>
-
-            <Link href={`/client-dashboard/${clientId}/cart`} className="relative">
-              <button className="p-2 text-white hover:bg-white/20 rounded-full">
-                <ShoppingCart className="h-5 w-5" />
-                {cartCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
-                    {cartCount}
-                  </span>
-                )}
-              </button>
-            </Link>
-
-            <div className="h-6 w-px bg-white/30 mx-1"></div>
-
-            <button className="p-2 text-white hover:bg-white/20 rounded-md flex items-center gap-2">
-              <User className="h-4 w-4" />
-              <span className="hidden sm:inline">Account</span>
-            </button>
-
-            <button className="p-2 text-white hover:bg-white/20 rounded-md flex items-center gap-2">
-              <LogOut className="h-4 w-4" />
-              <span className="hidden sm:inline">Logout</span>
-            </button>
-          </div>
+     
         </div>
       </div>
 
