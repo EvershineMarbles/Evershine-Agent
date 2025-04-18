@@ -36,7 +36,7 @@ export default function AgentLogin() {
       ...prev,
       [name]: value,
     }))
-    // Clear error when user types
+    // Clear error when user typs
     setErrors((prev) => ({
       ...prev,
       [name]: "",
