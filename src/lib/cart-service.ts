@@ -57,3 +57,49 @@ export interface CartItem {
     }
   }
   
+  // Clear all cart data (both items and quantities)
+  export async function clearEntireCart(): Promise<boolean> {
+    try {
+      // Clear local storage
+      localStorage.removeItem("cart")
+      localStorage.removeItem("cartQuantities")
+  
+      // Clear server-side cart if we have a token
+      const token = localStorage.getItem("clientImpersonationToken")
+      if (token) {
+        // Make API call to clear cart on server
+        const response = await fetch("https://evershinebackend-2.onrender.com/api/clearCart", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }).catch((err) => {
+          console.error("Error clearing server cart:", err)
+          return null
+        })
+  
+        // If API doesn't exist or fails, we still cleared local storage
+        if (response && !response.ok) {
+          console.warn("Failed to clear server cart, but local cart was cleared")
+        }
+      }
+  
+      return true
+    } catch (e) {
+      console.error("Error clearing cart:", e)
+      return false
+    }
+  }
+  
+  // Check if cart is empty
+  export function isCartEmpty(): boolean {
+    try {
+      const savedCart = localStorage.getItem("cart")
+      return !savedCart || JSON.parse(savedCart).length === 0
+    } catch (e) {
+      console.error("Error checking if cart is empty:", e)
+      return true
+    }
+  }
+  

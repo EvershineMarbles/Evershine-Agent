@@ -363,6 +363,15 @@ export default function WishlistPage() {
 
   // Handle adding item to cart
   const handleAddToCart = async (postId: string, name: string) => {
+    if (cart.includes(postId)) {
+      toast({
+        title: "Already in cart",
+        description: "This item is already in your cart",
+        variant: "default",
+      })
+      return
+    }
+
     setAddingToCart((prev) => ({ ...prev, [postId]: true }))
     try {
       const token = localStorage.getItem("clientImpersonationToken")
@@ -374,8 +383,7 @@ export default function WishlistPage() {
       // Get the quantity for this product
       const quantity = quantities[postId] || 1
 
-      // Instead of making multiple API calls, we'll make a single call with quantity information
-      // First, add the item to the cart once
+      // Make a single API call with the quantity
       const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
         method: "POST",
         headers: {
@@ -384,9 +392,7 @@ export default function WishlistPage() {
         },
         body: JSON.stringify({
           productId: postId,
-          // Note: The current API might not support a quantity parameter
-          // We're adding it in case it does or will in the future
-          quantity: quantity,
+          quantity: quantity, // Add quantity parameter
         }),
       })
 
@@ -400,21 +406,6 @@ export default function WishlistPage() {
         throw new Error(data.message || "Failed to add to cart")
       }
 
-      // Store the quantity in localStorage so we can use it in the cart page
-      try {
-        // Get existing cart quantities or initialize empty object
-        const savedCartQuantities = localStorage.getItem("cartQuantities")
-        const cartQuantities = savedCartQuantities ? JSON.parse(savedCartQuantities) : {}
-
-        // Update the quantity for this product
-        cartQuantities[postId] = quantity
-
-        // Save back to localStorage
-        localStorage.setItem("cartQuantities", JSON.stringify(cartQuantities))
-      } catch (e) {
-        console.error("Error saving cart quantities:", e)
-      }
-
       // Update local state for cart
       setCart((prev) => [...prev, postId])
 
@@ -422,6 +413,16 @@ export default function WishlistPage() {
       const savedCart = localStorage.getItem("cart")
       const cartItems = savedCart ? JSON.parse(savedCart) : []
       localStorage.setItem("cart", JSON.stringify([...cartItems, postId]))
+
+      // Store the quantity in localStorage
+      try {
+        const savedCartQuantities = localStorage.getItem("cartQuantities")
+        const cartQuantities = savedCartQuantities ? JSON.parse(savedCartQuantities) : {}
+        cartQuantities[postId] = quantity
+        localStorage.setItem("cartQuantities", JSON.stringify(cartQuantities))
+      } catch (e) {
+        console.error("Error storing cart quantity:", e)
+      }
 
       // Now remove from wishlist
       await handleRemoveFromWishlist(postId)
@@ -583,16 +584,6 @@ export default function WishlistPage() {
                     <h3 className="font-semibold text-lg text-foreground line-clamp-1">{item.name}</h3>
                     <p className="text-lg font-bold mt-2">₹{item.price.toLocaleString()}</p>
                     <p className="text-sm text-muted-foreground mt-1">{item.category}</p>
-
-                    {item.quantityAvailable !== undefined && (
-                      <p className="text-sm mt-1">
-                        {item.quantityAvailable > 0 ? (
-                          <span className="text-green-600">In stock: {item.quantityAvailable}</span>
-                        ) : (
-                          <span className="text-red-500">Out of stock</span>
-                        )}
-                      </p>
-                    )}
 
                     {/* Quantity input */}
                     <div className="mt-4 mb-2">

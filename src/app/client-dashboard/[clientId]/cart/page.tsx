@@ -8,7 +8,9 @@ import { ArrowLeft, Trash2, Loader2, ShoppingBag, Plus, Minus } from "lucide-rea
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { getCartItemQuantity } from "@/lib/cart-service"
+import { getCartItemQuantity, clearEntireCart } from "@/lib/cart-service"
+// Add this import at the top of the file
+import CartDebug from "@/components/cart-debug"
 
 interface CartItem {
   _id: string
@@ -105,6 +107,76 @@ export default function CartPage() {
 
     fetchCart()
   }, [toast])
+
+  // Add this useEffect to ensure we're always showing the latest cart data
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      refreshCart()
+    }, 60000) // Refresh every 60 seconds
+
+    return () => clearInterval(intervalId) // Clear interval on unmount
+  }, [])
+
+  // Add a function to refresh the cart data
+  const refreshCart = async () => {
+    try {
+      setLoading(true)
+
+      // Get the token
+      const token = localStorage.getItem("clientImpersonationToken")
+
+      if (!token) {
+        throw new Error("No authentication token found. Please refresh the page and try again.")
+      }
+
+      const response = await fetch("https://evershinebackend-2.onrender.com/api/getUserCart", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      // Check for errors
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error("Authentication failed. Please refresh the token and try again.")
+        } else {
+          throw new Error(`API error: ${response.status} ${response.statusText}`)
+        }
+      }
+
+      const data = await response.json()
+
+      if (data.data) {
+        // Filter out any items with null or undefined postId
+        const validItems = (data.data.items || []).filter(
+          (item: CartItem) => item.postId && typeof item.postId === "string",
+        )
+
+        // If server cart is empty but we have local cart data, clear local cart
+        if (validItems.length === 0) {
+          localStorage.removeItem("cart")
+          localStorage.removeItem("cartQuantities")
+        }
+
+        setCartItems(validItems)
+      } else {
+        setCartItems([])
+        // Clear local cart data if server cart is empty
+        localStorage.removeItem("cart")
+        localStorage.removeItem("cartQuantities")
+      }
+    } catch (error: any) {
+      console.error("Error refreshing cart:", error)
+      // If we can't reach the server, clear local cart data to be safe
+      localStorage.removeItem("cart")
+      localStorage.removeItem("cartQuantities")
+      setCartItems([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   // Update item quantity
   const updateQuantity = async (productId: string, newQuantity: number) => {
@@ -335,10 +407,8 @@ export default function CartPage() {
               // Clear local cart state
               setCartItems([])
 
-              // Clear localStorage cart
-              if (typeof window !== "undefined") {
-                localStorage.removeItem("cart")
-              }
+              // Clear ALL cart data from localStorage
+              await clearEntireCart()
 
               // Redirect directly to orders page
               router.push(`/client-dashboard/${clientId}/orders`)
@@ -371,10 +441,8 @@ export default function CartPage() {
         // Clear cart items from state
         setCartItems([])
 
-        // Clear localStorage cart
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("cart")
-        }
+        // Clear ALL cart data from localStorage
+        await clearEntireCart()
 
         // Redirect directly to orders page
         router.push(`/client-dashboard/${clientId}/orders`)
@@ -399,6 +467,55 @@ export default function CartPage() {
     }
   }
 
+  // Add a new function to manually clear the cart
+  const handleClearCart = async () => {
+    try {
+      // Show loading state
+      setLoading(true)
+
+      // Clear cart on server
+      const token = localStorage.getItem("clientImpersonationToken")
+      if (token) {
+        // Try to clear each item individually if there's no clear cart endpoint
+        for (const item of cartItems) {
+          try {
+            await fetch("https://evershinebackend-2.onrender.com/api/deleteUserCartItem", {
+              method: "DELETE",
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ productId: item.postId }),
+            })
+          } catch (e) {
+            console.error("Error removing item:", e)
+          }
+        }
+      }
+
+      // Clear local cart data
+      await clearEntireCart()
+
+      // Update UI
+      setCartItems([])
+
+      toast({
+        title: "Cart Cleared",
+        description: "All items have been removed from your cart",
+        variant: "default",
+      })
+    } catch (error: any) {
+      console.error("Error clearing cart:", error)
+      toast({
+        title: "Error",
+        description: error.message || "Failed to clear cart. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-[80vh]">
@@ -410,12 +527,27 @@ export default function CartPage() {
 
   return (
     <div className="p-6 md:p-8">
-      <div className="flex items-center mb-8">
-        <Button variant="ghost" size="icon" onClick={() => router.back()} className="mr-4">
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <h1 className="text-3xl font-bold">Your Cart</h1>
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center">
+          <Button variant="ghost" size="icon" onClick={() => router.back()} className="mr-4">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <h1 className="text-3xl font-bold">Your Cart</h1>
+        </div>
+
+        {cartItems.length > 0 && (
+          <Button
+            variant="outline"
+            onClick={handleClearCart}
+            className="text-red-500 border-red-200 hover:bg-red-50"
+            disabled={loading}
+          >
+            {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+            Clear Cart
+          </Button>
+        )}
       </div>
+      {process.env.NODE_ENV === "development" && <CartDebug />}
 
       {checkoutError && (
         <Alert variant="destructive" className="mb-6">
