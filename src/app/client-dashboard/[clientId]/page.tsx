@@ -501,12 +501,6 @@ export default function ProductsPage() {
                   <p className="text-lg font-bold mt-2">₹{product.price.toLocaleString()}</p>
                   <p className="text-sm text-muted-foreground mt-1">{product.category}</p>
 
-                  {product.quantityAvailable !== undefined && (
-                    <p className="text-sm mt-1">
-                      {product.quantityAvailable > 0 ? `In stock: ${product.quantityAvailable}` : "Out of stock"}
-                    </p>
-                  )}
-
                   <button
                     onClick={(e) => toggleWishlist(e, product.postId)}
                     className={`mt-4 w-full py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2
