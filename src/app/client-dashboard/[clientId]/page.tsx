@@ -506,7 +506,7 @@ export default function ProductsPage() {
                     className={`mt-4 w-full py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2
                               ${
                                 wishlist.includes(product.postId)
-                                ? "bg-red-100 text-red-600 border border-red-200"                                 : addingToWishlist[product.postId]
+                                ? "bg-gray-100 text-gray-600 border border-gray-200"                                : addingToWishlist[product.postId]
                                     ? "bg-gray-200 text-gray-700"
                                     : "bg-primary hover:bg-primary/90 text-primary-foreground"
                               } 
