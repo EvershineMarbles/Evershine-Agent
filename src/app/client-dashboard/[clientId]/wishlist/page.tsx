@@ -585,16 +585,6 @@ export default function WishlistPage() {
                     <p className="text-lg font-bold mt-2">₹{item.price.toLocaleString()}</p>
                     <p className="text-sm text-muted-foreground mt-1">{item.category}</p>
 
-                    {item.quantityAvailable !== undefined && (
-                      <p className="text-sm mt-1">
-                        {item.quantityAvailable > 0 ? (
-                          <span className="text-green-600">In stock: {item.quantityAvailable}</span>
-                        ) : (
-                          <span className="text-red-500">Out of stock</span>
-                        )}
-                      </p>
-                    )}
-
                     {/* Quantity input */}
                     <div className="mt-4 mb-2">
                       <label
