@@ -1,173 +1,93 @@
-import { toast } from "@/components/ui/use-toast"
-
-export async function apiRequest(url: string, options: RequestInit = {}) {
+// Add this function to fetch wishlist items with better error handling and debugging
+export async function fetchWishlistItems() {
   try {
-    // Get the token
     const token = localStorage.getItem("clientImpersonationToken")
 
     if (!token) {
-      throw new Error("No authentication token found. Please refresh the page and try again.")
+      throw new Error("No authentication token found")
     }
 
-    // Add headers
-    const headers = {
-      ...options.headers,
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    }
+    console.log("Fetching wishlist with token:", token.substring(0, 10) + "...")
 
-    // Make the request
-    const response = await fetch(url, {
-      ...options,
-      headers,
+    const response = await fetch("https://evershinebackend-2.onrender.com/api/getUserWishlist", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
     })
 
-    // Handle non-OK responses
+    console.log(`Wishlist API response status: ${response.status}`)
+
     if (!response.ok) {
-      // Try to get detailed error message
+      // Try to get more detailed error information
       let errorMessage = `API error: ${response.status} ${response.statusText}`
-
       try {
-        const errorText = await response.text()
-
-        // Try to parse as JSON
-        try {
-          const errorData = JSON.parse(errorText)
-          if (errorData.message) {
-            errorMessage = errorData.message
-          }
-        } catch (e) {
-          // If not JSON, use the text as is if it exists
-          if (errorText) {
-            errorMessage = errorText
-          }
+        const errorData = await response.json()
+        if (errorData && errorData.message) {
+          errorMessage = errorData.message
         }
       } catch (e) {
-        // Ignore error reading response
+        // If we can't parse the error as JSON, just use the status
       }
 
       throw new Error(errorMessage)
     }
 
-    // Parse and return the response
-    return await response.json()
-  } catch (error: any) {
-    console.error(`API request to ${url} failed:`, error)
+    const data = await response.json()
+    console.log("Wishlist API response data:", data)
 
-    // Show toast notification for API errors
-    toast({
-      title: "API Error",
-      description: error.message || "An error occurred while communicating with the server",
-      variant: "destructive",
-    })
-
+    return data
+  } catch (error) {
+    console.error("Error fetching wishlist items:", error)
     throw error
   }
 }
 
-/**
- * Makes an API request with automatic retry for certain errors
- */
-export async function apiRequestWithRetry(url: string, options: RequestInit = {}, maxRetries = 3) {
-  let retries = 0
-  let lastError: Error
+// Add this function to sync local wishlist with server
+export async function syncLocalWishlistWithServer(clientId: string, localItems: any[]) {
+  try {
+    const token = localStorage.getItem("clientImpersonationToken")
 
-  while (retries < maxRetries) {
-    try {
-      return await apiRequest(url, options)
-    } catch (error: any) {
-      lastError = error
-
-      // Only retry for certain errors (network errors, 500s)
-      if (error.message.includes("NetworkError") || error.message.includes("500")) {
-        retries++
-        console.log(`Retrying API request (${retries}/${maxRetries})...`)
-
-        // Wait before retrying (exponential backoff)
-        await new Promise((resolve) => setTimeout(resolve, 1000 * Math.pow(2, retries)))
-      } else {
-        // Don't retry for client errors (400s)
-        break
-      }
+    if (!token) {
+      throw new Error("No authentication token found")
     }
-  }
 
-  throw lastError
-}
-
-// Helper for wishlist operations
-export async function addToWishlist(productId: string) {
-  // Validate productId
-  if (!productId || typeof productId !== "string") {
-    toast({
-      title: "Error",
-      description: "Invalid product ID. Cannot add to wishlist.",
-      variant: "destructive",
+    // Get server wishlist first
+    const response = await fetch("https://evershinebackend-2.onrender.com/api/getUserWishlist", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
     })
-    throw new Error("Invalid product ID")
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status} ${response.statusText}`)
+    }
+
+    const data = await response.json()
+    const serverItems = data.data?.items || []
+
+    // Find items in local storage that aren't on the server
+    const serverItemIds = serverItems.map((item: any) => item.postId)
+    const itemsToSync = localItems.filter((item) => !serverItemIds.includes(item.postId))
+
+    // Add each missing item to the server
+    for (const item of itemsToSync) {
+      await fetch("https://evershinebackend-2.onrender.com/api/addToWishlist", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ productId: item.postId }),
+      })
+    }
+
+    return true
+  } catch (error) {
+    console.error("Error syncing wishlist:", error)
+    return false
   }
-
-  return apiRequest("https://evershinebackend-2.onrender.com/api/addToWishlist", {
-    method: "POST",
-    body: JSON.stringify({ productId }),
-  })
-}
-
-export async function removeFromWishlist(productId: string) {
-  // Validate productId
-  if (!productId || typeof productId !== "string") {
-    toast({
-      title: "Error",
-      description: "Invalid product ID. Cannot remove from wishlist.",
-      variant: "destructive",
-    })
-    throw new Error("Invalid product ID")
-  }
-
-  return apiRequest("https://evershinebackend-2.onrender.com/api/deleteUserWishlistItem", {
-    method: "DELETE",
-    body: JSON.stringify({ productId }),
-  })
-}
-
-export async function getWishlist() {
-  return apiRequest("https://evershinebackend-2.onrender.com/api/getUserWishlist")
-}
-
-export async function addToCart(productId: string) {
-  // Validate productId
-  if (!productId || typeof productId !== "string") {
-    toast({
-      title: "Error",
-      description: "Invalid product ID. Cannot add to cart.",
-      variant: "destructive",
-    })
-    throw new Error("Invalid product ID")
-  }
-
-  return apiRequest("https://evershinebackend-2.onrender.com/api/addToCart", {
-    method: "POST",
-    body: JSON.stringify({ productId }),
-  })
-}
-
-export async function removeFromCart(productId: string) {
-  // Validate productId
-  if (!productId || typeof productId !== "string") {
-    toast({
-      title: "Error",
-      description: "Invalid product ID. Cannot remove from cart.",
-      variant: "destructive",
-    })
-    throw new Error("Invalid product ID")
-  }
-
-  return apiRequest("https://evershinebackend-2.onrender.com/api/deleteUserCartItem", {
-    method: "DELETE",
-    body: JSON.stringify({ productId }),
-  })
-}
-
-export async function getCart() {
-  return apiRequest("https://evershinebackend-2.onrender.com/api/getUserCart")
 }

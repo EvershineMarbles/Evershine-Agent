@@ -1,15 +1,25 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowLeft, Trash2, Loader2, Heart, AlertCircle, ShoppingCart } from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Loader2, AlertCircle, Heart, ShoppingCart, Trash2, ArrowLeft } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { addToCart, removeFromWishlist } from "@/lib/api-helpers"
-import { filterValidWishlistItems, type WishlistItem } from "@/lib/validation"
+import { ErrorBoundary } from "@/components/error-boundary"
+
+interface WishlistItem {
+  _id: string
+  postId: string
+  name: string
+  price: number
+  image: string[]
+  category: string
+  description?: string
+  quantityAvailable?: number
+}
 
 export default function WishlistPage() {
   const params = useParams()
@@ -19,142 +29,170 @@ export default function WishlistPage() {
 
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [removing, setRemoving] = useState<Record<string, boolean>>({})
   const [addingToCart, setAddingToCart] = useState<Record<string, boolean>>({})
-  const [error, setError] = useState<string | null>(null)
   const [imageError, setImageError] = useState<Record<string, boolean>>({})
   const [cart, setCart] = useState<string[]>([])
 
-  // Load cart from localStorage
+  // Fetch wishlist items
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    const fetchWishlist = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const token = localStorage.getItem("clientImpersonationToken")
+
+        if (!token) {
+          throw new Error("No authentication token found. Please refresh the page and try again.")
+        }
+
+        const response = await fetch("https://evershinebackend-2.onrender.com/api/getUserWishlist", {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status} ${response.statusText}`)
+        }
+
+        const data = await response.json()
+
+        if (data.success && data.data && Array.isArray(data.data.items)) {
+          setWishlistItems(data.data.items)
+        } else {
+          // Fallback to local storage if API doesn't return expected format
+          const savedWishlist = localStorage.getItem("wishlist")
+          if (savedWishlist) {
+            const wishlistIds = JSON.parse(savedWishlist)
+            // Here we would ideally fetch product details for each ID
+            // For now, we'll just set the IDs
+            setWishlistItems(
+              wishlistIds.map((id: string) => ({ postId: id, name: "Product", price: 0, image: [], category: "" })),
+            )
+          } else {
+            setWishlistItems([])
+          }
+        }
+      } catch (err: any) {
+        console.error("Error fetching wishlist:", err)
+        setError(err.message || "Failed to load wishlist")
+
+        // Fallback to local storage
+        const savedWishlist = localStorage.getItem("wishlist")
+        if (savedWishlist) {
+          try {
+            const wishlistIds = JSON.parse(savedWishlist)
+            // Here we would ideally fetch product details for each ID
+            setWishlistItems(
+              wishlistIds.map((id: string) => ({ postId: id, name: "Product", price: 0, image: [], category: "" })),
+            )
+          } catch (e) {
+            console.error("Error parsing local wishlist:", e)
+            setWishlistItems([])
+          }
+        }
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    // Also fetch cart to check which items are already in cart
+    const fetchCart = async () => {
       try {
         const savedCart = localStorage.getItem("cart")
         if (savedCart) {
           setCart(JSON.parse(savedCart))
         }
-      } catch (e) {
-        console.error("Error loading cart from localStorage:", e)
+
+        const token = localStorage.getItem("clientImpersonationToken")
+        if (token) {
+          const response = await fetch("https://evershinebackend-2.onrender.com/api/getUserCart", {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          })
+
+          if (response.ok) {
+            const data = await response.json()
+            if (data.success && data.data && Array.isArray(data.data.items)) {
+              setCart(data.data.items.map((item: any) => item.postId))
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching cart:", err)
       }
     }
-  }, [])
 
-  // Save cart to localStorage whenever it changes
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("cart", JSON.stringify(cart))
-    }
-  }, [cart])
+    fetchWishlist()
+    fetchCart()
+  }, [clientId])
 
-  // Update the fetchWishlist function to add more debugging
-  const fetchWishlist = useCallback(async () => {
+  // Handle removing item from wishlist
+  const handleRemoveFromWishlist = async (postId: string) => {
+    setRemoving((prev) => ({ ...prev, [postId]: true }))
     try {
-      setLoading(true)
-      setError(null)
-
-      console.log("Fetching wishlist items...")
       const token = localStorage.getItem("clientImpersonationToken")
 
       if (!token) {
-        throw new Error("No authentication token found")
+        throw new Error("No authentication token found. Please refresh the page and try again.")
       }
 
-      // Log the token (first few characters only for security)
-      console.log(`Using token: ${token.substring(0, 10)}...`)
-
-      const response = await fetch("https://evershinebackend-2.onrender.com/api/getUserWishlist", {
-        method: "GET",
+      const response = await fetch("https://evershinebackend-2.onrender.com/api/deleteUserWishlistItem", {
+        method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
+        body: JSON.stringify({ productId: postId }),
       })
-
-      console.log(`Wishlist API response status: ${response.status}`)
 
       if (!response.ok) {
         throw new Error(`API error: ${response.status} ${response.statusText}`)
       }
 
       const data = await response.json()
-      console.log("Wishlist API response data:", data)
 
-      if (data.success && data.data && data.data.items) {
-        // Filter and validate wishlist items
-        const validItems = filterValidWishlistItems(data.data.items)
+      if (data.success) {
+        // Update local state
+        setWishlistItems((prev) => prev.filter((item) => item.postId !== postId))
 
-        // Process the image URLs to ensure they're valid
-        const processedItems = validItems.map((item) => ({
-          ...item,
-          image:
-            Array.isArray(item.image) && item.image.length > 0
-              ? item.image.filter((url) => typeof url === "string" && url.trim() !== "")
-              : ["/placeholder.svg?height=300&width=300"],
-        }))
-
-        console.log(`Found ${processedItems.length} valid wishlist items`)
-        setWishlistItems(processedItems)
-      } else {
-        console.warn("No items found in wishlist response:", data)
-        setWishlistItems([])
-      }
-    } catch (error: any) {
-      console.error("Error fetching wishlist:", error)
-      setError(error.message || "Failed to load your wishlist. Please try again.")
-      toast({
-        title: "Error",
-        description: error.message || "Failed to load your wishlist. Please try again.",
-        variant: "destructive",
-      })
-      setWishlistItems([])
-    } finally {
-      setLoading(false)
-    }
-  }, [toast])
-
-  useEffect(() => {
-    fetchWishlist()
-  }, [fetchWishlist])
-
-  // Remove item from wishlist
-  const handleRemoveFromWishlist = async (productId: string) => {
-    try {
-      setRemoving((prev) => ({ ...prev, [productId]: true }))
-
-      await removeFromWishlist(productId)
-
-      // Update local state
-      setWishlistItems((prev) => prev.filter((item) => item.postId !== productId))
-
-      // Update localStorage wishlist
-      if (typeof window !== "undefined") {
+        // Update localStorage
         const savedWishlist = localStorage.getItem("wishlist")
         if (savedWishlist) {
-          const wishlistArray = JSON.parse(savedWishlist)
-          localStorage.setItem("wishlist", JSON.stringify(wishlistArray.filter((id: string) => id !== productId)))
+          const wishlistIds = JSON.parse(savedWishlist)
+          localStorage.setItem("wishlist", JSON.stringify(wishlistIds.filter((id: string) => id !== postId)))
         }
-      }
 
-      toast({
-        title: "Item removed",
-        description: "Item has been removed from your wishlist",
-        variant: "default",
-      })
-    } catch (error: any) {
-      console.error("Error removing item from wishlist:", error)
+        toast({
+          title: "Item removed",
+          description: "Item has been removed from your wishlist",
+          variant: "default",
+        })
+      } else {
+        throw new Error(data.message || "Failed to remove from wishlist")
+      }
+    } catch (err: any) {
+      console.error("Error removing from wishlist:", err)
       toast({
         title: "Error",
-        description: error.message || "Failed to remove item from wishlist. Please try again.",
+        description: err.message || "Failed to remove item from wishlist. Please try again.",
         variant: "destructive",
       })
     } finally {
-      setRemoving((prev) => ({ ...prev, [productId]: false }))
+      setRemoving((prev) => ({ ...prev, [postId]: false }))
     }
   }
 
-  // Add to cart function
-  const handleAddToCart = async (productId: string, productName: string) => {
-    if (cart.includes(productId)) {
+  // Handle adding item to cart
+  const handleAddToCart = async (postId: string, name: string) => {
+    if (cart.includes(postId)) {
       toast({
         title: "Already in cart",
         description: "This item is already in your cart",
@@ -163,35 +201,65 @@ export default function WishlistPage() {
       return
     }
 
+    setAddingToCart((prev) => ({ ...prev, [postId]: true }))
     try {
-      setAddingToCart((prev) => ({ ...prev, [productId]: true }))
+      const token = localStorage.getItem("clientImpersonationToken")
 
-      await addToCart(productId)
+      if (!token) {
+        throw new Error("No authentication token found. Please refresh the page and try again.")
+      }
 
-      toast({
-        title: "Added to cart",
-        description: `${productName} has been added to your cart`,
-        variant: "default",
+      const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ productId: postId }),
       })
-      setCart((prev) => [...prev, productId])
-    } catch (error: any) {
-      console.error("Error adding to cart:", error)
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`)
+      }
+
+      const data = await response.json()
+
+      if (data.success) {
+        // Update local state
+        setCart((prev) => [...prev, postId])
+
+        // Update localStorage
+        const savedCart = localStorage.getItem("cart")
+        const cartItems = savedCart ? JSON.parse(savedCart) : []
+        localStorage.setItem("cart", JSON.stringify([...cartItems, postId]))
+
+        toast({
+          title: "Added to cart",
+          description: `${name} has been added to your cart`,
+          variant: "default",
+        })
+      } else {
+        throw new Error(data.message || "Failed to add to cart")
+      }
+    } catch (err: any) {
+      console.error("Error adding to cart:", err)
       toast({
-        title: "Error adding to cart",
-        description: error.message || "Failed to add item to cart. Please try again.",
+        title: "Error",
+        description: err.message || "Failed to add item to cart. Please try again.",
         variant: "destructive",
       })
     } finally {
-      setAddingToCart((prev) => ({ ...prev, [productId]: false }))
+      setAddingToCart((prev) => ({ ...prev, [postId]: false }))
     }
   }
 
   // Handle image loading errors
-  const handleImageError = useCallback((itemId: string) => {
+  const handleImageError = (itemId: string) => {
     setImageError((prev) => ({ ...prev, [itemId]: true }))
-  }, [])
+  }
 
   return (
+    <ErrorBoundary>
       <div className="p-6 md:p-8">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center">
@@ -216,10 +284,12 @@ export default function WishlistPage() {
         </div>
 
         {error && (
-          <Alert variant="destructive" className="mb-6">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
+          <Card className="mb-6 border-red-200 bg-red-50">
+            <CardContent className="p-4 text-red-800 flex items-center">
+              <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
+              <p>{error}</p>
+            </CardContent>
+          </Card>
         )}
 
         {loading ? (
@@ -300,7 +370,7 @@ export default function WishlistPage() {
 
                     <button
                       onClick={() => handleAddToCart(item.postId, item.name)}
-                      className={`mt-4 w-full py-2 rounded-lg text-sm font-medium
+                      className={`mt-4 w-full py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2
                                 ${
                                   cart.includes(item.postId)
                                     ? "bg-muted text-muted-foreground"
@@ -315,13 +385,16 @@ export default function WishlistPage() {
                       type="button"
                     >
                       {addingToCart[item.postId] ? (
-                        <Loader2 className="h-4 w-4 animate-spin mx-auto" />
-                      ) : cart.includes(item.postId) ? (
-                        "Added to Cart"
-                      ) : item.quantityAvailable !== undefined && item.quantityAvailable <= 0 ? (
-                        "Out of Stock"
+                        <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
-                        "Add to Cart"
+                        <>
+                          <ShoppingCart className="h-4 w-4" />
+                          {cart.includes(item.postId)
+                            ? "Added to Cart"
+                            : item.quantityAvailable !== undefined && item.quantityAvailable <= 0
+                              ? "Out of Stock"
+                              : "Add to Cart"}
+                        </>
                       )}
                     </button>
                   </div>
@@ -337,5 +410,6 @@ export default function WishlistPage() {
           </>
         )}
       </div>
+    </ErrorBoundary>
   )
 }

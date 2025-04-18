@@ -563,31 +563,26 @@ export default function ClientDashboard() {
                   <p className="text-lg font-bold mt-2">₹{product.price.toLocaleString()}</p>
                   <p className="text-sm text-muted-foreground mt-1">{product.category}</p>
 
+                  {product.quantityAvailable !== undefined && (
+                    <p className="text-sm mt-1">
+                      {product.quantityAvailable > 0 ? `In stock: ${product.quantityAvailable}` : "Out of stock"}
+                    </p>
+                  )}
+
                   <button
-                    onClick={(e) => addToCart(e, product.postId, product.name)}
-                    className={`mt-4 w-full py-2 rounded-lg text-sm font-medium
+                    onClick={(e) => toggleWishlist(e, product.postId)}
+                    className={`mt-4 w-full py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2
                               ${
-                                cart.includes(product.postId)
-                                  ? "bg-muted text-muted-foreground"
+                                wishlist.includes(product.postId)
+                                  ? "bg-red-100 text-red-600 border border-red-200"
                                   : "bg-primary hover:bg-primary/90 text-primary-foreground"
                               } 
                               transition-colors`}
-                    disabled={
-                      cart.includes(product.postId) ||
-                      addingToCart[product.postId] ||
-                      (product.quantityAvailable !== undefined && product.quantityAvailable <= 0)
-                    }
+                    disabled={product.quantityAvailable !== undefined && product.quantityAvailable <= 0}
                     type="button"
                   >
-                    {addingToCart[product.postId] ? (
-                      <Loader2 className="h-4 w-4 animate-spin mx-auto" />
-                    ) : cart.includes(product.postId) ? (
-                      "Added to Cart"
-                    ) : product.quantityAvailable !== undefined && product.quantityAvailable <= 0 ? (
-                      "Out of Stock"
-                    ) : (
-                      "Add to Cart"
-                    )}
+                    <Heart className={`h-4 w-4 ${wishlist.includes(product.postId) ? "fill-red-500" : ""}`} />
+                    {wishlist.includes(product.postId) ? "In Wishlist" : "Add to Wishlist"}
                   </button>
                 </div>
               </div>
