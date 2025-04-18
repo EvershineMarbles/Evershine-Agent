@@ -20,6 +20,11 @@ interface ClientSettings {
   city: string
   profession: string
   purpose: string
+  clientId: string
+  quantityRequired: number
+  agentAffiliated: string
+  createdAt?: string
+  updatedAt?: string
 }
 
 export default function SettingsPage() {
@@ -35,6 +40,9 @@ export default function SettingsPage() {
     city: "",
     profession: "",
     purpose: "",
+    clientId: "",
+    quantityRequired: 0,
+    agentAffiliated: "",
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -87,6 +95,11 @@ export default function SettingsPage() {
             city: data.data.city || "",
             profession: data.data.profession || "",
             purpose: data.data.purpose || "",
+            clientId: data.data.clientId || clientId,
+            quantityRequired: data.data.quantityRequired || 0,
+            agentAffiliated: data.data.agentAffiliated || "",
+            createdAt: data.data.createdAt || "",
+            updatedAt: data.data.updatedAt || "",
             // Add any additional fields that might be in the client data
             // This ensures we don't lose any data when updating
             ...data.data,
@@ -277,6 +290,63 @@ export default function SettingsPage() {
                       disabled={saving}
                     />
                   </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="quantityRequired">Quantity Required</Label>
+                    <Input
+                      id="quantityRequired"
+                      name="quantityRequired"
+                      type="number"
+                      value={settings.quantityRequired || 0}
+                      onChange={handleChange}
+                      disabled={saving}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="agentAffiliated">Agent Affiliated</Label>
+                    <Input
+                      id="agentAffiliated"
+                      name="agentAffiliated"
+                      value={settings.agentAffiliated || ""}
+                      onChange={handleChange}
+                      disabled={true} // Agent affiliation should be immutable
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="clientId">Client ID</Label>
+                    <Input
+                      id="clientId"
+                      name="clientId"
+                      value={settings.clientId || clientId}
+                      disabled={true} // Client ID is immutable
+                    />
+                  </div>
+
+                  {settings.createdAt && (
+                    <div className="space-y-2">
+                      <Label htmlFor="createdAt">Created At</Label>
+                      <Input
+                        id="createdAt"
+                        name="createdAt"
+                        value={new Date(settings.createdAt).toLocaleString()}
+                        disabled={true}
+                      />
+                    </div>
+                  )}
+
+                  {settings.updatedAt && (
+                    <div className="space-y-2">
+                      <Label htmlFor="updatedAt">Last Updated</Label>
+                      <Input
+                        id="updatedAt"
+                        name="updatedAt"
+                        value={new Date(settings.updatedAt).toLocaleString()}
+                        disabled={true}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <Separator />
