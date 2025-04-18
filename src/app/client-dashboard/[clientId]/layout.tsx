@@ -26,10 +26,7 @@ export default function ClientDashboardLayout({
       <IconSidebar clientId={clientId} />
       <main className="flex-1 ml-16 overflow-auto">
         <div className="p-4 border-b bg-white">
-          <Link href="/dashboard" className="inline-flex items-center text-dark hover:underline">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Home
-          </Link>
+   
         </div>
         {children}
       </main>
