@@ -47,7 +47,7 @@ export default function ClientDashboardLayout({
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       {/* Top Navigation Strip */}
-      <div className="w-full bg-[#194a95] text-white py-3 px-4 md:px-8 shadow-md z-10">
+      <div className="w-full bg-[#194a95] text-white py-3 px-4 md:px-8 shadow-md z-0">
         <div className="ml-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <Home className="h-5 w-5" />
