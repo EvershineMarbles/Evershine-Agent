@@ -4,10 +4,13 @@ import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowLeft, Trash2, Loader2, ShoppingBag, Plus, Minus } from "lucide-react"
+import { ArrowLeft, Trash2, Loader2, ShoppingBag, Plus, Minus, Bug, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { getCartItemQuantity } from "@/lib/cart-service"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Textarea } from "@/components/ui/textarea"
 
 interface CartItem {
   _id: string
@@ -31,20 +34,53 @@ export default function CartPage() {
   const [updating, setUpdating] = useState<Record<string, boolean>>({})
   const [isCheckingOut, setIsCheckingOut] = useState(false)
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
+  const [clearingCart, setClearingCart] = useState(false)
+
+  // Debug state
+  const [showDebug, setShowDebug] = useState(true)
+  const [apiResponse, setApiResponse] = useState<any>(null)
+  const [localStorageData, setLocalStorageData] = useState<any>(null)
+  const [debugLog, setDebugLog] = useState<string[]>([])
+
+  // Add to debug log
+  const addToLog = (message: string) => {
+    console.log(message)
+    setDebugLog((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ${message}`])
+  }
+
+  // Update local storage debug data
+  const updateLocalStorageDebug = () => {
+    try {
+      const cart = localStorage.getItem("cart")
+      const cartQuantities = localStorage.getItem("cartQuantities")
+
+      setLocalStorageData({
+        cart: cart ? JSON.parse(cart) : null,
+        cartQuantities: cartQuantities ? JSON.parse(cartQuantities) : null,
+      })
+
+      addToLog(`LocalStorage updated: Cart has ${cart ? JSON.parse(cart).length : 0} items`)
+    } catch (e) {
+      addToLog(`Error reading localStorage: ${e}`)
+    }
+  }
 
   // Fetch cart items
   useEffect(() => {
     const fetchCart = async () => {
       try {
         setLoading(true)
+        addToLog("Fetching cart data from API...")
 
         // Get the token
         const token = localStorage.getItem("clientImpersonationToken")
 
         if (!token) {
+          addToLog("No authentication token found")
           throw new Error("No authentication token found. Please refresh the page and try again.")
         }
 
+        addToLog(`Using token: ${token.substring(0, 10)}...`)
         const response = await fetch("https://evershinebackend-2.onrender.com/api/getUserCart", {
           method: "GET",
           headers: {
@@ -53,33 +89,69 @@ export default function CartPage() {
           },
         })
 
+        addToLog(`API response status: ${response.status}`)
+
         // Check for errors
         if (!response.ok) {
           if (response.status === 401) {
+            addToLog("Authentication failed (401)")
             throw new Error("Authentication failed. Please refresh the token and try again.")
           } else {
+            addToLog(`API error: ${response.status} ${response.statusText}`)
             throw new Error(`API error: ${response.status} ${response.statusText}`)
           }
         }
 
         const data = await response.json()
+        addToLog(`API response received: ${JSON.stringify(data).substring(0, 100)}...`)
+
+        // Store the full API response for debugging
+        setApiResponse(data)
 
         if (data.data) {
           // Filter out any items with null or undefined postId
           const validItems = (data.data.items || []).filter(
             (item: CartItem) => item.postId && typeof item.postId === "string",
           )
-          setCartItems(validItems)
 
-          // Check if any items were filtered out
+          addToLog(`Valid items from API: ${validItems.length}`)
+
           if (validItems.length < (data.data.items || []).length) {
-            console.warn("Some items were filtered out due to missing postId")
+            addToLog(`WARNING: Filtered out ${(data.data.items || []).length - validItems.length} invalid items`)
           }
+
+          // Apply quantities from localStorage
+          const itemsWithQuantities = validItems.map((item: CartItem) => {
+            // Get quantity from localStorage or use the one from API
+            const storedQuantity = getCartItemQuantity(item.postId)
+            addToLog(`Item ${item.postId}: API quantity=${item.quantity}, localStorage quantity=${storedQuantity}`)
+            return {
+              ...item,
+              quantity: storedQuantity || item.quantity,
+            }
+          })
+
+          setCartItems(itemsWithQuantities)
+
+          // Update localStorage cart to match server
+          const cartIds = validItems.map((item: CartItem) => item.postId)
+          localStorage.setItem("cart", JSON.stringify(cartIds))
+          addToLog(`Updated localStorage cart with ${cartIds.length} items`)
+
+          // Update debug info
+          updateLocalStorageDebug()
         } else {
+          addToLog("No cart data in API response, setting empty cart")
           setCartItems([])
+          // Clear localStorage cart
+          localStorage.removeItem("cart")
+          localStorage.removeItem("cartQuantities")
+          addToLog("Cleared localStorage cart data")
+          updateLocalStorageDebug()
         }
       } catch (error: any) {
         console.error("Error fetching cart:", error)
+        addToLog(`Error: ${error.message}`)
         toast({
           title: "Error",
           description: error.message || "Failed to load your cart. Please try again.",
@@ -92,6 +164,7 @@ export default function CartPage() {
     }
 
     fetchCart()
+    updateLocalStorageDebug()
   }, [toast])
 
   // Update item quantity
@@ -100,6 +173,7 @@ export default function CartPage() {
 
     try {
       setUpdating((prev) => ({ ...prev, [productId]: true }))
+      addToLog(`Updating quantity for ${productId} to ${newQuantity}`)
 
       // Get the token
       const token = localStorage.getItem("clientImpersonationToken")
@@ -109,6 +183,7 @@ export default function CartPage() {
       }
 
       // First remove the item
+      addToLog(`Removing item ${productId} before updating quantity`)
       const removeResponse = await fetch("https://evershinebackend-2.onrender.com/api/deleteUserCartItem", {
         method: "DELETE",
         headers: {
@@ -119,30 +194,47 @@ export default function CartPage() {
       })
 
       if (!removeResponse.ok) {
+        addToLog(`Failed to remove item: ${removeResponse.status}`)
         throw new Error(`Failed to update quantity: ${removeResponse.status}`)
       }
 
       // Then add it back with the new quantity
-      // For this to work properly, we need to add the item back multiple times
-      for (let i = 0; i < newQuantity; i++) {
-        const addResponse = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ productId }),
-        })
+      addToLog(`Adding item ${productId} back with quantity ${newQuantity}`)
+      const addResponse = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          productId,
+          quantity: newQuantity, // Add quantity parameter
+        }),
+      })
 
-        if (!addResponse.ok) {
-          throw new Error(`Failed to update quantity: ${addResponse.status}`)
-        }
+      if (!addResponse.ok) {
+        addToLog(`Failed to add item back: ${addResponse.status}`)
+        throw new Error(`Failed to update quantity: ${addResponse.status}`)
+      }
+
+      // Update local storage quantity
+      try {
+        const savedCartQuantities = localStorage.getItem("cartQuantities")
+        const cartQuantities = savedCartQuantities ? JSON.parse(savedCartQuantities) : {}
+        cartQuantities[productId] = newQuantity
+        localStorage.setItem("cartQuantities", JSON.stringify(cartQuantities))
+        addToLog(`Updated localStorage quantity for ${productId} to ${newQuantity}`)
+      } catch (e) {
+        console.error("Error updating cart quantities:", e)
+        addToLog(`Error updating localStorage quantities: ${e}`)
       }
 
       // Update local state
       setCartItems((prev) =>
         prev.map((item) => (item.postId === productId ? { ...item, quantity: newQuantity } : item)),
       )
+
+      updateLocalStorageDebug()
 
       toast({
         title: "Quantity Updated",
@@ -151,6 +243,7 @@ export default function CartPage() {
       })
     } catch (error: any) {
       console.error("Error updating quantity:", error)
+      addToLog(`Error updating quantity: ${error.message}`)
       toast({
         title: "Error",
         description: error.message || "Failed to update quantity. Please try again.",
@@ -165,6 +258,7 @@ export default function CartPage() {
   const removeFromCart = async (productId: string) => {
     try {
       setRemoving((prev) => ({ ...prev, [productId]: true }))
+      addToLog(`Removing item ${productId} from cart`)
 
       // Get the token
       const token = localStorage.getItem("clientImpersonationToken")
@@ -184,6 +278,7 @@ export default function CartPage() {
 
       // Check for errors
       if (!response.ok) {
+        addToLog(`API error removing item: ${response.status}`)
         if (response.status === 401) {
           throw new Error("Authentication failed. Please refresh the token and try again.")
         } else {
@@ -192,6 +287,7 @@ export default function CartPage() {
       }
 
       const data = await response.json()
+      addToLog(`Remove API response: ${JSON.stringify(data).substring(0, 100)}...`)
 
       if (data.success) {
         setCartItems((prev) => prev.filter((item) => item.postId !== productId))
@@ -202,8 +298,20 @@ export default function CartPage() {
           if (savedCart) {
             const cartArray = JSON.parse(savedCart)
             localStorage.setItem("cart", JSON.stringify(cartArray.filter((id: string) => id !== productId)))
+            addToLog(`Updated localStorage cart after removal`)
+          }
+
+          // Also remove from cartQuantities
+          const savedCartQuantities = localStorage.getItem("cartQuantities")
+          if (savedCartQuantities) {
+            const cartQuantities = JSON.parse(savedCartQuantities)
+            delete cartQuantities[productId]
+            localStorage.setItem("cartQuantities", JSON.stringify(cartQuantities))
+            addToLog(`Removed item from localStorage quantities`)
           }
         }
+
+        updateLocalStorageDebug()
 
         toast({
           title: "Item removed",
@@ -215,6 +323,7 @@ export default function CartPage() {
       }
     } catch (error: any) {
       console.error("Error removing item from cart:", error)
+      addToLog(`Error removing item: ${error.message}`)
       toast({
         title: "Error",
         description: error.message || "Failed to remove item from cart. Please try again.",
@@ -235,6 +344,7 @@ export default function CartPage() {
     try {
       setIsCheckingOut(true)
       setCheckoutError(null)
+      addToLog("Starting checkout process")
 
       // Validate cart has items
       if (cartItems.length === 0) {
@@ -244,6 +354,7 @@ export default function CartPage() {
       // Check for any items with null or undefined postId
       const invalidItems = cartItems.filter((item) => !item.postId || typeof item.postId !== "string")
       if (invalidItems.length > 0) {
+        addToLog(`Found ${invalidItems.length} invalid items in cart`)
         throw new Error("Some items in your cart are invalid. Please remove them and try again.")
       }
 
@@ -269,6 +380,8 @@ export default function CartPage() {
         notes: "Order placed via agent dashboard",
       }
 
+      addToLog(`Sending checkout request with payload: ${JSON.stringify(payload)}`)
+
       // Make API request to create order
       const response = await fetch("https://evershinebackend-2.onrender.com/api/createOrder", {
         method: "POST",
@@ -279,24 +392,31 @@ export default function CartPage() {
         body: JSON.stringify(payload),
       })
 
+      addToLog(`Checkout API response status: ${response.status}`)
+
       // Get response text first to handle both JSON and non-JSON responses
       const responseText = await response.text()
+      addToLog(`Checkout API response text: ${responseText.substring(0, 100)}...`)
 
       let data
       try {
         // Try to parse as JSON
         data = JSON.parse(responseText)
+        addToLog(`Parsed checkout response as JSON: ${JSON.stringify(data).substring(0, 100)}...`)
       } catch (e) {
         // Not JSON, handle as text
+        addToLog(`Failed to parse checkout response as JSON: ${e}`)
       }
 
       // Special case: If we get a 500 error but the order might have been created
       if (response.status === 500) {
+        addToLog("Got 500 error, checking if order was created anyway")
         try {
           // Wait a moment to ensure any database operations complete
           await new Promise((resolve) => setTimeout(resolve, 1500))
 
           // Fetch the cart again to see if it was cleared by the server
+          addToLog("Checking cart status after 500 error")
           const cartCheckResponse = await fetch("https://evershinebackend-2.onrender.com/api/getUserCart", {
             method: "GET",
             headers: {
@@ -307,16 +427,19 @@ export default function CartPage() {
 
           if (cartCheckResponse.ok) {
             const cartData = await cartCheckResponse.json()
+            addToLog(`Cart check response: ${JSON.stringify(cartData).substring(0, 100)}...`)
 
             // If the cart is now empty, the order probably succeeded despite the error
             if (cartData.data && (!cartData.data.items || cartData.data.items.length === 0)) {
+              addToLog("Cart is empty after 500 error, assuming order succeeded")
               // Clear local cart state
               setCartItems([])
 
               // Clear localStorage cart
-              if (typeof window !== "undefined") {
-                localStorage.removeItem("cart")
-              }
+              localStorage.removeItem("cart")
+              localStorage.removeItem("cartQuantities")
+              addToLog("Cleared localStorage cart data")
+              updateLocalStorageDebug()
 
               // Redirect directly to orders page
               router.push(`/client-dashboard/${clientId}/orders`)
@@ -325,6 +448,7 @@ export default function CartPage() {
           }
         } catch (cartCheckError: any) {
           // Handle error silently
+          addToLog(`Error checking cart after 500: ${cartCheckError}`)
         }
 
         // If we get here, the cart check didn't confirm success
@@ -346,25 +470,30 @@ export default function CartPage() {
 
       // If we have data and it indicates success
       if (data && data.success) {
+        addToLog("Checkout successful, clearing cart")
         // Clear cart items from state
         setCartItems([])
 
         // Clear localStorage cart
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("cart")
-        }
+        localStorage.removeItem("cart")
+        localStorage.removeItem("cartQuantities")
+        addToLog("Cleared localStorage cart data")
+        updateLocalStorageDebug()
 
         // Redirect directly to orders page
         router.push(`/client-dashboard/${clientId}/orders`)
       } else if (data) {
         // We have data but success is false
+        addToLog(`Checkout failed with message: ${data.message}`)
         throw new Error(data.message || "Failed to place order")
       } else {
         // No parseable data
+        addToLog("Received invalid response from server")
         throw new Error("Received an invalid response from the server")
       }
     } catch (error: any) {
       console.error("Error during checkout:", error)
+      addToLog(`Checkout error: ${error.message}`)
       setCheckoutError(error.message || "An unknown error occurred during checkout")
 
       toast({
@@ -374,6 +503,214 @@ export default function CartPage() {
       })
     } finally {
       setIsCheckingOut(false)
+    }
+  }
+
+  // IMPROVED: Clear cart function that ensures server-side cart is properly cleared
+  const handleClearCart = async () => {
+    try {
+      setClearingCart(true)
+      setLoading(true)
+      addToLog("=== STARTING COMPLETE CART CLEARING PROCESS ===")
+
+      // Get the token
+      const token = localStorage.getItem("clientImpersonationToken")
+      if (!token) {
+        addToLog("No authentication token found")
+        throw new Error("No authentication token found. Please refresh the page and try again.")
+      }
+
+      // First, get the current cart to know what items to remove
+      addToLog("Fetching current cart to identify items to remove")
+      const cartResponse = await fetch("https://evershinebackend-2.onrender.com/api/getUserCart", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (!cartResponse.ok) {
+        addToLog(`Failed to fetch cart: ${cartResponse.status}`)
+        throw new Error(`Failed to fetch cart: ${cartResponse.status}`)
+      }
+
+      const cartData = await cartResponse.json()
+      addToLog(`Current cart data: ${JSON.stringify(cartData).substring(0, 100)}...`)
+
+      // Extract items to remove
+      const itemsToRemove = cartData.data?.items || []
+      addToLog(`Found ${itemsToRemove.length} items to remove from server`)
+
+      // Remove each item individually from the server
+      for (const item of itemsToRemove) {
+        if (!item.postId) {
+          addToLog(`Skipping item with no postId: ${JSON.stringify(item)}`)
+          continue
+        }
+
+        addToLog(`Removing item ${item.postId} from server`)
+        try {
+          const removeResponse = await fetch("https://evershinebackend-2.onrender.com/api/deleteUserCartItem", {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ productId: item.postId }),
+          })
+
+          if (removeResponse.ok) {
+            addToLog(`Successfully removed item ${item.postId} from server`)
+          } else {
+            const errorText = await removeResponse.text()
+            addToLog(`Failed to remove item ${item.postId}: ${removeResponse.status} - ${errorText}`)
+          }
+        } catch (e) {
+          addToLog(`Error removing item ${item.postId}: ${e}`)
+        }
+
+        // Add a small delay between requests to avoid overwhelming the server
+        await new Promise((resolve) => setTimeout(resolve, 300))
+      }
+
+      // Verify the cart is now empty on the server
+      addToLog("Verifying cart is empty on server")
+      const verifyResponse = await fetch("https://evershinebackend-2.onrender.com/api/getUserCart", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (verifyResponse.ok) {
+        const verifyData = await verifyResponse.json()
+        addToLog(`Verification response: ${JSON.stringify(verifyData).substring(0, 100)}...`)
+
+        const remainingItems = verifyData.data?.items || []
+        if (remainingItems.length > 0) {
+          addToLog(`WARNING: ${remainingItems.length} items still in cart after clearing`)
+        } else {
+          addToLog("SUCCESS: Server cart is now empty")
+        }
+      } else {
+        addToLog(`Failed to verify cart: ${verifyResponse.status}`)
+      }
+
+      // Clear local state and storage regardless of server result
+      setCartItems([])
+      localStorage.removeItem("cart")
+      localStorage.removeItem("cartQuantities")
+      addToLog("Cleared local cart state and localStorage")
+      updateLocalStorageDebug()
+
+      addToLog("=== CART CLEARING PROCESS COMPLETE ===")
+
+      toast({
+        title: "Cart Cleared",
+        description: "All items have been removed from your cart",
+        variant: "default",
+      })
+    } catch (error: any) {
+      console.error("Error clearing cart:", error)
+      addToLog(`Error in cart clearing process: ${error.message}`)
+      toast({
+        title: "Error",
+        description: error.message || "Failed to clear cart. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setClearingCart(false)
+      setLoading(false)
+    }
+  }
+
+  // Add a function to refresh the cart
+  const handleRefreshCart = async () => {
+    setLoading(true)
+    addToLog("Manually refreshing cart")
+
+    try {
+      // Get the token
+      const token = localStorage.getItem("clientImpersonationToken")
+
+      if (!token) {
+        throw new Error("No authentication token found. Please refresh the page and try again.")
+      }
+
+      const response = await fetch("https://evershinebackend-2.onrender.com/api/getUserCart", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      addToLog(`Refresh API response status: ${response.status}`)
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      addToLog(`Refresh API response: ${JSON.stringify(data).substring(0, 100)}...`)
+
+      // Store the full API response for debugging
+      setApiResponse(data)
+
+      if (data.data) {
+        // Filter out any items with null or undefined postId
+        const validItems = (data.data.items || []).filter(
+          (item: CartItem) => item.postId && typeof item.postId === "string",
+        )
+
+        addToLog(`Valid items from refresh: ${validItems.length}`)
+
+        // Apply quantities from localStorage
+        const itemsWithQuantities = validItems.map((item: CartItem) => {
+          // Get quantity from localStorage or use the one from API
+          const storedQuantity = getCartItemQuantity(item.postId)
+          return {
+            ...item,
+            quantity: storedQuantity || item.quantity,
+          }
+        })
+
+        setCartItems(itemsWithQuantities)
+
+        // Update localStorage cart to match server
+        const cartIds = validItems.map((item: CartItem) => item.postId)
+        localStorage.setItem("cart", JSON.stringify(cartIds))
+        addToLog(`Updated localStorage cart with ${cartIds.length} items`)
+
+        // Update debug info
+        updateLocalStorageDebug()
+      } else {
+        addToLog("No cart data in refresh response, setting empty cart")
+        setCartItems([])
+        // Clear localStorage cart
+        localStorage.removeItem("cart")
+        localStorage.removeItem("cartQuantities")
+        addToLog("Cleared localStorage cart data")
+        updateLocalStorageDebug()
+      }
+
+      toast({
+        title: "Cart Refreshed",
+        description: "Your cart has been refreshed",
+        variant: "default",
+      })
+    } catch (error: any) {
+      console.error("Error refreshing cart:", error)
+      addToLog(`Error refreshing cart: ${error.message}`)
+      toast({
+        title: "Error",
+        description: error.message || "Failed to refresh cart. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -388,12 +725,70 @@ export default function CartPage() {
 
   return (
     <div className="p-6 md:p-8">
-      <div className="flex items-center mb-8">
-        <Button variant="ghost" size="icon" onClick={() => router.back()} className="mr-4">
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <h1 className="text-3xl font-bold">Your Cart</h1>
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center">
+          <Button variant="ghost" size="icon" onClick={() => router.back()} className="mr-4">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <h1 className="text-3xl font-bold">Your Cart</h1>
+        </div>
+
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleRefreshCart} className="flex items-center gap-1" disabled={loading}>
+            <RefreshCw className="h-4 w-4" />
+            Refresh
+          </Button>
+
+          <Button variant="outline" onClick={() => setShowDebug(!showDebug)} className="flex items-center gap-1">
+            <Bug className="h-4 w-4" />
+            {showDebug ? "Hide Debug" : "Show Debug"}
+          </Button>
+
+          {cartItems.length > 0 && (
+            <Button
+              variant="outline"
+              onClick={handleClearCart}
+              className="text-red-500 border-red-200 hover:bg-red-50"
+              disabled={loading || clearingCart}
+            >
+              {clearingCart ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              Clear Cart
+            </Button>
+          )}
+        </div>
       </div>
+
+      {showDebug && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="text-sm">Debug Information</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 text-xs">
+            <div>
+              <h3 className="font-bold mb-1">API Response:</h3>
+              <Textarea
+                readOnly
+                value={apiResponse ? JSON.stringify(apiResponse, null, 2) : "No data"}
+                className="h-32 font-mono"
+              />
+            </div>
+
+            <div>
+              <h3 className="font-bold mb-1">LocalStorage Data:</h3>
+              <Textarea
+                readOnly
+                value={localStorageData ? JSON.stringify(localStorageData, null, 2) : "No data"}
+                className="h-32 font-mono"
+              />
+            </div>
+
+            <div>
+              <h3 className="font-bold mb-1">Debug Log:</h3>
+              <Textarea readOnly value={debugLog.join("\n")} className="h-32 font-mono" />
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {checkoutError && (
         <Alert variant="destructive" className="mb-6">
