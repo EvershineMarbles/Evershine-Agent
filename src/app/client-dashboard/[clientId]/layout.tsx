@@ -28,7 +28,8 @@ export default function ClientDashboardLayout({
         <div className="p-4 border-b bg-white">
           <Link href="/dashboard" className="inline-flex items-center text-dark hover:underline">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Home
+            <span className="hidden sm:inline">Back to Home</span>
+            <span className="sm:hidden">Home</span>
           </Link>
         </div>
         {children}
@@ -36,4 +37,3 @@ export default function ClientDashboardLayout({
     </div>
   )
 }
-

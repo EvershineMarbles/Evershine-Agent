@@ -67,12 +67,13 @@
 .sidebar-tooltip {
   @apply absolute w-auto p-2 m-2 min-w-max left-14
   rounded-md shadow-md text-white bg-dark
-  text-xs font-bold transition-all duration-100 scale-0 origin-left;
+  text-xs font-bold transition-all duration-100 scale-0 origin-left z-50;
 }
 
 .sidebar-icon:hover .sidebar-tooltip {
   @apply scale-100;
 }
+
 
 .sidebar-hr {
   @apply bg-gray-600 border border-gray-600 rounded-full mx-2;
