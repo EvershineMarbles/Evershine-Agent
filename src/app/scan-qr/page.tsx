@@ -35,8 +35,8 @@ export default function ScanQRPage() {
 
       <Card className="max-w-md mx-auto">
         <CardHeader>
-          <CardTitle>QR Code Scanner</CardTitle>
-          <CardDescription>Scan a QR code to access client information</CardDescription>
+          <CardTitle>Scan Product QR</CardTitle>
+          <CardDescription> Scan this QR to access product details</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col items-center justify-center min-h-[300px]">
           {scanning ? (
@@ -53,7 +53,7 @@ export default function ScanQRPage() {
                 <QrCode className="h-16 w-16 text-green-500 mx-auto" />
               </div>
               <h3 className="text-xl font-bold">QR Code Scanned Successfully!</h3>
-              <p className="text-muted-foreground mt-2 mb-4">Client information retrieved</p>
+              <p className="text-muted-foreground mt-2 mb-4">Product information retrieved</p>
               <Button
                 className="bg-blue hover:bg-blue/90"
                 onClick={() => {

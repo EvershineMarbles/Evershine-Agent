@@ -28,15 +28,14 @@ export default function ScanQRPage() {
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Home
         </Link>
-        <Image src="/logo.png" alt="Evershine Logo" width={180} height={100} priority className="mt-8" />
       </div>
 
       <h2 className="text-3xl font-bold mb-6 text-center">Scan QR Code</h2>
 
       <Card className="max-w-md mx-auto">
         <CardHeader>
-          <CardTitle>QR Code Scanner</CardTitle>
-          <CardDescription>Scan a QR code to access client information</CardDescription>
+          <CardTitle>Scan Product QR</CardTitle>
+          <CardDescription> Scan this QR to access product details</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col items-center justify-center min-h-[300px]">
           {scanning ? (
