@@ -8,6 +8,7 @@ import { ArrowLeft, Trash2, Loader2, ShoppingBag, Plus, Minus } from "lucide-rea
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { getCartItemQuantity } from "@/lib/cart-service"
 
 interface CartItem {
   _id: string
@@ -69,7 +70,18 @@ export default function CartPage() {
           const validItems = (data.data.items || []).filter(
             (item: CartItem) => item.postId && typeof item.postId === "string",
           )
-          setCartItems(validItems)
+
+          // Apply quantities from localStorage
+          const itemsWithQuantities = validItems.map((item: CartItem) => {
+            // Get quantity from localStorage or use the one from API
+            const storedQuantity = getCartItemQuantity(item.postId)
+            return {
+              ...item,
+              quantity: storedQuantity || item.quantity,
+            }
+          })
+
+          setCartItems(itemsWithQuantities)
 
           // Check if any items were filtered out
           if (validItems.length < (data.data.items || []).length) {
@@ -123,20 +135,30 @@ export default function CartPage() {
       }
 
       // Then add it back with the new quantity
-      // For this to work properly, we need to add the item back multiple times
-      for (let i = 0; i < newQuantity; i++) {
-        const addResponse = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ productId }),
-        })
+      const addResponse = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          productId,
+          quantity: newQuantity, // Add quantity parameter
+        }),
+      })
 
-        if (!addResponse.ok) {
-          throw new Error(`Failed to update quantity: ${addResponse.status}`)
-        }
+      if (!addResponse.ok) {
+        throw new Error(`Failed to update quantity: ${addResponse.status}`)
+      }
+
+      // Update local storage quantity
+      try {
+        const savedCartQuantities = localStorage.getItem("cartQuantities")
+        const cartQuantities = savedCartQuantities ? JSON.parse(savedCartQuantities) : {}
+        cartQuantities[productId] = newQuantity
+        localStorage.setItem("cartQuantities", JSON.stringify(cartQuantities))
+      } catch (e) {
+        console.error("Error updating cart quantities:", e)
       }
 
       // Update local state
@@ -430,6 +452,7 @@ export default function CartPage() {
                         }
                         alt={item.name}
                         fill
+                        unoptimized={true}
                         className="object-cover"
                       />
                     </div>

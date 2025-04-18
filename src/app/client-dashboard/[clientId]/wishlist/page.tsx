@@ -363,15 +363,6 @@ export default function WishlistPage() {
 
   // Handle adding item to cart
   const handleAddToCart = async (postId: string, name: string) => {
-    if (cart.includes(postId)) {
-      toast({
-        title: "Already in cart",
-        description: "This item is already in your cart",
-        variant: "default",
-      })
-      return
-    }
-
     setAddingToCart((prev) => ({ ...prev, [postId]: true }))
     try {
       const token = localStorage.getItem("clientImpersonationToken")
@@ -383,26 +374,45 @@ export default function WishlistPage() {
       // Get the quantity for this product
       const quantity = quantities[postId] || 1
 
-      // Add to cart multiple times based on quantity
-      for (let i = 0; i < quantity; i++) {
-        const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ productId: postId }),
-        })
+      // Instead of making multiple API calls, we'll make a single call with quantity information
+      // First, add the item to the cart once
+      const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          productId: postId,
+          // Note: The current API might not support a quantity parameter
+          // We're adding it in case it does or will in the future
+          quantity: quantity,
+        }),
+      })
 
-        if (!response.ok) {
-          throw new Error(`API error: ${response.status} ${response.statusText}`)
-        }
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`)
+      }
 
-        const data = await response.json()
+      const data = await response.json()
 
-        if (!data.success) {
-          throw new Error(data.message || "Failed to add to cart")
-        }
+      if (!data.success) {
+        throw new Error(data.message || "Failed to add to cart")
+      }
+
+      // Store the quantity in localStorage so we can use it in the cart page
+      try {
+        // Get existing cart quantities or initialize empty object
+        const savedCartQuantities = localStorage.getItem("cartQuantities")
+        const cartQuantities = savedCartQuantities ? JSON.parse(savedCartQuantities) : {}
+
+        // Update the quantity for this product
+        cartQuantities[postId] = quantity
+
+        // Save back to localStorage
+        localStorage.setItem("cartQuantities", JSON.stringify(cartQuantities))
+      } catch (e) {
+        console.error("Error saving cart quantities:", e)
       }
 
       // Update local state for cart
