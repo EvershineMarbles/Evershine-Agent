@@ -6,10 +6,10 @@ import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Loader2, AlertCircle, Search, Heart, QrCode, ShoppingCart, Package } from "lucide-react"
+import { Loader2, AlertCircle, Search, Heart, QrCode, ShoppingCart, Home, User, LogOut } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 
 interface Product {
@@ -250,7 +250,7 @@ export default function ClientDashboard() {
     }
   }
 
-  // Add to cart function
+  // Add to cart function - Optimistic UI update
   const addToCart = async (e: React.MouseEvent, productId: string, productName: string) => {
     e.preventDefault() // Prevent navigation
 
@@ -263,10 +263,18 @@ export default function ClientDashboard() {
       return
     }
 
-    try {
-      // Set loading state for this specific product
-      setAddingToCart((prev) => ({ ...prev, [productId]: true }))
+    // Immediately update UI
+    setAddingToCart((prev) => ({ ...prev, [productId]: true }))
+    setCart((prev) => [...prev, productId])
 
+    // Show success toast immediately
+    toast({
+      title: "Added to cart",
+      description: `${productName} has been added to your cart`,
+      variant: "default",
+    })
+
+    try {
       // Get the token
       const token = localStorage.getItem("clientImpersonationToken")
 
@@ -274,7 +282,7 @@ export default function ClientDashboard() {
         throw new Error("No authentication token found. Please refresh the token and try again.")
       }
 
-      // Make a direct fetch request with the token
+      // Make API request in the background
       const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
         method: "POST",
         headers: {
@@ -316,18 +324,16 @@ export default function ClientDashboard() {
 
       const data = await response.json()
 
-      if (data.success) {
-        toast({
-          title: "Added to cart",
-          description: `${productName} has been added to your cart`,
-          variant: "default",
-        })
-        setCart((prev) => [...prev, productId])
-      } else {
+      if (!data.success) {
         throw new Error(data.message || "Failed to add to cart")
       }
     } catch (error: any) {
       console.error("Error adding to cart:", error)
+
+      // Revert the optimistic update
+      setCart((prev) => prev.filter((id) => id !== productId))
+
+      // Show error toast
       toast({
         title: "Error adding to cart",
         description: error.message || "Failed to add item to cart. Please try again.",
@@ -383,144 +389,200 @@ export default function ClientDashboard() {
   }
 
   return (
-    <div className="p-6 md:p-8">
-      {/* Header Section with Welcome, Search and QR Code */}
-      <div className="mb-8">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-          <h1 className="text-3xl font-bold">Welcome, {clientData?.name?.split(" ")[0] || "Client"}</h1>
+    <div>
+      {/* Top Navigation Strip */}
+      <div className="w-full bg-[#194a95] text-white py-3 px-4 md:px-8 shadow-md">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2">
+            <Home className="h-5 w-5" />
+            <span className="font-medium hidden sm:inline">Evershine</span>
+          </Link>
 
-          <div className="flex items-center gap-4 w-full md:w-auto">
-            <div className="relative flex-grow md:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                type="text"
-                placeholder="Search products..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
+          <div className="flex items-center gap-4">
+            <Link href={`/client-dashboard/${clientId}/wishlist`} className="relative">
+              <Button variant="ghost" size="icon" className="text-white hover:bg-white/20">
+                <Heart className="h-5 w-5" />
+                {wishlist.length > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                    {wishlist.length}
+                  </span>
+                )}
+              </Button>
+            </Link>
 
             <Link href={`/client-dashboard/${clientId}/cart`} className="relative">
-              <Button variant="outline" size="icon" className="rounded-full h-10 w-10">
+              <Button variant="ghost" size="icon" className="text-white hover:bg-white/20">
                 <ShoppingCart className="h-5 w-5" />
                 {cart.length > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-primary text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
                     {cart.length}
                   </span>
                 )}
               </Button>
             </Link>
+
+            <div className="h-6 w-px bg-white/30 mx-1"></div>
+
+            <Button variant="ghost" size="sm" className="text-white hover:bg-white/20 flex items-center gap-2">
+              <User className="h-4 w-4" />
+              <span className="hidden sm:inline">Account</span>
+            </Button>
+
+            <Button variant="ghost" size="sm" className="text-white hover:bg-white/20 flex items-center gap-2">
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">Logout</span>
+            </Button>
           </div>
         </div>
-
-        <Button
-          onClick={handleScanQrCode}
-          className="w-full md:w-auto bg-blue-700 hover:bg-blue-800 flex items-center justify-center gap-2"
-        >
-          <QrCode className="h-5 w-5" />
-          <span>Scan QR code</span>
-        </Button>
       </div>
 
-   
+      <div className="p-6 md:p-8">
+        {/* Header Section with Welcome, Search and QR Code */}
+        <div className="mb-8">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+            <h1 className="text-3xl font-bold">Welcome, {clientData?.name?.split(" ")[0] || "Client"}</h1>
 
-      {/* Products Section */}
-      <div className="mt-8">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold">Featured Products</h2>
-          <Link href={`/client-dashboard/${clientId}/products`}>
-            <Button variant="link" className="text-primary">
-              View All
-            </Button>
-          </Link>
-        </div>
-
-        <div className="mb-4">
-          <p className="text-sm text-muted-foreground">
-            Showing 1-{Math.min(filteredProducts.length, 8)} of {products.length} products
-          </p>
-        </div>
-
-        {productsLoading ? (
-          <div className="flex justify-center items-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        ) : productsError ? (
-          <Card className="border-red-200 bg-red-50">
-            <CardContent className="p-6">
-              <p className="text-red-700">{productsError}</p>
-              <Button onClick={() => window.location.reload()} className="mt-4 bg-red-600 hover:bg-red-700 text-white">
-                Retry
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {filteredProducts.slice(0, 8).map((product) => (
-              <div
-                key={product._id || product.postId}
-                className="group relative bg-card rounded-lg overflow-hidden border border-border hover:border-primary transition-all hover:shadow-md"
-              >
-                <div className="relative aspect-square">
-                  <Image
-                    src={
-                      product.image && product.image.length > 0
-                        ? product.image[0]
-                        : "/placeholder.svg?height=300&width=300"
-                    }
-                    alt={product.name}
-                    fill
-                    className="object-cover transition-transform group-hover:scale-105 duration-300"
-                    unoptimized={true}
-                  />
-
-                  {/* Wishlist button overlay */}
-                  <button
-                    onClick={(e) => toggleWishlist(e, product.postId)}
-                    className="absolute top-2 right-2 p-2 rounded-full bg-white/80 hover:bg-white transition-colors z-10"
-                    aria-label={wishlist.includes(product.postId) ? "Remove from wishlist" : "Add to wishlist"}
-                    type="button"
-                  >
-                    <Heart
-                      className={`h-5 w-5 ${
-                        wishlist.includes(product.postId) ? "text-red-500 fill-red-500" : "text-gray-600"
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                <div className="p-4">
-                  <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
-                  <p className="text-lg font-bold mt-2">₹{product.price.toLocaleString()}</p>
-                  <p className="text-sm text-muted-foreground mt-1">{product.category}</p>
-
-                  {product.quantityAvailable !== undefined && (
-                    <p className="text-sm mt-1">
-                      {product.quantityAvailable > 0 ? `In stock: ${product.quantityAvailable}` : "Out of stock"}
-                    </p>
-                  )}
-
-                  <button
-                    onClick={(e) => toggleWishlist(e, product.postId)}
-                    className={`mt-4 w-full py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2
-                              ${
-                                wishlist.includes(product.postId)
-                                  ? "bg-red-100 text-red-600 border border-red-200"
-                                  : "bg-primary hover:bg-primary/90 text-primary-foreground"
-                              } 
-                              transition-colors`}
-                    disabled={product.quantityAvailable !== undefined && product.quantityAvailable <= 0}
-                    type="button"
-                  >
-                    <Heart className={`h-4 w-4 ${wishlist.includes(product.postId) ? "fill-red-500" : ""}`} />
-                    {wishlist.includes(product.postId) ? "In Wishlist" : "Add to Wishlist"}
-                  </button>
-                </div>
+            <div className="flex items-center gap-4 w-full md:w-auto">
+              <div className="relative flex-grow md:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  type="text"
+                  placeholder="Search products..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
               </div>
-            ))}
+            </div>
           </div>
-        )}
+
+          <Button
+            onClick={handleScanQrCode}
+            className="w-full md:w-auto bg-blue-700 hover:bg-blue-800 flex items-center justify-center gap-2"
+          >
+            <QrCode className="h-5 w-5" />
+            <span>Scan QR code</span>
+          </Button>
+        </div>
+
+        {/* Products Section */}
+        <div className="mt-8">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold">Featured Products</h2>
+            <Link href={`/client-dashboard/${clientId}/products`}>
+              <Button variant="link" className="text-primary">
+                View All
+              </Button>
+            </Link>
+          </div>
+
+          <div className="mb-4">
+            <p className="text-sm text-muted-foreground">
+              Showing 1-{Math.min(filteredProducts.length, 8)} of {products.length} products
+            </p>
+          </div>
+
+          {productsLoading ? (
+            <div className="flex justify-center items-center h-64">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : productsError ? (
+            <Card className="border-red-200 bg-red-50">
+              <CardContent className="p-6">
+                <p className="text-red-700">{productsError}</p>
+                <Button
+                  onClick={() => window.location.reload()}
+                  className="mt-4 bg-red-600 hover:bg-red-700 text-white"
+                >
+                  Retry
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {filteredProducts.slice(0, 8).map((product) => (
+                <div
+                  key={product._id || product.postId}
+                  className="group relative bg-card rounded-lg overflow-hidden border border-border hover:border-primary transition-all hover:shadow-md"
+                >
+                  <div className="relative aspect-square">
+                    <Image
+                      src={
+                        product.image && product.image.length > 0
+                          ? product.image[0]
+                          : "/placeholder.svg?height=300&width=300"
+                      }
+                      alt={product.name}
+                      fill
+                      className="object-cover transition-transform group-hover:scale-105 duration-300"
+                      unoptimized={true}
+                    />
+
+                    {/* Wishlist button overlay */}
+                    <button
+                      onClick={(e) => toggleWishlist(e, product.postId)}
+                      className="absolute top-2 right-2 p-2 rounded-full bg-white/80 hover:bg-white transition-colors z-10"
+                      aria-label={wishlist.includes(product.postId) ? "Remove from wishlist" : "Add to wishlist"}
+                      type="button"
+                    >
+                      <Heart
+                        className={`h-5 w-5 ${
+                          wishlist.includes(product.postId) ? "text-red-500 fill-red-500" : "text-gray-600"
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  <div className="p-4">
+                    <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
+                    <p className="text-lg font-bold mt-2">₹{product.price.toLocaleString()}</p>
+                    <p className="text-sm text-muted-foreground mt-1">{product.category}</p>
+
+                    {product.quantityAvailable !== undefined && (
+                      <p className="text-sm mt-1">
+                        {product.quantityAvailable > 0 ? `In stock: ${product.quantityAvailable}` : "Out of stock"}
+                      </p>
+                    )}
+
+                    <button
+                      onClick={(e) => addToCart(e, product.postId, product.name)}
+                      className={`mt-4 w-full py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2
+                                ${
+                                  cart.includes(product.postId)
+                                    ? "bg-gray-100 text-gray-600 border border-gray-200"
+                                    : "bg-primary hover:bg-primary/90 text-primary-foreground"
+                                } 
+                                transition-colors`}
+                      disabled={
+                        (product.quantityAvailable !== undefined && product.quantityAvailable <= 0) ||
+                        addingToCart[product.postId] ||
+                        cart.includes(product.postId)
+                      }
+                      type="button"
+                    >
+                      {addingToCart[product.postId] ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                          Adding...
+                        </>
+                      ) : cart.includes(product.postId) ? (
+                        <>
+                          <ShoppingCart className="h-4 w-4" />
+                          Added to Cart
+                        </>
+                      ) : (
+                        <>
+                          <ShoppingCart className="h-4 w-4" />
+                          Add to Cart
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
