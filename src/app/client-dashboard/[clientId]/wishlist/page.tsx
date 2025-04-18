@@ -392,7 +392,7 @@ export default function WishlistPage() {
         },
         body: JSON.stringify({
           productId: postId,
-          quantity: quantity, // Add quantity parameter
+          quantity: quantity, // Pass the quantity from the wishlist
         }),
       })
 
@@ -584,6 +584,16 @@ export default function WishlistPage() {
                     <h3 className="font-semibold text-lg text-foreground line-clamp-1">{item.name}</h3>
                     <p className="text-lg font-bold mt-2">₹{item.price.toLocaleString()}</p>
                     <p className="text-sm text-muted-foreground mt-1">{item.category}</p>
+
+                    {item.quantityAvailable !== undefined && (
+                      <p className="text-sm mt-1">
+                        {item.quantityAvailable > 0 ? (
+                          <span className="text-green-600">In stock: {item.quantityAvailable}</span>
+                        ) : (
+                          <span className="text-red-500">Out of stock</span>
+                        )}
+                      </p>
+                    )}
 
                     {/* Quantity input */}
                     <div className="mt-4 mb-2">

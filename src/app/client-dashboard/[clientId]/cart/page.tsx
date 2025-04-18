@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowLeft, Trash2, Loader2, ShoppingBag, Plus, Minus } from 'lucide-react'
+import { ArrowLeft, Trash2, Loader2, ShoppingBag, Plus, Minus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -69,10 +69,24 @@ export default function CartPage() {
       if (data.data) {
         // Filter out any items with null or undefined postId
         const validItems = (data.data.items || []).filter(
-          (item: CartItem) => item.postId && typeof item.postId === "string"
+          (item: CartItem) => item.postId && typeof item.postId === "string",
         )
 
-        setCartItems(validItems)
+        // Get quantities from localStorage
+        const savedCartQuantities = localStorage.getItem("cartQuantities")
+        const cartQuantities = savedCartQuantities ? JSON.parse(savedCartQuantities) : {}
+
+        // Apply quantities from localStorage
+        const itemsWithQuantities = validItems.map((item: CartItem) => {
+          // Get quantity from localStorage or use the one from API
+          const storedQuantity = cartQuantities[item.postId]
+          return {
+            ...item,
+            quantity: storedQuantity || item.quantity || 1,
+          }
+        })
+
+        setCartItems(itemsWithQuantities)
 
         // Update localStorage cart to match server
         const cartIds = validItems.map((item: CartItem) => item.postId)
@@ -141,7 +155,7 @@ export default function CartPage() {
 
       // Update local state
       setCartItems((prev) =>
-        prev.map((item) => (item.postId === productId ? { ...item, quantity: newQuantity } : item))
+        prev.map((item) => (item.postId === productId ? { ...item, quantity: newQuantity } : item)),
       )
 
       toast({
