@@ -506,8 +506,7 @@ export default function ProductsPage() {
                     className={`mt-4 w-full py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2
                               ${
                                 wishlist.includes(product.postId)
-                                  ? "bg-red-100 text-red-600 border border-red-200"
-                                  : addingToWishlist[product.postId]
+                                ? "bg-gray-100 text-gray-600 border border-gray-200"                                  : addingToWishlist[product.postId]
                                     ? "bg-gray-200 text-gray-700"
                                     : "bg-primary hover:bg-primary/90 text-primary-foreground"
                               } 
@@ -519,7 +518,7 @@ export default function ProductsPage() {
                       <Loader2 className="h-4 w-4 animate-spin mr-1" />
                     ) : wishlist.includes(product.postId) ? (
                       <>
-                        <Heart className="h-4 w-4 fill-red-500 mr-1" />
+                         <Heart className="h-4 w-4 fill-gray-500 mr-1" />
                         Added to Wishlist
                       </>
                     ) : (
