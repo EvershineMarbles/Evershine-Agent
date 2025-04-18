@@ -3,7 +3,7 @@
 import React from "react"
 import { IconSidebar } from "@/components/icon-sidebar"
 import Link from "next/link"
-import { ArrowLeft, Heart, ShoppingCart, User, LogOut, Home } from "lucide-react"
+import { Heart, ShoppingCart, User, LogOut, Home } from "lucide-react"
 
 // Define the type for the unwrapped params
 type ClientParams = {
@@ -47,8 +47,8 @@ export default function ClientDashboardLayout({
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       {/* Top Navigation Strip */}
-      <div className="w-full bg-[#194a95] text-white py-3 px-4 md:px-8 shadow-md">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+      <div className="w-full bg-[#194a95] text-white py-3 px-4 md:px-8 shadow-md z-10">
+        <div className="ml-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <Home className="h-5 w-5" />
             <span className="font-medium hidden sm:inline">Evershine</span>
@@ -95,15 +95,7 @@ export default function ClientDashboardLayout({
       {/* Main content with sidebar */}
       <div className="flex flex-1 overflow-hidden">
         <IconSidebar clientId={clientId} />
-        <main className="flex-1 ml-16 overflow-auto">
-          <div className="p-4 border-b bg-white">
-            <Link href="/dashboard" className="inline-flex items-center text-dark hover:underline">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Home
-            </Link>
-          </div>
-          {children}
-        </main>
+        <main className="flex-1 ml-16 overflow-auto">{children}</main>
       </div>
     </div>
   )
