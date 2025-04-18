@@ -75,12 +75,12 @@ export default function ClientDetails({ clientId }: ClientDetailsProps) {
           setClient(clientData.data)
 
           // Fetch client orders
-          const ordersResponse = await fetchWithAdminAuth(`/api/admin/orders?clientId=${clientId}`)
+          const ordersResponse = await fetchWithAdminAuth(`/api/admin/clients/${clientId}/orders`)
 
           if (ordersResponse.ok) {
             const ordersData = await ordersResponse.json()
             if (ordersData.success && ordersData.data) {
-              setOrders(ordersData.data.orders)
+              setOrders(ordersData.data)
             }
           }
         } else {
