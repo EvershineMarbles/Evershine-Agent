@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { getCartItemQuantity } from "@/lib/cart-service"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
+import { clearEntireCart } from "@/lib/cart-service"
 
 interface CartItem {
   _id: string
@@ -513,108 +514,33 @@ export default function CartPage() {
       setLoading(true)
       addToLog("=== STARTING COMPLETE CART CLEARING PROCESS ===")
 
-      // Get the token
-      const token = localStorage.getItem("clientImpersonationToken")
-      if (!token) {
-        addToLog("No authentication token found")
-        throw new Error("No authentication token found. Please refresh the page and try again.")
-      }
+      // Use the improved clearEntireCart function from lib/cart-service.ts
+      const success = await clearEntireCart()
 
-      // First, get the current cart to know what items to remove
-      addToLog("Fetching current cart to identify items to remove")
-      const cartResponse = await fetch("https://evershinebackend-2.onrender.com/api/getUserCart", {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
+      if (success) {
+        addToLog("Cart clearing function completed successfully")
 
-      if (!cartResponse.ok) {
-        addToLog(`Failed to fetch cart: ${cartResponse.status}`)
-        throw new Error(`Failed to fetch cart: ${cartResponse.status}`)
-      }
+        // Clear local state
+        setCartItems([])
 
-      const cartData = await cartResponse.json()
-      addToLog(`Current cart data: ${JSON.stringify(cartData).substring(0, 100)}...`)
+        // Update debug info
+        updateLocalStorageDebug()
 
-      // Extract items to remove
-      const itemsToRemove = cartData.data?.items || []
-      addToLog(`Found ${itemsToRemove.length} items to remove from server`)
+        // Fetch the cart again to verify it's empty
+        addToLog("Verifying cart is empty by fetching it again")
+        await handleRefreshCart()
 
-      // Remove each item individually from the server
-      for (const item of itemsToRemove) {
-        if (!item.postId) {
-          addToLog(`Skipping item with no postId: ${JSON.stringify(item)}`)
-          continue
-        }
-
-        addToLog(`Removing item ${item.postId} from server`)
-        try {
-          const removeResponse = await fetch("https://evershinebackend-2.onrender.com/api/deleteUserCartItem", {
-            method: "DELETE",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ productId: item.postId }),
-          })
-
-          if (removeResponse.ok) {
-            addToLog(`Successfully removed item ${item.postId} from server`)
-          } else {
-            const errorText = await removeResponse.text()
-            addToLog(`Failed to remove item ${item.postId}: ${removeResponse.status} - ${errorText}`)
-          }
-        } catch (e) {
-          addToLog(`Error removing item ${item.postId}: ${e}`)
-        }
-
-        // Add a small delay between requests to avoid overwhelming the server
-        await new Promise((resolve) => setTimeout(resolve, 300))
-      }
-
-      // Verify the cart is now empty on the server
-      addToLog("Verifying cart is empty on server")
-      const verifyResponse = await fetch("https://evershinebackend-2.onrender.com/api/getUserCart", {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      if (verifyResponse.ok) {
-        const verifyData = await verifyResponse.json()
-        addToLog(`Verification response: ${JSON.stringify(verifyData).substring(0, 100)}...`)
-
-        const remainingItems = verifyData.data?.items || []
-        if (remainingItems.length > 0) {
-          addToLog(`WARNING: ${remainingItems.length} items still in cart after clearing`)
-        } else {
-          addToLog("SUCCESS: Server cart is now empty")
-        }
+        toast({
+          title: "Cart Cleared",
+          description: "All items have been removed from your cart",
+          variant: "default",
+        })
       } else {
-        addToLog(`Failed to verify cart: ${verifyResponse.status}`)
+        throw new Error("Failed to clear cart")
       }
-
-      // Clear local state and storage regardless of server result
-      setCartItems([])
-      localStorage.removeItem("cart")
-      localStorage.removeItem("cartQuantities")
-      addToLog("Cleared local cart state and localStorage")
-      updateLocalStorageDebug()
-
-      addToLog("=== CART CLEARING PROCESS COMPLETE ===")
-
-      toast({
-        title: "Cart Cleared",
-        description: "All items have been removed from your cart",
-        variant: "default",
-      })
     } catch (error: any) {
       console.error("Error clearing cart:", error)
-      addToLog(`Error in cart clearing process: ${error.message}`)
+      addToLog(`Error clearing cart: ${error.message}`)
       toast({
         title: "Error",
         description: error.message || "Failed to clear cart. Please try again.",
