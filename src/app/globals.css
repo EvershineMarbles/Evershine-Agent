@@ -71,7 +71,7 @@
 }
 
 .sidebar-icon:hover .sidebar-tooltip {
-  @apply scale-100;
+  @apply scale-100 z-50;
 }
 
 

@@ -61,7 +61,7 @@ export function IconSidebar({ clientId }: IconSidebarProps) {
             <TooltipTrigger asChild>
               <Link href={route.href} className={cn("sidebar-icon", pathname === route.href ? "bg-blue" : "")}>
                 <route.icon size={24} />
-                <span className="sidebar-tooltip">{route.name}</span>
+                <span className="sidebar-tooltip z-50" >{route.name}</span>
               </Link>
             </TooltipTrigger>
             <TooltipContent side="right">{route.name}</TooltipContent>
@@ -76,7 +76,7 @@ export function IconSidebar({ clientId }: IconSidebarProps) {
             <TooltipTrigger asChild>
               <Link href="/" className="sidebar-icon">
                 <LogOut size={24} />
-                <span className="sidebar-tooltip">Logout</span>
+                <span className="sidebar-tooltip z-50">Logout</span>
               </Link>
             </TooltipTrigger>
             <TooltipContent side="right">Logout</TooltipContent>
