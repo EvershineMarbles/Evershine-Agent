@@ -9,6 +9,7 @@ import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ErrorBoundary } from "@/components/error-boundary"
+import { Input } from "@/components/ui/input"
 
 // Define the Product interface
 interface Product {
@@ -40,6 +41,7 @@ export default function ProductsPage() {
   const [addingToCart, setAddingToCart] = useState<Record<string, boolean>>({})
   const [addingToWishlist, setAddingToWishlist] = useState<Record<string, boolean>>({})
   const [error, setError] = useState<string | null>(null)
+  const [clientData, setClientData] = useState<any>(null)
 
   // Load wishlist and cart from localStorage
   useEffect(() => {
@@ -355,6 +357,34 @@ export default function ProductsPage() {
     }
   }, [products])
 
+  // Fetch client data
+  useEffect(() => {
+    const fetchClientData = async () => {
+      try {
+        const token = localStorage.getItem("clientImpersonationToken")
+        if (!token) return
+
+        const response = await fetch(`https://evershinebackend-2.onrender.com/api/getClientDetails/${clientId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.data) {
+            setClientData(data.data)
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching client data:", error)
+      }
+    }
+
+    fetchClientData()
+  }, [clientId])
+
   // Loading state
   if (loading) {
     return (
@@ -375,27 +405,31 @@ export default function ProductsPage() {
           </Alert>
         )}
 
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Products</h1>
+        <div className="mb-8">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+            <h1 className="text-3xl font-bold">Welcome, {clientData?.name?.split(" ")[0] || "Client"}</h1>
 
-          <div className="flex items-center gap-4">
-            <Link href={`/client-dashboard/${clientId}/wishlist`} className="relative">
-              <Heart className="h-6 w-6 text-gray-600" />
-              {wishlist.length > 0 && (
-                <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  {wishlist.length}
-                </span>
-              )}
-            </Link>
+            <div className="flex items-center gap-4 w-full md:w-auto">
+              <div className="relative flex-grow md:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  type="text"
+                  placeholder="Search products..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
 
-            <Link href={`/client-dashboard/${clientId}/cart`} className="relative">
-              <ShoppingCart className="h-6 w-6 text-gray-600" />
-              {cart.length > 0 && (
-                <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  {cart.length}
-                </span>
-              )}
-            </Link>
+              <Link href={`/client-dashboard/${clientId}/cart`} className="relative">
+                <ShoppingCart className="h-6 w-6 text-gray-600" />
+                {cart.length > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                    {cart.length}
+                  </span>
+                )}
+              </Link>
+            </div>
           </div>
         </div>
 
@@ -466,6 +500,12 @@ export default function ProductsPage() {
                   <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
                   <p className="text-lg font-bold mt-2">₹{product.price.toLocaleString()}</p>
                   <p className="text-sm text-muted-foreground mt-1">{product.category}</p>
+
+                  {product.quantityAvailable !== undefined && (
+                    <p className="text-sm mt-1">
+                      {product.quantityAvailable > 0 ? `In stock: ${product.quantityAvailable}` : "Out of stock"}
+                    </p>
+                  )}
 
                   <button
                     onClick={(e) => toggleWishlist(e, product.postId)}

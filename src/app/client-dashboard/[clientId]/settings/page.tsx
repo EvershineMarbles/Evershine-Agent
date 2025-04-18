@@ -79,7 +79,7 @@ export default function SettingsPage() {
         const data = await response.json()
 
         if (data.data) {
-          // Set client data to state
+          // Set client data to state, ensuring we capture all fields
           setSettings({
             name: data.data.name || "",
             email: data.data.email || "",
@@ -87,6 +87,9 @@ export default function SettingsPage() {
             city: data.data.city || "",
             profession: data.data.profession || "",
             purpose: data.data.purpose || "",
+            // Add any additional fields that might be in the client data
+            // This ensures we don't lose any data when updating
+            ...data.data,
           })
         } else {
           throw new Error("Invalid response format from server")
@@ -126,20 +129,38 @@ export default function SettingsPage() {
         throw new Error("No authentication token found. Please refresh the page and try again.")
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"}/api/update-client`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
+      // Log the data being sent for debugging
+      console.log("Updating client with data:", settings)
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"}/api/update-client`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(settings),
         },
-        body: JSON.stringify(settings),
-      })
+      )
 
       if (!response.ok) {
-        throw new Error(`API error: ${response.status} ${response.statusText}`)
+        // Try to get more detailed error information
+        let errorMessage = `API error: ${response.status} ${response.statusText}`
+        try {
+          const errorData = await response.json()
+          if (errorData && errorData.message) {
+            errorMessage = errorData.message
+          }
+        } catch (e) {
+          // If we can't parse the error as JSON, just use the status
+        }
+
+        throw new Error(errorMessage)
       }
 
       const data = await response.json()
+      console.log("Update response:", data)
 
       toast({
         title: "Settings Saved",
@@ -276,6 +297,14 @@ export default function SettingsPage() {
                   </Button>
                 </div>
               </form>
+              <div className="mt-8 pt-4 border-t">
+                <details className="text-sm">
+                  <summary className="cursor-pointer text-muted-foreground font-medium">Debug: All Client Data</summary>
+                  <pre className="mt-2 p-4 bg-muted rounded-md overflow-auto max-h-96 text-xs">
+                    {JSON.stringify(settings, null, 2)}
+                  </pre>
+                </details>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
