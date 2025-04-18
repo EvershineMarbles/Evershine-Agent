@@ -9,7 +9,6 @@ import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ErrorBoundary } from "@/components/error-boundary"
-import { Input } from "@/components/ui/input"
 
 // Define the Product interface
 interface Product {
@@ -35,13 +34,14 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [imageError, setImageError] = useState<Record<string, boolean>>({})
-  // Wishlist and cart stte
+  // Wishlist and cart state
   const [wishlist, setWishlist] = useState<string[]>([])
   const [cart, setCart] = useState<string[]>([])
   const [addingToCart, setAddingToCart] = useState<Record<string, boolean>>({})
   const [addingToWishlist, setAddingToWishlist] = useState<Record<string, boolean>>({})
   const [error, setError] = useState<string | null>(null)
   const [clientData, setClientData] = useState<any>(null)
+
 
   // Load wishlist and cart from localStorage
   useEffect(() => {
@@ -356,7 +356,8 @@ export default function ProductsPage() {
       console.warn("Products with invalid postId:", productsWithInvalidPostId)
     }
   }, [products])
-
+  
+  
   // Fetch client data
   useEffect(() => {
     const fetchClientData = async () => {
@@ -385,6 +386,7 @@ export default function ProductsPage() {
     fetchClientData()
   }, [clientId])
 
+
   // Loading state
   if (loading) {
     return (
@@ -398,6 +400,9 @@ export default function ProductsPage() {
   return (
     <ErrorBoundary>
       <div className="p-6 md:p-8">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+            <h1 className="text-3xl font-bold">Welcome, {clientData?.name?.split(" ")[0] || "Client"}</h1>
+      </div>
         {error && (
           <Alert variant="destructive" className="mb-4">
             <AlertCircle className="h-4 w-4" />
@@ -405,31 +410,27 @@ export default function ProductsPage() {
           </Alert>
         )}
 
-        <div className="mb-8">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-            <h1 className="text-3xl font-bold">Welcome, {clientData?.name?.split(" ")[0] || "Client"}</h1>
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold">Products</h1>
 
-            <div className="flex items-center gap-4 w-full md:w-auto">
-              <div className="relative flex-grow md:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  type="text"
-                  placeholder="Search products..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+          <div className="flex items-center gap-4">
+            <Link href={`/client-dashboard/${clientId}/wishlist`} className="relative">
+              <Heart className="h-6 w-6 text-gray-600" />
+              {wishlist.length > 0 && (
+                <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {wishlist.length}
+                </span>
+              )}
+            </Link>
 
-              <Link href={`/client-dashboard/${clientId}/cart`} className="relative">
-                <ShoppingCart className="h-6 w-6 text-gray-600" />
-                {cart.length > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                    {cart.length}
-                  </span>
-                )}
-              </Link>
-            </div>
+            <Link href={`/client-dashboard/${clientId}/cart`} className="relative">
+              <ShoppingCart className="h-6 w-6 text-gray-600" />
+              {cart.length > 0 && (
+                <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {cart.length}
+                </span>
+              )}
+            </Link>
           </div>
         </div>
 
@@ -501,12 +502,14 @@ export default function ProductsPage() {
                   <p className="text-lg font-bold mt-2">₹{product.price.toLocaleString()}</p>
                   <p className="text-sm text-muted-foreground mt-1">{product.category}</p>
 
+
                   <button
                     onClick={(e) => toggleWishlist(e, product.postId)}
                     className={`mt-4 w-full py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2
                               ${
                                 wishlist.includes(product.postId)
-                                ? "bg-gray-100 text-gray-600 border border-gray-200"                                : addingToWishlist[product.postId]
+                                ? "bg-gray-100 text-gray-600 border border-gray-200"
+                                  : addingToWishlist[product.postId]
                                     ? "bg-gray-200 text-gray-700"
                                     : "bg-primary hover:bg-primary/90 text-primary-foreground"
                               } 
@@ -518,7 +521,7 @@ export default function ProductsPage() {
                       <Loader2 className="h-4 w-4 animate-spin mr-1" />
                     ) : wishlist.includes(product.postId) ? (
                       <>
-                         <Heart className="h-4 w-4 fill-gray-500 mr-1" />
+                          <Heart className="h-4 w-4 fill-gray-500 mr-1" />
                         Added to Wishlist
                       </>
                     ) : (
