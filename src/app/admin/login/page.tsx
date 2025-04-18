@@ -34,7 +34,7 @@ export default function AdminLogin() {
       ...prev,
       [name]: value,
     }))
-    // Clear error when user types
+    // Clear error when user type
     setErrors((prev) => ({
       ...prev,
       [name]: "",
