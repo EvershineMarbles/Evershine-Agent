@@ -101,12 +101,17 @@ export default function Dashboard() {
       <div className="w-full bg-[#194a95] text-white py-4 px-6">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Image src="/logo.png" alt="Evershine Logo" width={120} height={60} />
+            <Image src="/logo2.png" alt="Evershine Logo" width={80} height={40} />
             <h1 className="text-xl font-semibold">Agent Dashboard</h1>
           </div>
           <div className="flex items-center gap-4">
             <span className="text-sm md:text-base">Welcome, {agentName || agentEmail}</span>
-            <Button variant="ghost" size="sm" onClick={handleLogout} className="text-white hover:bg-white/20">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLogout}
+              className="text-white hover:bg-white/20 hover:text-white"
+            >
               <LogOut className="h-4 w-4 mr-2" />
               <span>Logout</span>
             </Button>
@@ -152,32 +157,29 @@ export default function Dashboard() {
 
         {/* Action Buttons */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Button
-            variant="outline"
-            className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 flex flex-col items-center gap-3 rounded-lg"
+          <button
+            className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg"
             onClick={() => router.push("/scan-qr")}
           >
             <QrCode className="h-6 w-6" />
             <span className="text-base font-medium">Scan QR</span>
-          </Button>
+          </button>
 
-          <Button
-            variant="outline"
-            className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 flex flex-col items-center gap-3 rounded-lg"
+          <button
+            className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg"
             onClick={() => router.push("/register-client")}
           >
             <UserPlus className="h-6 w-6" />
             <span className="text-base font-medium">Register a New Client</span>
-          </Button>
+          </button>
 
-          <Button
-            variant="outline"
-            className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 flex flex-col items-center gap-3 rounded-lg"
+          <button
+            className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg"
             onClick={() => router.push("/client-list")}
           >
             <List className="h-6 w-6" />
             <span className="text-base font-medium">Client List</span>
-          </Button>
+          </button>
         </div>
       </main>
     </div>
