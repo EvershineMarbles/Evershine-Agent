@@ -1,116 +1,281 @@
-'use client'
+"use client"
 
-import { useState, useEffect } from 'react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { fetchWithAuth } from '@/lib/auth'
+import { useEffect, useState, useCallback } from "react"
+import { useRouter } from "next/navigation"
+import Image from "next/image"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Users, LogOut, Loader2, Search, ArrowLeft, UserPlus } from "lucide-react"
+import { agentAPI } from "@/lib/api-utils"
+import { isAgentAuthenticated, clearAllTokens } from "@/lib/auth-utils"
+import { useToast } from "@/components/ui/use-toast"
+import { Input } from "@/components/ui/input"
 
+// Define client interface
 interface Client {
   _id: string
   name: string
   mobile: string
   clientId: string
-  quantityRequired: number
-  profession: string
-  purpose: string
-  city: string
-  email: string
-  agentAffiliated: string
+  profession?: string
+  city?: string
+  email?: string
 }
 
 export default function ClientList() {
+  const router = useRouter()
+  const { toast } = useToast()
+  const [agentEmail, setAgentEmail] = useState<string | null>(null)
+  const [agentName, setAgentName] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const [clients, setClients] = useState<Client[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [accessingClient, setAccessingClient] = useState<string | null>(null)
+
+  // Wrap fetchClients in useCallback to prevent it from being recreated on every render
+  const fetchClients = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const response = await agentAPI.getClients()
+
+      if (response.success && Array.isArray(response.data)) {
+        setClients(response.data)
+      } else {
+        toast({
+          title: "Error",
+          description: response.message || "Failed to fetch clients",
+          variant: "destructive",
+        })
+        setClients([])
+      }
+    } catch (error) {
+      console.error("Error fetching clients:", error)
+      toast({
+        title: "Error",
+        description: "Failed to fetch clients. Please try again.",
+        variant: "destructive",
+      })
+      setClients([])
+    } finally {
+      setIsLoading(false)
+    }
+  }, [toast])
 
   useEffect(() => {
-    const getClients = async () => {
-      try {
-        setLoading(true)
-        const response = await fetchWithAuth('/api/agent/clients')
-        const data = await response.json()
-        
-        if (data.data && Array.isArray(data.data)) {
-          setClients(data.data)
-        } else {
-          setClients([])
-        }
-      } catch (err) {
-        console.error('Error fetching clients:', err)
-        setError('Failed to load clients. Please try again.')
-      } finally {
-        setLoading(false)
-      }
+    // Check if agent is logged in
+    if (!isAgentAuthenticated()) {
+      router.push("/agent-login")
+      return
     }
 
-    getClients()
-  }, [])
+    // Fetch agent email from localStorage
+    const email = localStorage.getItem("agentEmail")
+    setAgentEmail(email)
 
-  const handleCreateClient = () => {
-    // Navigate to client creation page
-    window.location.href = '/create-client'
+    // Extract name from email (for demo purposes)
+    if (email) {
+      const name = email.split("@")[0]
+      // Capitalize first letter and format name
+      const formattedName = name.charAt(0).toUpperCase() + name.slice(1)
+      setAgentName(formattedName)
+    }
+
+    // Fetch clients
+    fetchClients()
+  }, [router, fetchClients])
+
+  const handleLogout = () => {
+    clearAllTokens()
+    router.push("/")
   }
 
-  const handleViewClient = (clientId: string) => {
-    // Navigate to client details page
-    window.location.href = `/client/${clientId}`
+  const handleClientSelect = async (clientId: string) => {
+    if (!clientId) {
+      toast({
+        title: "Error",
+        description: "Invalid client ID",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setAccessingClient(clientId)
+
+    try {
+      // Get the token for client impersonation
+      const response = await agentAPI.getClientImpersonationToken(clientId)
+
+      if (response.success && response.token) {
+        // Store the token in localStorage
+        localStorage.setItem("clientImpersonationToken", response.token)
+
+        // Navigate to client dashboard
+        router.push(`/client-dashboard/${clientId}`)
+      } else {
+        throw new Error(response.message || "Failed to get access token")
+      }
+    } catch (error: any) {
+      console.error("Error accessing client dashboard:", error)
+      toast({
+        title: "Access Error",
+        description: error.message || "Could not access client dashboard. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setAccessingClient(null)
+    }
   }
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-[200px]">
-        <p>Loading clients...</p>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="flex flex-col justify-center items-center min-h-[200px]">
-        <p className="text-red-500 mb-4">{error}</p>
-        <Button onClick={() => window.location.reload()}>Retry</Button>
-      </div>
-    )
-  }
+  // Filter clients based on search query
+  const filteredClients = clients.filter(
+    (client) =>
+      client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      client.mobile.includes(searchQuery) ||
+      (client.profession && client.profession.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (client.city && client.city.toLowerCase().includes(searchQuery.toLowerCase())),
+  )
 
   return (
-    <div className="container mx-auto p-4">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Clients</h1>
-        <Button onClick={handleCreateClient}>Create New Client</Button>
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Blue strip at the top */}
+      <div className="w-full bg-[#194a95] text-white py-4 px-6">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Image src="/logo2.png" alt="Evershine Logo" width={80} height={40} />
+            <h1 className="text-xl font-semibold">Agent Dashboard</h1>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="text-sm md:text-base">Welcome, {agentName || agentEmail}</span>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 text-white hover:bg-white/20 hover:text-white px-3 py-1.5 rounded-md text-sm"
+            >
+              <LogOut className="h-4 w-4" />
+              <span>Logout</span>
+            </button>
+          </div>
+        </div>
       </div>
 
-      {clients.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 bg-gray-50 rounded-lg">
-          <p className="text-gray-500 mb-4">No clients found</p>
-          <Button onClick={handleCreateClient}>Create Your First Client</Button>
+      <main className="container mx-auto py-6 px-4 flex-1">
+        {/* Back button and page title */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+          <div className="flex items-center gap-2">
+            <button onClick={() => router.push("/dashboard")} className="p-2 rounded-full hover:bg-gray-100">
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <h1 className="text-3xl font-bold">Client List</h1>
+          </div>
+
+          <div className="flex items-center gap-4 w-full md:w-auto">
+            <div className="relative flex-grow md:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                type="text"
+                placeholder="Search clients..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <button
+              onClick={() => router.push("/register-client")}
+              className="flex items-center gap-2 bg-[#194a95] text-white hover:bg-[#194a95]/90 hover:text-white px-4 py-2 rounded-md"
+            >
+              <UserPlus className="h-4 w-4" />
+              <span>New Client</span>
+            </button>
+          </div>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {clients.map((client) => (
-            <Card key={client._id} className="hover:shadow-md transition-shadow">
-              <CardHeader className="pb-2">
-                <CardTitle>{client.name}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <p><span className="font-medium">Mobile:</span> {client.mobile}</p>
-                  {client.email && <p><span className="font-medium">Email:</span> {client.email}</p>}
-                  {client.city && <p><span className="font-medium">City:</span> {client.city}</p>}
-                  {client.profession && <p><span className="font-medium">Profession:</span> {client.profession}</p>}
-                  <Button 
-                    variant="outline" 
-                    className="w-full mt-4"
-                    onClick={() => handleViewClient(client.clientId)}
+
+        {/* Client List Card */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Users className="h-5 w-5 mr-2" />
+              Client List
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin" />
+              </div>
+            ) : filteredClients.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-3 px-4">Name</th>
+                      <th className="text-left py-3 px-4">Mobile</th>
+                      <th className="text-left py-3 px-4">Profession</th>
+                      <th className="text-left py-3 px-4">City</th>
+                      <th className="text-center py-3 px-4">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredClients.map((client) => (
+                      <tr key={client._id || client.clientId} className="border-b hover:bg-gray-50">
+                        <td className="py-3 px-4">{client.name}</td>
+                        <td className="py-3 px-4">{client.mobile}</td>
+                        <td className="py-3 px-4">{client.profession || "-"}</td>
+                        <td className="py-3 px-4">{client.city || "-"}</td>
+                        <td className="py-3 px-4 flex justify-center gap-2">
+                          <button
+                            disabled={accessingClient === client.clientId}
+                            onClick={() => handleClientSelect(client.clientId)}
+                            className="bg-[#194a95] hover:bg-[#194a95]/90 text-white hover:text-white px-3 py-1.5 rounded-md text-sm flex items-center gap-2"
+                          >
+                            {accessingClient === client.clientId ? (
+                              <>
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                <span>Accessing...</span>
+                              </>
+                            ) : (
+                              <span>Access Dashboard</span>
+                            )}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground mb-4">
+                  {searchQuery ? "No clients match your search" : "No clients found"}
+                </p>
+                {searchQuery ? (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-md"
                   >
-                    View Details
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+                    Clear Search
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => router.push("/register-client")}
+                    className="bg-[#194a95] hover:bg-[#194a95]/90 text-white hover:text-white px-4 py-2 rounded-md flex items-center gap-2 mx-auto"
+                  >
+                    <UserPlus className="h-4 w-4" />
+                    <span>Register New Client</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Pagination (if needed in the future) */}
+        {filteredClients.length > 0 && (
+          <div className="flex justify-between items-center">
+            <p className="text-sm text-gray-500">
+              Showing {filteredClients.length} of {clients.length} clients
+            </p>
+            {/* Pagination controls would go here */}
+          </div>
+        )}
+      </main>
     </div>
   )
 }
