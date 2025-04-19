@@ -26,6 +26,8 @@ interface Product {
 }
 
 export default function ProductsPage() {
+  console.log("ProductsPage rendering")
+
   // Use the useParams hook to get the clientId
   const params = useParams()
   const router = useRouter()
@@ -43,6 +45,17 @@ export default function ProductsPage() {
   const [addingToWishlist, setAddingToWishlist] = useState<Record<string, boolean>>({})
   const [error, setError] = useState<string | null>(null)
   const [clientData, setClientData] = useState<any>(null)
+
+  // Debug scroll event
+  useEffect(() => {
+    console.log("Setting up scroll debug in ProductsPage")
+    const logScroll = () => {
+      console.log("Scroll event detected in ProductsPage, window.scrollY:", window.scrollY)
+    }
+
+    window.addEventListener("scroll", logScroll)
+    return () => window.removeEventListener("scroll", logScroll)
+  }, [])
 
   // Load wishlist and cart from localStorage
   useEffect(() => {
@@ -540,6 +553,34 @@ export default function ProductsPage() {
 
       {/* Use the BackToTop component */}
       <BackToTop />
+
+      {/* Fallback button that's always visible for testing */}
+      <button
+        id="debug-back-to-top"
+        onClick={() => {
+          console.log("Debug button clicked")
+          window.scrollTo({ top: 0, behavior: "smooth" })
+        }}
+        style={{
+          position: "fixed",
+          bottom: "80px",
+          right: "24px",
+          backgroundColor: "#00ff00", // Bright green
+          color: "black",
+          borderRadius: "9999px",
+          width: "48px",
+          height: "48px",
+          border: "2px solid black",
+          boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: "9999",
+        }}
+      >
+        ↑
+      </button>
     </ErrorBoundary>
   )
 }
