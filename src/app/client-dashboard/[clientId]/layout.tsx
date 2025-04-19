@@ -51,7 +51,7 @@ export default function ClientDashboardLayout({
         <div className="ml-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <Home className="h-5 w-5" />
-            <span className="font-medium hidden sm:inline">Back to</span>
+            <span className="font-medium hidden sm:inline">Back to Advisor Dashboard</span>
           </Link>
 
      

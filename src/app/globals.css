@@ -67,8 +67,9 @@
 .sidebar-tooltip {
   @apply absolute w-auto p-2 m-2 min-w-max left-14
   rounded-md shadow-md text-white bg-dark
-  text-xs font-bold transition-all duration-100 scale-0 origin-left;
+  text-xs font-bold transition-all duration-100 scale-0 origin-left z-50;
 }
+
 
 /* Add this to make the tooltip appear on hover */
 button:hover .sidebar-tooltip {
