@@ -1,17 +1,15 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode } from "lucide-react"
+import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode, ArrowUp } from "lucide-react"
 import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ErrorBoundary } from "@/components/error-boundary"
-import { BackToTop } from "@/components/back-to-top" // Import the BackToTop component
-import DebugScroll from "@/app/debug-scroll" // Import the debug component
-import { ArrowUp } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 // Define the Product interface
 interface Product {
@@ -28,8 +26,6 @@ interface Product {
 }
 
 export default function ProductsPage() {
-  console.log("ProductsPage rendering")
-
   // Use the useParams hook to get the clientId
   const params = useParams()
   const router = useRouter()
@@ -47,16 +43,75 @@ export default function ProductsPage() {
   const [addingToWishlist, setAddingToWishlist] = useState<Record<string, boolean>>({})
   const [error, setError] = useState<string | null>(null)
   const [clientData, setClientData] = useState<any>(null)
+  const [showBackToTop, setShowBackToTop] = useState(false)
 
-  // Debug scroll event
+  // Debug ref to track if scroll handler is working
+  const scrollDebugRef = useRef({
+    lastScrollY: 0,
+    scrollHandlerCalled: 0,
+  })
+
+  // Handle scroll for Back to Top button - Fixed implementation
   useEffect(() => {
-    const logScroll = () => {
-      console.log("Scroll event detected in ProductsPage, window.scrollY:", window.scrollY)
+    const checkScroll = () => {
+      const currentScrollY = window.scrollY
+      scrollDebugRef.current.lastScrollY = currentScrollY
+      scrollDebugRef.current.scrollHandlerCalled++
+
+      // Only update state if the value would change to avoid unnecessary renders
+      if ((currentScrollY > 300 && !showBackToTop) || (currentScrollY <= 300 && showBackToTop)) {
+        setShowBackToTop(currentScrollY > 300)
+        console.log("Back to top visibility changed:", currentScrollY > 300)
+      }
     }
 
-    window.addEventListener("scroll", logScroll)
-    return () => window.removeEventListener("scroll", logScroll)
-  }, [])
+    // Add throttling to avoid excessive function calls
+    let ticking = false
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          checkScroll()
+          ticking = false
+        })
+        ticking = true
+      }
+    }
+
+    // Add the event listener
+    window.addEventListener("scroll", handleScroll, { passive: true })
+
+    // Initial check
+    checkScroll()
+
+    // Log debug info
+    console.log("Scroll event listener added")
+
+    // Cleanup
+    return () => {
+      window.removeEventListener("scroll", handleScroll)
+      console.log("Scroll event listener removed")
+    }
+  }, [showBackToTop])
+
+  // Improved scroll to top function
+  const scrollToTop = () => {
+    console.log("Scroll to top clicked")
+    try {
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth",
+      })
+    } catch (error) {
+      // Fallback for older browsers
+      console.error("Smooth scroll failed, using fallback", error)
+      window.scrollTo(0, 0)
+    }
+  }
+
+  // Handle QR scan
+  const handleScanQR = () => {
+    router.push(`/client-dashboard/${clientId}/scan-qr/sqt`)
+  }
 
   // Load wishlist and cart from localStorage
   useEffect(() => {
@@ -357,11 +412,6 @@ export default function ProductsPage() {
     setImageError((prev) => ({ ...prev, [productId]: true }))
   }, [])
 
-  // Handle QR code scanning
-  const handleScanQR = () => {
-    router.push(`/client-dashboard/${clientId}/scan-qr`)
-  }
-
   // Debug logging for products
   useEffect(() => {
     // Check for problematic products
@@ -417,9 +467,6 @@ export default function ProductsPage() {
 
   return (
     <ErrorBoundary>
-      {/* Debug scroll position indicator */}
-      <DebugScroll />
-
       <div className="p-6 md:p-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <h1 className="text-3xl font-bold">Welcome, {clientData?.name?.split(" ")[0] || "Client"}</h1>
@@ -435,14 +482,11 @@ export default function ProductsPage() {
           <h1 className="text-3xl font-bold">Products</h1>
 
           <div className="flex items-center gap-4">
-            {/* Scan QR Button */}
-            <button
-              onClick={handleScanQR}
-              className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-              aria-label="Scan QR Code"
-            >
-              <QrCode className="h-6 w-6 text-gray-600" />
-            </button>
+            {/* Scan QR Button - Added before wishlist */}
+            <Button onClick={handleScanQR} variant="outline" className="flex items-center gap-2">
+              <QrCode className="h-5 w-5" />
+              <span className="hidden sm:inline">Scan QR</span>
+            </Button>
 
             <Link href={`/client-dashboard/${clientId}/wishlist`} className="relative">
               <Heart className="h-6 w-6 text-gray-600" />
@@ -529,7 +573,7 @@ export default function ProductsPage() {
 
                 <div className="p-4">
                   <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
-                  <p className="text-lg font-bold mt-2">₹{product.price.toLocaleString()}/sqt</p>
+                  <p className="text-lg font-bold mt-2">₹{product.price.toLocaleString()}</p>
                   <p className="text-sm text-muted-foreground mt-1">{product.category}</p>
 
                   <button
@@ -566,21 +610,24 @@ export default function ProductsPage() {
           </div>
         )}
 
-        {/* Add extra space at the bottom to ensure scrolling is possible */}
-        <div className="h-[500px]"></div>
+        {/* Back to Top Button - Fixed implementation */}
+        {showBackToTop && (
+          <button
+            onClick={scrollToTop}
+            className="fixed bottom-6 right-6 p-3 bg-primary text-white rounded-full shadow-lg hover:bg-primary/90 transition-all z-[9999] cursor-pointer"
+            aria-label="Back to top"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "40px",
+              height: "40px",
+            }}
+          >
+            <ArrowUp className="h-5 w-5" />
+          </button>
+        )}
       </div>
-
-      {/* Use the BackToTop component */}
-      <BackToTop />
-
-      {/* Fallback button that's always visible */}
-      <button
-        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-        className="fixed bottom-20 right-6 p-4 bg-green-500 text-white rounded-full shadow-lg z-[9999] border-2 border-white"
-        aria-label="Fallback Back to top"
-      >
-        <ArrowUp className="h-6 w-6" />
-      </button>
     </ErrorBoundary>
   )
 }
