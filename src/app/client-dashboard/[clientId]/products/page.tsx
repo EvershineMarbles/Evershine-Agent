@@ -10,6 +10,8 @@ import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { BackToTop } from "@/components/back-to-top" // Import the BackToTop component
+import DebugScroll from "@/app/debug-scroll" // Import the debug component
+import { ArrowUp } from "lucide-react"
 
 // Define the Product interface
 interface Product {
@@ -26,6 +28,8 @@ interface Product {
 }
 
 export default function ProductsPage() {
+  console.log("ProductsPage rendering")
+
   // Use the useParams hook to get the clientId
   const params = useParams()
   const router = useRouter()
@@ -42,6 +46,17 @@ export default function ProductsPage() {
   const [addingToCart, setAddingToCart] = useState<Record<string, boolean>>({})
   const [addingToWishlist, setAddingToWishlist] = useState<Record<string, boolean>>({})
   const [error, setError] = useState<string | null>(null)
+  const [clientData, setClientData] = useState<any>(null)
+
+  // Debug scroll event
+  useEffect(() => {
+    const logScroll = () => {
+      console.log("Scroll event detected in ProductsPage, window.scrollY:", window.scrollY)
+    }
+
+    window.addEventListener("scroll", logScroll)
+    return () => window.removeEventListener("scroll", logScroll)
+  }, [])
 
   // Load wishlist and cart from localStorage
   useEffect(() => {
@@ -362,6 +377,34 @@ export default function ProductsPage() {
     }
   }, [products])
 
+  // Fetch client data
+  useEffect(() => {
+    const fetchClientData = async () => {
+      try {
+        const token = localStorage.getItem("clientImpersonationToken")
+        if (!token) return
+
+        const response = await fetch(`https://evershinebackend-2.onrender.com/api/getClientDetails/${clientId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.data) {
+            setClientData(data.data)
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching client data:", error)
+      }
+    }
+
+    fetchClientData()
+  }, [clientId])
+
   // Loading state
   if (loading) {
     return (
@@ -374,7 +417,13 @@ export default function ProductsPage() {
 
   return (
     <ErrorBoundary>
+      {/* Debug scroll position indicator */}
+      <DebugScroll />
+
       <div className="p-6 md:p-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+          <h1 className="text-3xl font-bold">Welcome, {clientData?.name?.split(" ")[0] || "Client"}</h1>
+        </div>
         {error && (
           <Alert variant="destructive" className="mb-4">
             <AlertCircle className="h-4 w-4" />
@@ -386,7 +435,7 @@ export default function ProductsPage() {
           <h1 className="text-3xl font-bold">Products</h1>
 
           <div className="flex items-center gap-4">
-            {/* Scan QR Button - Added before wishlist icon */}
+            {/* Scan QR Button */}
             <button
               onClick={handleScanQR}
               className="p-2 rounded-full hover:bg-gray-100 transition-colors"
@@ -480,7 +529,6 @@ export default function ProductsPage() {
 
                 <div className="p-4">
                   <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
-                  {/* Added /sqt suffix to price */}
                   <p className="text-lg font-bold mt-2">₹{product.price.toLocaleString()}/sqt</p>
                   <p className="text-sm text-muted-foreground mt-1">{product.category}</p>
 
@@ -517,10 +565,22 @@ export default function ProductsPage() {
             ))}
           </div>
         )}
+
+        {/* Add extra space at the bottom to ensure scrolling is possible */}
+        <div className="h-[500px]"></div>
       </div>
 
-      {/* Use the separate BackToTop component */}
+      {/* Use the BackToTop component */}
       <BackToTop />
+
+      {/* Fallback button that's always visible */}
+      <button
+        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+        className="fixed bottom-20 right-6 p-4 bg-green-500 text-white rounded-full shadow-lg z-[9999] border-2 border-white"
+        aria-label="Fallback Back to top"
+      >
+        <ArrowUp className="h-6 w-6" />
+      </button>
     </ErrorBoundary>
   )
 }
