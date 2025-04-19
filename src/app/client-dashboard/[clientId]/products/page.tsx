@@ -1,15 +1,16 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode, ArrowUp } from "lucide-react"
+import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode } from "lucide-react"
 import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { Button } from "@/components/ui/button"
+import { BackToTop } from "@/components/back-to-top"
 
 // Define the Product interface
 interface Product {
@@ -43,70 +44,6 @@ export default function ProductsPage() {
   const [addingToWishlist, setAddingToWishlist] = useState<Record<string, boolean>>({})
   const [error, setError] = useState<string | null>(null)
   const [clientData, setClientData] = useState<any>(null)
-  const [showBackToTop, setShowBackToTop] = useState(false)
-
-  // Debug ref to track if scroll handler is working
-  const scrollDebugRef = useRef({
-    lastScrollY: 0,
-    scrollHandlerCalled: 0,
-  })
-
-  // Handle scroll for Back to Top button - Fixed implementation
-  useEffect(() => {
-    const checkScroll = () => {
-      const currentScrollY = window.scrollY
-      scrollDebugRef.current.lastScrollY = currentScrollY
-      scrollDebugRef.current.scrollHandlerCalled++
-
-      // Only update state if the value would change to avoid unnecessary renders
-      if ((currentScrollY > 300 && !showBackToTop) || (currentScrollY <= 300 && showBackToTop)) {
-        setShowBackToTop(currentScrollY > 300)
-        console.log("Back to top visibility changed:", currentScrollY > 300)
-      }
-    }
-
-    // Add throttling to avoid excessive function calls
-    let ticking = false
-    const handleScroll = () => {
-      if (!ticking) {
-        window.requestAnimationFrame(() => {
-          checkScroll()
-          ticking = false
-        })
-        ticking = true
-      }
-    }
-
-    // Add the event listener
-    window.addEventListener("scroll", handleScroll, { passive: true })
-
-    // Initial check
-    checkScroll()
-
-    // Log debug info
-    console.log("Scroll event listener added")
-
-    // Cleanup
-    return () => {
-      window.removeEventListener("scroll", handleScroll)
-      console.log("Scroll event listener removed")
-    }
-  }, [showBackToTop])
-
-  // Improved scroll to top function
-  const scrollToTop = () => {
-    console.log("Scroll to top clicked")
-    try {
-      window.scrollTo({
-        top: 0,
-        behavior: "smooth",
-      })
-    } catch (error) {
-      // Fallback for older browsers
-      console.error("Smooth scroll failed, using fallback", error)
-      window.scrollTo(0, 0)
-    }
-  }
 
   // Handle QR scan
   const handleScanQR = () => {
@@ -467,6 +404,9 @@ export default function ProductsPage() {
 
   return (
     <ErrorBoundary>
+      {/* Include the BackToTop component */}
+      <BackToTop />
+
       <div className="p-6 md:p-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <h1 className="text-3xl font-bold">Welcome, {clientData?.name?.split(" ")[0] || "Client"}</h1>
@@ -608,24 +548,6 @@ export default function ProductsPage() {
               </div>
             ))}
           </div>
-        )}
-
-        {/* Back to Top Button - Fixed implementation */}
-        {showBackToTop && (
-          <button
-            onClick={scrollToTop}
-            className="fixed bottom-6 right-6 p-3 bg-primary text-white rounded-full shadow-lg hover:bg-primary/90 transition-all z-[9999] cursor-pointer"
-            aria-label="Back to top"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: "40px",
-              height: "40px",
-            }}
-          >
-            <ArrowUp className="h-5 w-5" />
-          </button>
         )}
       </div>
     </ErrorBoundary>
