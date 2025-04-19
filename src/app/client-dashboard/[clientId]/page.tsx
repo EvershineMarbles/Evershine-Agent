@@ -9,7 +9,6 @@ import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ErrorBoundary } from "@/components/error-boundary"
-import { BackToTop } from "@/components/back-to-top" // Import the BackToTop component
 
 // Define the Product interface
 interface Product {
@@ -552,7 +551,6 @@ export default function ProductsPage() {
       </div>
 
       {/* Use the BackToTop component */}
-      <BackToTop />
 
       {/* Fallback button that's always visible for testing */}
       <button
