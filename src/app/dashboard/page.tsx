@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Users, Package, Bell, LogOut, UserPlus, Loader2, QrCode, List } from "lucide-react"
 import { agentAPI } from "@/lib/api-utils"
 import { isAgentAuthenticated, clearAllTokens } from "@/lib/auth-utils"
@@ -25,6 +25,7 @@ export default function Dashboard() {
   const router = useRouter()
   const { toast } = useToast()
   const [agentEmail, setAgentEmail] = useState<string | null>(null)
+  const [agentName, setAgentName] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [clients, setClients] = useState<Client[]>([])
 
@@ -68,6 +69,14 @@ export default function Dashboard() {
     const email = localStorage.getItem("agentEmail")
     setAgentEmail(email)
 
+    // Extract name from email (for demo purposes)
+    if (email) {
+      const name = email.split("@")[0]
+      // Capitalize first letter and format name
+      const formattedName = name.charAt(0).toUpperCase() + name.slice(1)
+      setAgentName(formattedName)
+    }
+
     // Fetch clients
     fetchClients()
   }, [router, fetchClients]) // Add fetchClients to the dependency array
@@ -89,92 +98,85 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Blue strip at the top */}
-      <div className="w-full bg-[#194a95] text-white py-4 px-6 shadow-md">
-        <div className="container mx-auto flex justify-between items-center">
-          <div className="flex items-center">
-            <Image src="/logo.png" alt="Evershine Logo" width={120} height={60} className="mr-4" />
-            <h1 className="text-xl font-semibold hidden sm:block">Agent Dashboard</h1>
+      <div className="w-full bg-[#194a95] text-white py-4 px-6">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Image src="/logo.png" alt="Evershine Logo" width={120} height={60} />
+            <h1 className="text-xl font-semibold">Agent Dashboard</h1>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-sm hidden md:inline-block">Welcome, {agentEmail}</span>
+            <span className="text-sm md:text-base">Welcome, {agentName || agentEmail}</span>
             <Button variant="ghost" size="sm" onClick={handleLogout} className="text-white hover:bg-white/20">
               <LogOut className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Logout</span>
+              <span>Logout</span>
             </Button>
           </div>
         </div>
       </div>
 
-      <main className="container mx-auto py-8 px-4 flex-1">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-        </div>
+      <main className="container mx-auto py-6 px-4 flex-1">
+        <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center">
-                <Users className="h-5 w-5 mr-2 text-blue" />
-                Total Clients
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold">{clients.length}</p>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          <Card className="border rounded-lg overflow-hidden">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3">
+                <Users className="h-5 w-5 text-[#194a95]" />
+                <span className="text-gray-600 font-medium">Total Clients</span>
+              </div>
+              <p className="text-3xl font-bold mt-2">{clients.length}</p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center">
-                <Package className="h-5 w-5 mr-2 text-blue" />
-                Active Orders
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold">12</p>
+          <Card className="border rounded-lg overflow-hidden">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3">
+                <Package className="h-5 w-5 text-[#194a95]" />
+                <span className="text-gray-600 font-medium">Active Orders</span>
+              </div>
+              <p className="text-3xl font-bold mt-2">12</p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center">
-                <Bell className="h-5 w-5 mr-2 text-blue" />
-                Pending Reminders
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold">8</p>
+          <Card className="border rounded-lg overflow-hidden">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3">
+                <Bell className="h-5 w-5 text-[#194a95]" />
+                <span className="text-gray-600 font-medium">Pending Reminders</span>
+              </div>
+              <p className="text-3xl font-bold mt-2">8</p>
             </CardContent>
           </Card>
         </div>
 
         {/* Action Buttons */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Button
-            size="lg"
-            className="h-auto py-6 bg-[#194a95] hover:bg-[#0f3a7a] flex flex-col items-center gap-2"
+            variant="outline"
+            className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 flex flex-col items-center gap-3 rounded-lg"
             onClick={() => router.push("/scan-qr")}
           >
-            <QrCode className="h-8 w-8" />
-            <span className="text-lg">Scan QR</span>
+            <QrCode className="h-6 w-6" />
+            <span className="text-base font-medium">Scan QR</span>
           </Button>
 
           <Button
-            size="lg"
-            className="h-auto py-6 bg-[#194a95] hover:bg-[#0f3a7a] flex flex-col items-center gap-2"
+            variant="outline"
+            className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 flex flex-col items-center gap-3 rounded-lg"
             onClick={() => router.push("/register-client")}
           >
-            <UserPlus className="h-8 w-8" />
-            <span className="text-lg">Register a New Client</span>
+            <UserPlus className="h-6 w-6" />
+            <span className="text-base font-medium">Register a New Client</span>
           </Button>
 
           <Button
-            size="lg"
-            className="h-auto py-6 bg-[#194a95] hover:bg-[#0f3a7a] flex flex-col items-center gap-2"
+            variant="outline"
+            className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 flex flex-col items-center gap-3 rounded-lg"
             onClick={() => router.push("/client-list")}
           >
-            <List className="h-8 w-8" />
-            <span className="text-lg">Client List</span>
+            <List className="h-6 w-6" />
+            <span className="text-base font-medium">Client List</span>
           </Button>
         </div>
       </main>
