@@ -49,7 +49,7 @@ export default function ClientDashboardLayout({
       {/* Top Navigation Strip */}
       <div className="w-full bg-[#194a95] text-white py-3 px-4 md:px-8 shadow-md z-0">
         <div className="ml-16 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2">
+        <Link href="/dashboard" className="flex items-center gap-2">
         <ArrowLeft className="h-5 w-5" />
         <span className="font-medium hidden sm:inline">Back to Advisor Dashboard</span>
       </Link>
