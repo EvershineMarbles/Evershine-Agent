@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Home, ShoppingCart, Heart, QrCode, Package, Settings, LogOut } from "lucide-react"
+import { Home, ShoppingCart, Heart, QrCode, Settings, LogOut, User } from "lucide-react"
 import { useState } from "react"
 
 interface IconSidebarProps {
@@ -20,11 +20,7 @@ export function IconSidebar({ clientId }: IconSidebarProps) {
       href: `/client-dashboard/${clientId}`,
       icon: Home,
     },
-    {
-      name: "Products",
-      href: `/client-dashboard/${clientId}/products`,
-      icon: Package,
-    },
+    // Products route removed
     {
       name: "Scan Products",
       href: `/client-dashboard/${clientId}/scan`,
@@ -63,7 +59,16 @@ export function IconSidebar({ clientId }: IconSidebarProps) {
 
   return (
     <div className="fixed top-0 left-0 h-screen w-16 flex flex-col bg-dark text-white shadow-lg">
-      {/* Profile section removed */}
+      <div
+        className="flex items-center justify-center h-12 w-12 mt-4 mx-auto bg-dark hover:bg-blue rounded-xl cursor-pointer"
+        onMouseEnter={() => setActiveTooltip("profile")}
+        onMouseLeave={() => setActiveTooltip(null)}
+      >
+        <User size={24} />
+        {activeTooltip === "profile" && <div style={tooltipStyle}>Profile</div>}
+      </div>
+
+      <hr className="my-2 border-gray-700" />
 
       {routes.map((route) => (
         <Link
