@@ -48,10 +48,15 @@ export function IconSidebar({ clientId }: IconSidebarProps) {
 
   return (
     <div className="fixed top-0 left-0 h-screen w-16 flex flex-col bg-dark text-white shadow-lg">
-      <div className="sidebar-icon mt-4">
-        <User size={24} />
-        <span className="sidebar-tooltip">Profile</span>
-      </div>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="sidebar-icon mt-4">
+              <User size={24} />
+            </div>
+          </TooltipTrigger>
+        </Tooltip>
+      </TooltipProvider>
 
       <hr className="sidebar-hr my-2" />
 
@@ -61,10 +66,11 @@ export function IconSidebar({ clientId }: IconSidebarProps) {
             <TooltipTrigger asChild>
               <Link href={route.href} className={cn("sidebar-icon", pathname === route.href ? "bg-blue" : "")}>
                 <route.icon size={24} />
-                <span className="sidebar-tooltip">{route.name}</span>
               </Link>
             </TooltipTrigger>
-            <TooltipContent side="right">{route.name}</TooltipContent>
+            <TooltipContent side="right" className="z-50">
+              {route.name}
+            </TooltipContent>
           </Tooltip>
         ))}
       </TooltipProvider>
@@ -76,14 +82,14 @@ export function IconSidebar({ clientId }: IconSidebarProps) {
             <TooltipTrigger asChild>
               <Link href="/" className="sidebar-icon">
                 <LogOut size={24} />
-                <span className="sidebar-tooltip">Logout</span>
               </Link>
             </TooltipTrigger>
-            <TooltipContent side="right">Logout</TooltipContent>
+            <TooltipContent side="right" className="z-50">
+              Logout
+            </TooltipContent>
           </Tooltip>
         </TooltipProvider>
       </div>
     </div>
   )
 }
-
