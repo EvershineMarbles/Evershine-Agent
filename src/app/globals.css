@@ -75,6 +75,21 @@
   @apply scale-100;
 }
 
+.tooltip-wrapper {
+  @apply absolute left-14 scale-0 p-2 m-2 min-w-max
+  rounded-md shadow-md text-white bg-dark
+  text-xs font-bold transition-all duration-100 origin-left
+  group-hover:scale-100;
+
+  /* Critical fix: These properties ensure the tooltip appears on top */
+  position: fixed;
+  z-index: 9999;
+}
+
+/* Ensure the tooltip is visible */
+.sidebar-icon:hover .tooltip-wrapper {
+  display: block;
+}
 
 /* Add this to make the tooltip appear on hover */
 button:hover .sidebar-tooltip {
