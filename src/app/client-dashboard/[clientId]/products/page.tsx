@@ -4,11 +4,12 @@ import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode, ArrowUp } from "lucide-react"
+import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode } from "lucide-react"
 import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ErrorBoundary } from "@/components/error-boundary"
+import { BackToTop } from "@/components/back-to-top" // Import the BackToTop component
 
 // Define the Product interface
 interface Product {
@@ -41,36 +42,6 @@ export default function ProductsPage() {
   const [addingToCart, setAddingToCart] = useState<Record<string, boolean>>({})
   const [addingToWishlist, setAddingToWishlist] = useState<Record<string, boolean>>({})
   const [error, setError] = useState<string | null>(null)
-  // Add state for back to top button
-  const [showBackToTop, setShowBackToTop] = useState(false)
-
-  // Handle scroll for back to top button
-  useEffect(() => {
-    const handleScroll = () => {
-      if (window.scrollY > 300) {
-        setShowBackToTop(true)
-      } else {
-        setShowBackToTop(false)
-      }
-    }
-
-    // Add the event listener
-    window.addEventListener("scroll", handleScroll)
-
-    // Initial check in case page is already scrolled
-    handleScroll()
-
-    // Clean up
-    return () => window.removeEventListener("scroll", handleScroll)
-  }, [])
-
-  // Function to scroll back to top
-  const scrollToTop = () => {
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    })
-  }
 
   // Load wishlist and cart from localStorage
   useEffect(() => {
@@ -548,16 +519,8 @@ export default function ProductsPage() {
         )}
       </div>
 
-      {/* Back to Top Button - Always render but control visibility with CSS */}
-      <button
-        onClick={scrollToTop}
-        className={`fixed bottom-6 right-6 p-3 bg-[#194a95] text-white rounded-full shadow-lg hover:bg-[#194a95]/90 transition-all z-50 ${
-          showBackToTop ? "opacity-100" : "opacity-0 pointer-events-none"
-        }`}
-        aria-label="Back to top"
-      >
-        <ArrowUp className="h-5 w-5" />
-      </button>
+      {/* Use the separate BackToTop component */}
+      <BackToTop />
     </ErrorBoundary>
   )
 }

@@ -1,331 +1,112 @@
 "use client"
 
-import type React from "react"
-import { useState, useEffect, useCallback } from "react"
-import { useParams, useRouter } from "next/navigation"
-import Link from "next/link"
-import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode, ArrowUp } from "lucide-react"
+import { useEffect, useState, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import Image from "next/image"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Users, Package, Bell, LogOut, UserPlus, Loader2, QrCode, List } from "lucide-react"
+import { agentAPI } from "@/lib/api-utils"
+import { isAgentAuthenticated, clearAllTokens } from "@/lib/auth-utils"
 import { useToast } from "@/components/ui/use-toast"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { ErrorBoundary } from "@/components/error-boundary"
+import Link from "next/link"
+import { BackToTop } from "@/components/back-to-top" // Import the BackToTop component
 
-// Define the Product interface
-interface Product {
+// Define client interface
+interface Client {
   _id: string
   name: string
-  price: number
-  image: string[]
-  postId: string
-  category: string
-  description: string
-  status?: "draft" | "pending" | "approved"
-  applicationAreas?: string
-  quantityAvailable?: number
+  mobile: string
+  clientId: string
+  profession?: string
+  city?: string
+  email?: string
 }
 
-export default function ProductsPage() {
-  // Use the useParams hook to get the clientId
-  const params = useParams()
+export default function Dashboard() {
   const router = useRouter()
-  const clientId = params.clientId as string
-
   const { toast } = useToast()
-  const [products, setProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [imageError, setImageError] = useState<Record<string, boolean>>({})
-  // Wishlist and cart state
-  const [wishlist, setWishlist] = useState<string[]>([])
-  const [cart, setCart] = useState<string[]>([])
-  const [addingToCart, setAddingToCart] = useState<Record<string, boolean>>({})
-  const [addingToWishlist, setAddingToWishlist] = useState<Record<string, boolean>>({})
-  const [error, setError] = useState<string | null>(null)
-  const [clientData, setClientData] = useState<any>(null)
-  const [showBackToTop, setShowBackToTop] = useState(false)
+  const [agentEmail, setAgentEmail] = useState<string | null>(null)
+  const [agentName, setAgentName] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [clients, setClients] = useState<Client[]>([])
+  const [accessingClient, setAccessingClient] = useState<string | null>(null)
 
-  // Handle scroll for back to top button
-  useEffect(() => {
-    const handleScroll = () => {
-      if (window.scrollY > 300) {
-        setShowBackToTop(true)
-      } else {
-        setShowBackToTop(false)
-      }
-    }
-
-    // Add the event listener
-    window.addEventListener("scroll", handleScroll)
-
-    // Initial check in case page is already scrolled
-    handleScroll()
-
-    // Clean up
-    return () => window.removeEventListener("scroll", handleScroll)
-  }, [])
-
-  // Make sure the scrollToTop function is defined correctly
-  const scrollToTop = () => {
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    })
-  }
-
-  // Load wishlist and cart from localStorage
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const savedWishlist = localStorage.getItem("wishlist")
-        if (savedWishlist) {
-          setWishlist(JSON.parse(savedWishlist))
-        }
-
-        const savedCart = localStorage.getItem("cart")
-        if (savedCart) {
-          setCart(JSON.parse(savedCart))
-        }
-      } catch (e) {
-        console.error("Error loading data from localStorage:", e)
-      }
-    }
-  }, [])
-
-  // Save wishlist and cart to localStorage whenever they change
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("wishlist", JSON.stringify(wishlist))
-      localStorage.setItem("cart", JSON.stringify(cart))
-    }
-  }, [wishlist, cart])
-
-  // Fetch products function
-  const fetchProducts = useCallback(async () => {
+  // Wrap fetchClients in useCallback to prevent it from being recreated on every render
+  const fetchClients = useCallback(async () => {
+    setIsLoading(true)
     try {
-      setLoading(true)
-      setError(null)
+      const response = await agentAPI.getClients()
 
-      // Use environment variable if available, otherwise use a default URL
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
-      console.log("Fetching products from:", `${apiUrl}/api/getAllProducts`)
-
-      const response = await fetch(`${apiUrl}/api/getAllProducts`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        // Add a timeout to prevent long waiting times
-        signal: AbortSignal.timeout(8000), // 8 second timeout
-      })
-
-      if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`)
-      }
-
-      const data = await response.json()
-
-      if (data.success && Array.isArray(data.data)) {
-        console.log("Products fetched successfully:", data.data)
-
-        // Filter out products with missing or invalid postId
-        const validProducts = data.data.filter(
-          (product: Product) => product.postId && typeof product.postId === "string",
-        )
-
-        if (validProducts.length < data.data.length) {
-          console.warn(`Filtered out ${data.data.length - validProducts.length} products with invalid postId`)
-        }
-
-        // Process the image URLs to ensure they're valid
-        const processedProducts = validProducts.map((product: Product) => ({
-          ...product,
-          image:
-            Array.isArray(product.image) && product.image.length > 0
-              ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
-              : ["/placeholder.svg"],
-        }))
-
-        setProducts(processedProducts)
+      if (response.success && Array.isArray(response.data)) {
+        setClients(response.data)
       } else {
-        throw new Error(data.msg || "Invalid API response format")
+        toast({
+          title: "Error",
+          description: response.message || "Failed to fetch clients",
+          variant: "destructive",
+        })
+        setClients([])
       }
-    } catch (error: any) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to load products"
-      console.error("Error fetching products:", error)
-      setError(errorMessage)
-
-      // Show error toast
+    } catch (error) {
+      console.error("Error fetching clients:", error)
       toast({
-        title: "Error fetching products",
-        description: "Could not load products from the server. Please try again later.",
+        title: "Error",
+        description: "Failed to fetch clients. Please try again.",
         variant: "destructive",
       })
-
-      // Set empty products array
-      setProducts([])
+      setClients([])
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
-  }, [toast])
+  }, [toast]) // Add toast as a dependency
 
-  // Fetch products on component mount
   useEffect(() => {
-    fetchProducts()
-  }, [fetchProducts])
+    // Check if agent is logged in
+    if (!isAgentAuthenticated()) {
+      router.push("/agent-login")
+      return
+    }
 
-  // Update the toggleWishlist function to make an API call instead of just updating local state
-  const toggleWishlist = useCallback(
-    async (e: React.MouseEvent, productId: string) => {
-      e.preventDefault() // Prevent navigation
+    // Fetch agent email from localStorage
+    const email = localStorage.getItem("agentEmail")
+    setAgentEmail(email)
 
-      // Add validation here
-      if (!productId || typeof productId !== "string") {
-        toast({
-          title: "Error",
-          description: "Invalid product ID. Cannot update wishlist.",
-          variant: "destructive",
-        })
-        return
-      }
+    // Extract name from email (for demo purposes)
+    if (email) {
+      const name = email.split("@")[0]
+      // Capitalize first letter and format name
+      const formattedName = name.charAt(0).toUpperCase() + name.slice(1)
+      setAgentName(formattedName)
+    }
 
-      // Set loading state for this specific product
-      setAddingToWishlist((prev) => ({ ...prev, [productId]: true }))
+    // Fetch clients
+    fetchClients()
+  }, [router, fetchClients]) // Add fetchClients to the dependency array
 
-      // Optimistically update UI
-      if (wishlist.includes(productId)) {
-        // Remove from wishlist
-        setWishlist((prev) => prev.filter((id) => id !== productId))
-      } else {
-        // Add to wishlist
-        setWishlist((prev) => [...prev, productId])
-      }
-
-      try {
-        // Get the token
-        const token = localStorage.getItem("clientImpersonationToken")
-
-        if (!token) {
-          throw new Error("No authentication token found. Please refresh the token using the debug panel above")
-        }
-
-        if (wishlist.includes(productId)) {
-          // Remove from wishlist
-          const response = await fetch("https://evershinebackend-2.onrender.com/api/deleteUserWishlistItem", {
-            method: "DELETE",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ productId }),
-          })
-
-          if (!response.ok) {
-            throw new Error(`API error: ${response.status} ${response.statusText}`)
-          }
-
-          const data = await response.json()
-
-          if (data.success) {
-            toast({
-              title: "Removed from wishlist",
-              description: "Item has been removed from your wishlist",
-              variant: "default",
-            })
-          } else {
-            throw new Error(data.message || "Failed to remove from wishlist")
-          }
-        } else {
-          // Add to wishlist
-          const response = await fetch("https://evershinebackend-2.onrender.com/api/addToWishlist", {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ productId }),
-          })
-
-          if (!response.ok) {
-            throw new Error(`API error: ${response.status} ${response.statusText}`)
-          }
-
-          const data = await response.json()
-
-          if (data.success) {
-            toast({
-              title: "Added to wishlist",
-              description: "Item has been added to your wishlist",
-              variant: "default",
-            })
-          } else {
-            throw new Error(data.message || "Failed to add to wishlist")
-          }
-        }
-      } catch (error: any) {
-        console.error("Error updating wishlist:", error)
-
-        // Revert the optimistic update
-        if (wishlist.includes(productId)) {
-          // We were trying to remove, but failed, so add it back
-          setWishlist((prev) => [...prev, productId])
-        } else {
-          // We were trying to add, but failed, so remove it
-          setWishlist((prev) => prev.filter((id) => id !== productId))
-        }
-
-        toast({
-          title: "Error",
-          description: error.message || "Failed to update wishlist. Please try again.",
-          variant: "destructive",
-        })
-      } finally {
-        setAddingToWishlist((prev) => ({ ...prev, [productId]: false }))
-      }
-    },
-    [wishlist, toast],
-  )
-
-  // Add to cart function
-  const addToCart = async (e: React.MouseEvent, productId: string, productName: string) => {
-    e.preventDefault() // Prevent navigation
-
-    if (cart.includes(productId)) {
+  const handleClientSelect = async (clientId: string) => {
+    if (!clientId) {
       toast({
-        title: "Already in cart",
-        description: "This item is already in your cart",
-        variant: "default",
+        title: "Error",
+        description: "Invalid client ID",
+        variant: "destructive",
       })
       return
     }
 
+    setAccessingClient(clientId)
+
     try {
-      // Set loading state for this specific product
-      setAddingToCart((prev) => ({ ...prev, [productId]: true }))
-
-      // Immediately update UI state to show item as added to cart
-      setCart((prev) => [...prev, productId])
-
-      // Update localStorage cart
-      const savedCart = localStorage.getItem("cart")
-      const cartItems = savedCart ? JSON.parse(savedCart) : []
-      localStorage.setItem("cart", JSON.stringify([...cartItems, productId]))
-
-      // Get the token
-      const token = localStorage.getItem("clientImpersonationToken")
-
-      if (!token) {
-        throw new Error("No authentication token found. Please refresh the token and try again.")
-      }
-
-      // Make API request in background
-      const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
+      // Get the token for client impersonation
+      const response = await fetch(
+        `https://evershinebackend-2.onrender.com/api/getClientImpersonationToken/${clientId}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("agentToken")}`,
+          },
         },
-        body: JSON.stringify({ productId }),
-      })
+      )
 
       if (!response.ok) {
         throw new Error(`API error: ${response.status} ${response.statusText}`)
@@ -333,261 +114,202 @@ export default function ProductsPage() {
 
       const data = await response.json()
 
-      if (data.success) {
-        toast({
-          title: "Added to cart",
-          description: `${productName} has been added to your cart`,
-          variant: "default",
-        })
+      if (data.success && data.token) {
+        // Store the token in localStorage
+        localStorage.setItem("clientImpersonationToken", data.token)
+
+        // Navigate to client dashboard
+        router.push(`/client-dashboard/${clientId}`)
       } else {
-        throw new Error(data.message || "Failed to add to cart")
+        throw new Error(data.message || "Failed to get access token")
       }
     } catch (error: any) {
-      // If there was an error, revert the cart state
-      setCart((prev) => prev.filter((id) => id !== productId))
-
-      console.error("Error adding to cart:", error)
+      console.error("Error accessing client dashboard:", error)
       toast({
-        title: "Error adding to cart",
-        description: error.message || "Failed to add item to cart. Please try again.",
+        title: "Access Error",
+        description: error.message || "Could not access client dashboard. Please try again.",
         variant: "destructive",
       })
     } finally {
-      // Clear loading state
-      setAddingToCart((prev) => ({ ...prev, [productId]: false }))
+      setAccessingClient(null)
     }
   }
 
-  // Filter products based on search query
-  const filteredProducts = products.filter(
-    (product) =>
-      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      product.category.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
-
-  // Handle image loading errors
-  const handleImageError = useCallback((productId: string) => {
-    console.log("Image error for product:", productId)
-    setImageError((prev) => ({ ...prev, [productId]: true }))
-  }, [])
-
-  // Handle QR code scanning
-  const handleScanQR = () => {
-    router.push(`/client-dashboard/${clientId}/scan-qr`)
+  const handleLogout = () => {
+    clearAllTokens()
+    router.push("/")
   }
 
-  // Debug logging for products
-  useEffect(() => {
-    // Check for problematic products
-    const productsWithoutPostId = products.filter((product) => !product.postId)
-    const productsWithInvalidPostId = products.filter((product) => product.postId && typeof product.postId !== "string")
-
-    if (productsWithoutPostId.length > 0) {
-      console.warn("Products without postId:", productsWithoutPostId)
-    }
-
-    if (productsWithInvalidPostId.length > 0) {
-      console.warn("Products with invalid postId:", productsWithInvalidPostId)
-    }
-  }, [products])
-
-  // Fetch client data
-  useEffect(() => {
-    const fetchClientData = async () => {
-      try {
-        const token = localStorage.getItem("clientImpersonationToken")
-        if (!token) return
-
-        const response = await fetch(`https://evershinebackend-2.onrender.com/api/getClientDetails/${clientId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          if (data.data) {
-            setClientData(data.data)
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching client data:", error)
-      }
-    }
-
-    fetchClientData()
-  }, [clientId])
-
-  // Loading state
-  if (loading) {
+  if (isLoading && clients.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-[80vh]">
-        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-muted-foreground">Loading products...</p>
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin mr-2" />
+        <p>Loading dashboard...</p>
       </div>
     )
   }
 
   return (
-    <ErrorBoundary>
-      <div className="p-6 md:p-8">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-          <h1 className="text-3xl font-bold">Welcome, {clientData?.name?.split(" ")[0] || "Client"}</h1>
-        </div>
-        {error && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Products</h1>
-
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Blue strip at the top */}
+      <div className="w-full bg-[#194a95] text-white py-4 px-6">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
-            {/* Scan QR Button */}
-            <button
-              onClick={handleScanQR}
-              className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-              aria-label="Scan QR Code"
-            >
-              <QrCode className="h-6 w-6 text-gray-600" />
-            </button>
-
-            <Link href={`/client-dashboard/${clientId}/wishlist`} className="relative">
-              <Heart className="h-6 w-6 text-gray-600" />
-              {wishlist.length > 0 && (
-                <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  {wishlist.length}
-                </span>
-              )}
-            </Link>
-
-            <Link href={`/client-dashboard/${clientId}/cart`} className="relative">
-              <ShoppingCart className="h-6 w-6 text-gray-600" />
-              {cart.length > 0 && (
-                <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  {cart.length}
-                </span>
-              )}
-            </Link>
+            <Image src="/logo2.png" alt="Evershine Logo" width={80} height={40} />
+            <h1 className="text-xl font-semibold">Agent Dashboard</h1>
           </div>
-        </div>
-
-        <div className="relative mb-6">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search products by name or category..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 pr-4 py-2 w-full rounded-lg border border-input focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-          />
-        </div>
-
-        {filteredProducts.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-xl font-medium mb-4">No products found</p>
-            <p className="text-muted-foreground mb-6">
-              {searchQuery ? "Try a different search term" : "No products are currently available"}
-            </p>
+          <div className="flex items-center gap-4">
+            <span className="text-sm md:text-base">Welcome, {agentName || agentEmail}</span>
             <button
-              onClick={fetchProducts}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+              onClick={handleLogout}
+              className="flex items-center gap-2 text-white hover:bg-white/20 hover:text-white px-3 py-1.5 rounded-md text-sm"
             >
-              Refresh Products
+              <LogOut className="h-4 w-4" />
+              <span>Logout</span>
             </button>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredProducts.map((product) => (
-              <div
-                key={product._id}
-                className="group relative bg-card rounded-lg overflow-hidden border border-border hover:border-primary transition-all hover:shadow-md"
-              >
-                <div className="p-3">
-                  <div className="relative w-full overflow-hidden rounded-xl bg-gray-50 aspect-square">
-                    <Image
-                      src={imageError[product._id] ? "/placeholder.svg" : product.image?.[0] || "/placeholder.svg"}
-                      alt={product.name}
-                      fill
-                      unoptimized={true} // This bypasses Vercel's image optimization
-                      className="object-cover transition-transform group-hover:scale-105 duration-300"
-                      onError={() => handleImageError(product._id)}
-                    />
-
-                    {/* Wishlist button overlay */}
-                    <button
-                      onClick={(e) => toggleWishlist(e, product.postId)}
-                      className="absolute top-2 right-2 p-2 rounded-full bg-white/80 hover:bg-white transition-colors z-10"
-                      aria-label={wishlist.includes(product.postId) ? "Remove from wishlist" : "Add to wishlist"}
-                      type="button"
-                      disabled={addingToWishlist[product.postId]}
-                    >
-                      {addingToWishlist[product.postId] ? (
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                      ) : (
-                        <Heart
-                          className={`h-5 w-5 ${
-                            wishlist.includes(product.postId) ? "text-red-500 fill-red-500" : "text-gray-600"
-                          }`}
-                        />
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="p-4">
-                  <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
-                  <p className="text-lg font-bold mt-2">₹{product.price.toLocaleString()}/sqt</p>
-                  <p className="text-sm text-muted-foreground mt-1">{product.category}</p>
-
-                  <button
-                    onClick={(e) => toggleWishlist(e, product.postId)}
-                    className={`mt-4 w-full py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2
-                              ${
-                                wishlist.includes(product.postId)
-                                  ? "bg-gray-100 text-gray-600 border border-gray-200"
-                                  : addingToWishlist[product.postId]
-                                    ? "bg-gray-200 text-gray-700"
-                                    : "bg-primary hover:bg-primary/90 text-primary-foreground"
-                              } 
-                              transition-colors`}
-                    disabled={addingToWishlist[product.postId]}
-                    type="button"
-                  >
-                    {addingToWishlist[product.postId] ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                    ) : wishlist.includes(product.postId) ? (
-                      <>
-                        <Heart className="h-4 w-4 fill-gray-500 mr-1" />
-                        Added to Wishlist
-                      </>
-                    ) : (
-                      <>
-                        <Heart className="h-4 w-4 mr-1" />
-                        Add to Wishlist
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        </div>
       </div>
 
-      {/* Back to Top Button - Always render but control visibility with CSS */}
-      <button
-        onClick={scrollToTop}
-        className={`fixed bottom-6 right-6 p-3 bg-[#194a95] text-white rounded-full shadow-lg hover:bg-[#194a95]/90 transition-all z-50 ${
-          showBackToTop ? "opacity-100" : "opacity-0 pointer-events-none"
-        }`}
-        aria-label="Back to top"
-      >
-        <ArrowUp className="h-5 w-5" />
-      </button>
-    </ErrorBoundary>
+      <main className="container mx-auto py-6 px-4 flex-1">
+        <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          <Card className="border rounded-lg overflow-hidden">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3">
+                <Users className="h-5 w-5 text-[#194a95]" />
+                <span className="text-gray-600 font-medium">Total Clients</span>
+              </div>
+              <p className="text-3xl font-bold mt-2">{clients.length}</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border rounded-lg overflow-hidden">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3">
+                <Package className="h-5 w-5 text-[#194a95]" />
+                <span className="text-gray-600 font-medium">Active Orders</span>
+              </div>
+              <p className="text-3xl font-bold mt-2">12</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border rounded-lg overflow-hidden">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3">
+                <Bell className="h-5 w-5 text-[#194a95]" />
+                <span className="text-gray-600 font-medium">Pending Reminders</span>
+              </div>
+              <p className="text-3xl font-bold mt-2">8</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+          <button
+            className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg"
+            onClick={() => router.push("/scan-qr")}
+          >
+            <QrCode className="h-6 w-6" />
+            <span className="text-base font-medium">Scan QR</span>
+          </button>
+
+          <button
+            className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg"
+            onClick={() => router.push("/register-client")}
+          >
+            <UserPlus className="h-6 w-6" />
+            <span className="text-base font-medium">Register a New Client</span>
+          </button>
+
+          <button
+            className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg"
+            onClick={() => router.push("/client-list")}
+          >
+            <List className="h-6 w-6" />
+            <span className="text-base font-medium">Client List</span>
+          </button>
+        </div>
+
+        {/* Client List Card */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Users className="h-5 w-5 mr-2" />
+                Client List
+              </div>
+              <Link href="/client-list">
+                <span className="text-sm text-[#194a95] hover:underline">View All</span>
+              </Link>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin" />
+              </div>
+            ) : clients.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-3 px-4">Name</th>
+                      <th className="text-left py-3 px-4">Mobile</th>
+                      <th className="text-left py-3 px-4">Profession</th>
+                      <th className="text-left py-3 px-4">City</th>
+                      <th className="text-center py-3 px-4">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {clients.slice(0, 5).map((client) => (
+                      <tr key={client._id || client.clientId} className="border-b hover:bg-gray-50">
+                        <td className="py-3 px-4">{client.name}</td>
+                        <td className="py-3 px-4">{client.mobile}</td>
+                        <td className="py-3 px-4">{client.profession || "-"}</td>
+                        <td className="py-3 px-4">{client.city || "-"}</td>
+                        <td className="py-3 px-4 flex justify-center gap-2">
+                          <button
+                            disabled={accessingClient === client.clientId}
+                            onClick={() => handleClientSelect(client.clientId)}
+                            className="bg-[#194a95] hover:bg-[#194a95]/90 text-white hover:text-white px-3 py-1.5 rounded-md text-sm flex items-center gap-2"
+                          >
+                            {accessingClient === client.clientId ? (
+                              <>
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                <span>Accessing...</span>
+                              </>
+                            ) : (
+                              <span>Access Dashboard</span>
+                            )}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground mb-4">No clients found</p>
+                <button
+                  onClick={() => router.push("/register-client")}
+                  className="bg-[#194a95] hover:bg-[#194a95]/90 text-white hover:text-white px-4 py-2 rounded-md flex items-center gap-2 mx-auto"
+                >
+                  <UserPlus className="h-4 w-4" />
+                  <span>Register New Client</span>
+                </button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </main>
+
+      {/* Add the BackToTop component */}
+      <BackToTop />
+    </div>
   )
 }
