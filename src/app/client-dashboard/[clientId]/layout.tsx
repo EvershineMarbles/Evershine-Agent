@@ -3,7 +3,7 @@
 import React from "react"
 import { IconSidebar } from "@/components/icon-sidebar"
 import Link from "next/link"
-import { Heart, ShoppingCart, User, LogOut, Home } from "lucide-react"
+import { Heart, ShoppingCart, User, LogOut, ArrowLeft } from "lucide-react"
 
 // Define the type for the unwrapped params
 type ClientParams = {
@@ -49,11 +49,10 @@ export default function ClientDashboardLayout({
       {/* Top Navigation Strip */}
       <div className="w-full bg-[#194a95] text-white py-3 px-4 md:px-8 shadow-md z-0">
         <div className="ml-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <Home className="h-5 w-5" />
-            <span className="font-medium hidden sm:inline">Back to Advisor Dashboard</span>
-          </Link>
-
+        <Link href="/" className="flex items-center gap-2">
+        <ArrowLeft className="h-5 w-5" />
+        <span className="font-medium hidden sm:inline">Back to Advisor Dashboard</span>
+      </Link>
      
         </div>
       </div>
