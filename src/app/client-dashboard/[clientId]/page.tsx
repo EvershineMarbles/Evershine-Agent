@@ -54,10 +54,17 @@ export default function ProductsPage() {
       }
     }
 
+    // Add the event listener
     window.addEventListener("scroll", handleScroll)
+
+    // Initial check in case page is already scrolled
+    handleScroll()
+
+    // Clean up
     return () => window.removeEventListener("scroll", handleScroll)
   }, [])
 
+  // Make sure the scrollToTop function is defined correctly
   const scrollToTop = () => {
     window.scrollTo({
       top: 0,
@@ -571,16 +578,16 @@ export default function ProductsPage() {
         )}
       </div>
 
-      {/* Back to Top Button */}
-      {showBackToTop && (
-        <button
-          onClick={scrollToTop}
-          className="fixed bottom-6 right-6 p-3 bg-[#194a95] text-white rounded-full shadow-lg hover:bg-[#194a95]/90 transition-all z-50"
-          aria-label="Back to top"
-        >
-          <ArrowUp className="h-5 w-5" />
-        </button>
-      )}
+      {/* Back to Top Button - Always render but control visibility with CSS */}
+      <button
+        onClick={scrollToTop}
+        className={`fixed bottom-6 right-6 p-3 bg-[#194a95] text-white rounded-full shadow-lg hover:bg-[#194a95]/90 transition-all z-50 ${
+          showBackToTop ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+        aria-label="Back to top"
+      >
+        <ArrowUp className="h-5 w-5" />
+      </button>
     </ErrorBoundary>
   )
 }

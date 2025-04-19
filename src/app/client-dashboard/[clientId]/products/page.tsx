@@ -2,9 +2,9 @@
 
 import type React from "react"
 import { useState, useEffect, useCallback } from "react"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { Search, Loader2, Heart, ShoppingCart, AlertCircle } from "lucide-react"
+import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode, ArrowUp } from "lucide-react"
 import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -27,6 +27,7 @@ interface Product {
 export default function ProductsPage() {
   // Use the useParams hook to get the clientId
   const params = useParams()
+  const router = useRouter()
   const clientId = params.clientId as string
 
   const { toast } = useToast()
@@ -40,6 +41,36 @@ export default function ProductsPage() {
   const [addingToCart, setAddingToCart] = useState<Record<string, boolean>>({})
   const [addingToWishlist, setAddingToWishlist] = useState<Record<string, boolean>>({})
   const [error, setError] = useState<string | null>(null)
+  // Add state for back to top button
+  const [showBackToTop, setShowBackToTop] = useState(false)
+
+  // Handle scroll for back to top button
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 300) {
+        setShowBackToTop(true)
+      } else {
+        setShowBackToTop(false)
+      }
+    }
+
+    // Add the event listener
+    window.addEventListener("scroll", handleScroll)
+
+    // Initial check in case page is already scrolled
+    handleScroll()
+
+    // Clean up
+    return () => window.removeEventListener("scroll", handleScroll)
+  }, [])
+
+  // Function to scroll back to top
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    })
+  }
 
   // Load wishlist and cart from localStorage
   useEffect(() => {
@@ -118,7 +149,7 @@ export default function ProductsPage() {
       } else {
         throw new Error(data.msg || "Invalid API response format")
       }
-    } catch (error: Error | unknown) {
+    } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : "Failed to load products"
       console.error("Error fetching products:", error)
       setError(errorMessage)
@@ -340,6 +371,11 @@ export default function ProductsPage() {
     setImageError((prev) => ({ ...prev, [productId]: true }))
   }, [])
 
+  // Handle QR code scanning
+  const handleScanQR = () => {
+    router.push(`/client-dashboard/${clientId}/scan-qr`)
+  }
+
   // Debug logging for products
   useEffect(() => {
     // Check for problematic products
@@ -379,6 +415,15 @@ export default function ProductsPage() {
           <h1 className="text-3xl font-bold">Products</h1>
 
           <div className="flex items-center gap-4">
+            {/* Scan QR Button - Added before wishlist icon */}
+            <button
+              onClick={handleScanQR}
+              className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+              aria-label="Scan QR Code"
+            >
+              <QrCode className="h-6 w-6 text-gray-600" />
+            </button>
+
             <Link href={`/client-dashboard/${clientId}/wishlist`} className="relative">
               <Heart className="h-6 w-6 text-gray-600" />
               {wishlist.length > 0 && (
@@ -464,16 +509,16 @@ export default function ProductsPage() {
 
                 <div className="p-4">
                   <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
-                  <p className="text-lg font-bold mt-2">₹{product.price.toLocaleString()}</p>
+                  {/* Added /sqt suffix to price */}
+                  <p className="text-lg font-bold mt-2">₹{product.price.toLocaleString()}/sqt</p>
                   <p className="text-sm text-muted-foreground mt-1">{product.category}</p>
-
 
                   <button
                     onClick={(e) => toggleWishlist(e, product.postId)}
                     className={`mt-4 w-full py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2
                               ${
                                 wishlist.includes(product.postId)
-                                ? "bg-gray-100 text-gray-600 border border-gray-200"
+                                  ? "bg-gray-100 text-gray-600 border border-gray-200"
                                   : addingToWishlist[product.postId]
                                     ? "bg-gray-200 text-gray-700"
                                     : "bg-primary hover:bg-primary/90 text-primary-foreground"
@@ -486,7 +531,7 @@ export default function ProductsPage() {
                       <Loader2 className="h-4 w-4 animate-spin mr-1" />
                     ) : wishlist.includes(product.postId) ? (
                       <>
-                          <Heart className="h-4 w-4 fill-gray-500 mr-1" />
+                        <Heart className="h-4 w-4 fill-gray-500 mr-1" />
                         Added to Wishlist
                       </>
                     ) : (
@@ -502,6 +547,17 @@ export default function ProductsPage() {
           </div>
         )}
       </div>
+
+      {/* Back to Top Button - Always render but control visibility with CSS */}
+      <button
+        onClick={scrollToTop}
+        className={`fixed bottom-6 right-6 p-3 bg-[#194a95] text-white rounded-full shadow-lg hover:bg-[#194a95]/90 transition-all z-50 ${
+          showBackToTop ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+        aria-label="Back to top"
+      >
+        <ArrowUp className="h-5 w-5" />
+      </button>
     </ErrorBoundary>
   )
 }
