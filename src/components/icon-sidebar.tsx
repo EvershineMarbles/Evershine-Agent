@@ -55,9 +55,6 @@ export function IconSidebar({ clientId }: IconSidebarProps) {
               <User size={24} />
             </div>
           </TooltipTrigger>
-          <TooltipContent side="right" className="z-[9999]">
-            Profile
-          </TooltipContent>
         </Tooltip>
       </TooltipProvider>
 
