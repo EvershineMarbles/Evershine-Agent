@@ -64,10 +64,15 @@
   rounded-xl hover:rounded-xl transition-all duration-300 ease-linear cursor-pointer;
 }
 
+/* Add this to your globals.css or wherever your sidebar tooltip styles are defined */
 .sidebar-tooltip {
   @apply absolute w-auto p-2 m-2 min-w-max left-14
   rounded-md shadow-md text-white bg-dark
-  text-xs font-bold transition-all duration-100 scale-0 origin-left z-50;
+  text-xs font-bold transition-all duration-100 scale-0 origin-left z-[9999];
+}
+
+.sidebar-icon:hover .sidebar-tooltip {
+  @apply scale-100;
 }
 
 
