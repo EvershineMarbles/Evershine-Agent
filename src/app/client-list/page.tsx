@@ -102,16 +102,31 @@ export default function ClientList() {
 
     try {
       // Get the token for client impersonation
-      const response = await agentAPI.getClientImpersonationToken(clientId)
+      const response = await fetch(
+        `https://evershinebackend-2.onrender.com/api/getClientImpersonationToken/${clientId}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("agentToken")}`,
+          },
+        },
+      )
 
-      if (response.success && response.token) {
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`)
+      }
+
+      const data = await response.json()
+
+      if (data.success && data.token) {
         // Store the token in localStorage
-        localStorage.setItem("clientImpersonationToken", response.token)
+        localStorage.setItem("clientImpersonationToken", data.token)
 
         // Navigate to client dashboard
         router.push(`/client-dashboard/${clientId}`)
       } else {
-        throw new Error(response.message || "Failed to get access token")
+        throw new Error(data.message || "Failed to get access token")
       }
     } catch (error: any) {
       console.error("Error accessing client dashboard:", error)

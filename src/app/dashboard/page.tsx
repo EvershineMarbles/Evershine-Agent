@@ -159,14 +159,6 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <button
             className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg"
-            onClick={() => router.push("/scan-qr")}
-          >
-            <QrCode className="h-6 w-6" />
-            <span className="text-base font-medium">Scan QR</span>
-          </button>
-
-          <button
-            className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg"
             onClick={() => router.push("/register-client")}
           >
             <UserPlus className="h-6 w-6" />
@@ -179,6 +171,14 @@ export default function Dashboard() {
           >
             <List className="h-6 w-6" />
             <span className="text-base font-medium">Client List</span>
+          </button>
+
+          <button
+            className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg"
+            onClick={() => router.push("/scan-qr")}
+          >
+            <QrCode className="h-6 w-6" />
+            <span className="text-base font-medium">Scan QR</span>
           </button>
         </div>
       </main>
