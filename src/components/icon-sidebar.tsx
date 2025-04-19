@@ -64,8 +64,6 @@ export function IconSidebar({ clientId }: IconSidebarProps) {
         onMouseEnter={() => setActiveTooltip("profile")}
         onMouseLeave={() => setActiveTooltip(null)}
       >
-        <User size={24} />
-        {activeTooltip === "profile" && <div style={tooltipStyle}>Profile</div>}
       </div>
 
       <hr className="my-2 border-gray-700" />
