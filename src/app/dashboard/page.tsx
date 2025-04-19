@@ -2,14 +2,13 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { Users, LogOut, UserPlus, Loader2, QrCode, ArrowLeft } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Users, Package, Bell, LogOut, UserPlus, Loader2, QrCode, List } from "lucide-react"
 import { agentAPI } from "@/lib/api-utils"
-import { isAgentAuthenticated, storeClientImpersonationToken, clearAllTokens } from "@/lib/auth-utils"
+import { isAgentAuthenticated, clearAllTokens } from "@/lib/auth-utils"
 import { useToast } from "@/components/ui/use-toast"
-import DebugPanel from "@/components/debug-panel"
 
 // Define client interface
 interface Client {
@@ -28,7 +27,6 @@ export default function Dashboard() {
   const [agentEmail, setAgentEmail] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [clients, setClients] = useState<Client[]>([])
-  const [showDebug, setShowDebug] = useState(false)
 
   // Wrap fetchClients in useCallback to prevent it from being recreated on every render
   const fetchClients = useCallback(async () => {
@@ -74,39 +72,6 @@ export default function Dashboard() {
     fetchClients()
   }, [router, fetchClients]) // Add fetchClients to the dependency array
 
-  const handleClientSelect = async (clientId: string) => {
-    try {
-      console.log("Attempting to impersonate client:", clientId)
-      const response = await agentAPI.impersonateClient(clientId)
-      console.log("Impersonation response:", response)
-
-      if (response.success && response.data && response.data.impersonationToken) {
-        // Store the impersonation token
-        storeClientImpersonationToken(clientId, response.data.impersonationToken)
-        console.log("Impersonation token stored, redirecting to client dashboard")
-
-        // Add a small delay to ensure token is stored before navigation
-        setTimeout(() => {
-          router.push(`/client-dashboard/${clientId}`)
-        }, 100)
-      } else {
-        console.error("Failed to get impersonation token:", response)
-        toast({
-          title: "Error",
-          description: response.message || "Failed to access client dashboard",
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      console.error("Error impersonating client:", error)
-      toast({
-        title: "Error",
-        description: "Failed to access client dashboard. Please try again.",
-        variant: "destructive",
-      })
-    }
-  }
-
   const handleLogout = () => {
     clearAllTokens()
     router.push("/")
@@ -122,55 +87,95 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b p-4">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Blue strip at the top */}
+      <div className="w-full bg-[#194a95] text-white py-4 px-6 shadow-md">
         <div className="container mx-auto flex justify-between items-center">
           <div className="flex items-center">
-            <Link href="https://evershine-agent.vercel.app/agent-login" className="mr-4">
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
-            <Image src="/logo.png" alt="Evershine Logo" width={120} height={60} />
+            <Image src="/logo.png" alt="Evershine Logo" width={120} height={60} className="mr-4" />
+            <h1 className="text-xl font-semibold hidden sm:block">Agent Dashboard</h1>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">Welcome, {agentEmail}</span>
-            <Button variant="outline" size="sm" onClick={handleLogout}>
+            <span className="text-sm hidden md:inline-block">Welcome, {agentEmail}</span>
+            <Button variant="ghost" size="sm" onClick={handleLogout} className="text-white hover:bg-white/20">
               <LogOut className="h-4 w-4 mr-2" />
-              Logout
+              <span className="hidden sm:inline">Logout</span>
             </Button>
           </div>
         </div>
-      </header>
+      </div>
 
-      {showDebug && (
-        <div className="container mx-auto mt-4">
-          <DebugPanel />
-        </div>
-      )}
-
-      <main className="container mx-auto py-8 px-4">
+      <main className="container mx-auto py-8 px-4 flex-1">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Agent Dashboard</h1>
+          <h1 className="text-3xl font-bold">Dashboard</h1>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          <Link href="/register-client">
-            <Button className="bg-coral hover:bg-coral/90 h-24 text-lg font-medium">
-              <UserPlus className="h-4 w-4 mr-2" />
-              Register New Client
-            </Button>
-          </Link>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center">
+                <Users className="h-5 w-5 mr-2 text-blue" />
+                Total Clients
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold">{clients.length}</p>
+            </CardContent>
+          </Card>
 
-          <Button className="bg-blue hover:bg-blue/90 h-24 text-lg font-medium">
-            <QrCode className="h-4 w-4 mr-2" />
-            Scan QR Code
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center">
+                <Package className="h-5 w-5 mr-2 text-blue" />
+                Active Orders
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold">12</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center">
+                <Bell className="h-5 w-5 mr-2 text-blue" />
+                Pending Reminders
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold">8</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Button
+            size="lg"
+            className="h-auto py-6 bg-[#194a95] hover:bg-[#0f3a7a] flex flex-col items-center gap-2"
+            onClick={() => router.push("/scan-qr")}
+          >
+            <QrCode className="h-8 w-8" />
+            <span className="text-lg">Scan QR</span>
           </Button>
 
-          <Link href="/clients" className="w-full">
-            <Button className="bg-green-500 hover:bg-green-700 h-24 text-lg font-medium">
-              <Users className="h-4 w-4 mr-2" />
-              Client List
-            </Button>
-          </Link>
+          <Button
+            size="lg"
+            className="h-auto py-6 bg-[#194a95] hover:bg-[#0f3a7a] flex flex-col items-center gap-2"
+            onClick={() => router.push("/register-client")}
+          >
+            <UserPlus className="h-8 w-8" />
+            <span className="text-lg">Register a New Client</span>
+          </Button>
+
+          <Button
+            size="lg"
+            className="h-auto py-6 bg-[#194a95] hover:bg-[#0f3a7a] flex flex-col items-center gap-2"
+            onClick={() => router.push("/client-list")}
+          >
+            <List className="h-8 w-8" />
+            <span className="text-lg">Client List</span>
+          </Button>
         </div>
       </main>
     </div>
