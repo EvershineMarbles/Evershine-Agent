@@ -18,21 +18,7 @@ export function IconSidebar({ clientId }: IconSidebarProps) {
       href: `/client-dashboard/${clientId}`,
       icon: Home,
     },
-    {
-      name: "Products",
-      href: `/client-dashboard/${clientId}/products`,
-      icon: Package,
-    },
-    {
-      name: "Scan Products",
-      href: `/client-dashboard/${clientId}/scan`,
-      icon: QrCode,
-    },
-    {
-      name: "Wishlist",
-      href: `/client-dashboard/${clientId}/wishlist`,
-      icon: Heart,
-    },
+ 
     {
       name: "Cart",
       href: `/client-dashboard/${clientId}/cart`,
