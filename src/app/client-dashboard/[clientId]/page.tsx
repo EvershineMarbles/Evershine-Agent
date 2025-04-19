@@ -348,21 +348,6 @@ export default function ProductsPage() {
     router.push(`/client-dashboard/${clientId}/scan-qr`)
   }
 
-  // Debug logging for products
-  useEffect(() => {
-    // Check for problematic products
-    const productsWithoutPostId = products.filter((product) => !product.postId)
-    const productsWithInvalidPostId = products.filter((product) => product.postId && typeof product.postId !== "string")
-
-    if (productsWithoutPostId.length > 0) {
-      console.warn("Products without postId:", productsWithoutPostId)
-    }
-
-    if (productsWithInvalidPostId.length > 0) {
-      console.warn("Products with invalid postId:", productsWithInvalidPostId)
-    }
-  }, [products])
-
   // Fetch client data
   useEffect(() => {
     const fetchClientData = async () => {
@@ -548,6 +533,9 @@ export default function ProductsPage() {
             ))}
           </div>
         )}
+
+        {/* Add extra space at the bottom to ensure scrolling is possible */}
+        <div className="h-[500px]"></div>
       </div>
 
       {/* Use the BackToTop component */}
