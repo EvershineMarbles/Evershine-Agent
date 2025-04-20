@@ -188,7 +188,7 @@ export default function AdminDashboard() {
                 </Button>
               </Link>
 
-              <Link href="../scan-qr" className="w-full">
+              <Link href="/scan-qr" className="w-full">
                 <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-12 text-lg font-normal w-full rounded-md">
                   Scan QR Code
                 </Button>
