@@ -176,7 +176,7 @@ export default function AdminDashboard() {
         </div>
  {/* Action Buttons - First Row */}
  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <Link href="app/register-client" className="w-full">
+              <Link href="./register-client" className="w-full">
                 <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-12 text-lg font-normal w-full rounded-md">
                   Register New Client
                 </Button>
@@ -188,7 +188,7 @@ export default function AdminDashboard() {
                 </Button>
               </Link>
 
-              <Link href="/admin/followups" className="w-full">
+              <Link href="/admin/dashboard/followups" className="w-full">
                 <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-12 text-lg font-normal w-full rounded-md">
                   Follow-up Reminders
                 </Button>
@@ -197,13 +197,13 @@ export default function AdminDashboard() {
 
             {/* Action Buttons - Second Row */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-              <Link href="/admin/agents" className="w-full">
+              <Link href="/admin/dashboard/agents" className="w-full">
                 <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-12 text-lg font-normal w-full rounded-md">
                   Advisors
                 </Button>
               </Link>
 
-              <Link href="/admin/all-clients" className="w-full">
+              <Link href="/admin/dashboard/all-clients" className="w-full">
                 <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-12 text-lg font-normal w-full rounded-md">
                   Client List
                 </Button>
