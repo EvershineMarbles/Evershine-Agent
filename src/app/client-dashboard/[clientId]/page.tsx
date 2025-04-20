@@ -398,6 +398,20 @@ export default function ProductsPage() {
     )
   }
 
+  // Add this function to handle product card clicks
+  const handleProductClick = (e: React.MouseEvent, productId: string) => {
+    // Check if the click was on a button or its children
+    const target = e.target as HTMLElement
+    if (target.closest("button")) {
+      // If clicked on a button, don't navigate
+      e.preventDefault()
+      return
+    }
+
+    // Otherwise, allow navigation to proceed
+    router.push(`/client-dashboard/${clientId}/product/${productId}`)
+  }
+
   return (
     <ErrorBoundary>
       <div className="p-6 md:p-8">
@@ -473,7 +487,8 @@ export default function ProductsPage() {
             {filteredProducts.map((product) => (
               <div
                 key={product._id}
-                className="group relative bg-card rounded-lg overflow-hidden border border-border hover:border-primary transition-all hover:shadow-md"
+                className="group relative bg-card rounded-lg overflow-hidden border border-border hover:border-primary transition-all hover:shadow-md cursor-pointer"
+                onClick={(e) => handleProductClick(e, product.postId)}
               >
                 <div className="p-3">
                   <div className="relative w-full overflow-hidden rounded-xl bg-gray-50 aspect-square">
@@ -511,10 +526,11 @@ export default function ProductsPage() {
                   <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
                   <p className="text-lg font-bold mt-2">₹{product.price.toLocaleString()}/sqt</p>
                   <p className="text-sm text-muted-foreground mt-1">{product.category}</p>
+                </div>
 
-                  <button
-                    onClick={(e) => toggleWishlist(e, product.postId)}
-                    className={`mt-4 w-full py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2
+                <button
+                  onClick={(e) => toggleWishlist(e, product.postId)}
+                  className={`mt-4 w-full py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2
                               ${
                                 wishlist.includes(product.postId)
                                   ? "bg-gray-100 text-gray-600 border border-gray-200"
@@ -523,24 +539,23 @@ export default function ProductsPage() {
                                     : "bg-primary hover:bg-primary/90 text-primary-foreground"
                               } 
                               transition-colors`}
-                    disabled={addingToWishlist[product.postId]}
-                    type="button"
-                  >
-                    {addingToWishlist[product.postId] ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                    ) : wishlist.includes(product.postId) ? (
-                      <>
-                        <Heart className="h-4 w-4 fill-gray-500 mr-1" />
-                        Added to Wishlist
-                      </>
-                    ) : (
-                      <>
-                        <Heart className="h-4 w-4 mr-1" />
-                        Add to Wishlist
-                      </>
-                    )}
-                  </button>
-                </div>
+                  disabled={addingToWishlist[product.postId]}
+                  type="button"
+                >
+                  {addingToWishlist[product.postId] ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                  ) : wishlist.includes(product.postId) ? (
+                    <>
+                      <Heart className="h-4 w-4 fill-gray-500 mr-1" />
+                      Added to Wishlist
+                    </>
+                  ) : (
+                    <>
+                      <Heart className="h-4 w-4 mr-1" />
+                      Add to Wishlist
+                    </>
+                  )}
+                </button>
               </div>
             ))}
           </div>
@@ -549,8 +564,6 @@ export default function ProductsPage() {
         {/* Add extra space at the bottom to ensure scrolling is possible */}
         <div className="h-[500px]"></div>
       </div>
-     
-      
     </ErrorBoundary>
   )
 }
