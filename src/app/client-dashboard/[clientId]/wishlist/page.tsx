@@ -383,11 +383,7 @@ export default function WishlistPage() {
         // We don't throw here because we've already updated the UI
       }
 
-      toast({
-        title: "Item removed",
-        description: "Item has been removed from your wishlist",
-        variant: "default",
-      })
+    
     } catch (err: any) {
       console.error("Error removing from wishlist:", err)
       toast({
