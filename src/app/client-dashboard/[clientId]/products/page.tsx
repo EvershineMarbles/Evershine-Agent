@@ -254,7 +254,18 @@ export default function ProductsPage() {
           if (data.success) {
             toast({
               title: "Added to wishlist",
-              description: "Item has been added to your wishlist",
+              description: (
+                <div className="flex flex-col space-y-2">
+                  <p>Item has been added to your wishlist</p>
+                  <Button
+                    size="sm"
+                    onClick={() => router.push(`/client-dashboard/${clientId}/wishlist`)}
+                    className="bg-[#194a95] hover:bg-[#0f3a7a] text-white w-fit"
+                  >
+                    View Wishlist
+                  </Button>
+                </div>
+              ),
               variant: "default",
             })
           } else {
@@ -282,7 +293,7 @@ export default function ProductsPage() {
         setAddingToWishlist((prev) => ({ ...prev, [productId]: false }))
       }
     },
-    [wishlist, toast],
+    [wishlist, toast, router, clientId],
   )
 
   // Add to cart function
@@ -424,19 +435,19 @@ export default function ProductsPage() {
     )
   }
 
-    // Add this function to handle product card clicks
-    const handleProductClick = (e: React.MouseEvent, productId: string) => {
-      // Check if the click was on a button or its children
-      const target = e.target as HTMLElement
-      if (target.closest("button")) {
-        // If clicked on a button, don't navigate
-        e.preventDefault()
-        return
-      }
-  
-      // Otherwise, allow navigation to proceed
-      router.push(`/client-dashboard/${clientId}/product/${productId}`)
+  // Add this function to handle product card clicks
+  const handleProductClick = (e: React.MouseEvent, productId: string) => {
+    // Check if the click was on a button or its children
+    const target = e.target as HTMLElement
+    if (target.closest("button")) {
+      // If clicked on a button, don't navigate
+      e.preventDefault()
+      return
     }
+
+    // Otherwise, allow navigation to proceed
+    router.push(`/client-dashboard/${clientId}/product/${productId}`)
+  }
 
   return (
     <ErrorBoundary>
@@ -510,9 +521,8 @@ export default function ProductsPage() {
             {filteredProducts.map((product) => (
               <div
                 key={product._id}
-                className="group relative bg-card rounded-lg overflow-hidden border border-border hover:border-primary transition-all hover:shadow-md"
+                className="group relative bg-card rounded-lg overflow-hidden border border-border hover:border-primary transition-all hover:shadow-md cursor-pointer"
                 onClick={(e) => handleProductClick(e, product.postId)}
-
               >
                 <div className="p-3">
                   <div className="relative w-full overflow-hidden rounded-xl bg-gray-50 aspect-square">
@@ -548,7 +558,7 @@ export default function ProductsPage() {
 
                 <div className="p-4">
                   <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
-                  <p className="text-lg font-bold mt-2">₹{product.price.toLocaleString()}</p>
+                  <p className="text-lg font-bold mt-2">₹{product.price.toLocaleString()}/sqft</p>
                   <p className="text-sm text-muted-foreground mt-1">{product.category}</p>
 
                   <button
@@ -585,16 +595,7 @@ export default function ProductsPage() {
           </div>
         )}
 
-        {/* Back to Top Button */}
-        {showBackToTop && (
-          <button
-            onClick={scrollToTop}
-            className="fixed bottom-6 right-6 p-3 bg-primary text-primary-foreground rounded-full shadow-lg hover:bg-primary/90 transition-all z-50"
-            aria-label="Back to top"
-          >
-            <ArrowUp className="h-5 w-5" />
-          </button>
-        )}
+   
       </div>
     </ErrorBoundary>
   )

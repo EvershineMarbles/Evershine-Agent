@@ -4,11 +4,12 @@ import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode } from "lucide-react"
+import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode } from 'lucide-react'
 import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ErrorBoundary } from "@/components/error-boundary"
+import { Button } from "@/components/ui/button"
 
 // Define the Product interface
 interface Product {
@@ -157,6 +158,11 @@ export default function ProductsPage() {
     fetchProducts()
   }, [fetchProducts])
 
+  // Navigate to wishlist page
+  const goToWishlist = () => {
+    router.push(`/client-dashboard/${clientId}/wishlist`)
+  }
+
   // Update the toggleWishlist function to make an API call instead of just updating local state
   const toggleWishlist = useCallback(
     async (e: React.MouseEvent, productId: string) => {
@@ -238,7 +244,18 @@ export default function ProductsPage() {
           if (data.success) {
             toast({
               title: "Added to wishlist",
-              description: "Item has been added to your wishlist",
+              description: (
+                <div className="flex flex-col space-y-2">
+                  <p>Item has been added to your wishlist</p>
+                  <Button 
+                    onClick={goToWishlist} 
+                    className="bg-[#194a95] hover:bg-[#0f3a7a] text-white"
+                    size="sm"
+                  >
+                    View Wishlist
+                  </Button>
+                </div>
+              ),
               variant: "default",
             })
           } else {
@@ -266,7 +283,7 @@ export default function ProductsPage() {
         setAddingToWishlist((prev) => ({ ...prev, [productId]: false }))
       }
     },
-    [wishlist, toast],
+    [wishlist, toast, clientId, router],
   )
 
   // Add to cart function
@@ -398,19 +415,19 @@ export default function ProductsPage() {
     )
   }
 
-     // Add this function to handle product card clicks
-     const handleProductClick = (e: React.MouseEvent, productId: string) => {
-      // Check if the click was on a button or its children
-      const target = e.target as HTMLElement
-      if (target.closest("button")) {
-        // If clicked on a button, don't navigate
-        e.preventDefault()
-        return
-      }
-  
-      // Otherwise, allow navigation to proceed
-      router.push(`/client-dashboard/${clientId}/product/${productId}`)
+  // Add this function to handle product card clicks
+  const handleProductClick = (e: React.MouseEvent, productId: string) => {
+    // Check if the click was on a button or its children
+    const target = e.target as HTMLElement
+    if (target.closest("button")) {
+      // If clicked on a button, don't navigate
+      e.preventDefault()
+      return
     }
+
+    // Otherwise, allow navigation to proceed
+    router.push(`/client-dashboard/${clientId}/product/${productId}`)
+  }
 
   return (
     <ErrorBoundary>
@@ -487,9 +504,8 @@ export default function ProductsPage() {
             {filteredProducts.map((product) => (
               <div
                 key={product._id}
-                className="group relative bg-card rounded-lg overflow-hidden border border-border hover:border-primary transition-all hover:shadow-md"
+                className="group relative bg-card rounded-lg overflow-hidden border border-border hover:border-primary transition-all hover:shadow-md cursor-pointer"
                 onClick={(e) => handleProductClick(e, product.postId)}
-
               >
                 <div className="p-3">
                   <div className="relative w-full overflow-hidden rounded-xl bg-gray-50 aspect-square">
@@ -565,8 +581,6 @@ export default function ProductsPage() {
         {/* Add extra space at the bottom to ensure scrolling is possible */}
         <div className="h-[500px]"></div>
       </div>
-     
-      
     </ErrorBoundary>
   )
 }
