@@ -85,26 +85,14 @@ export default function Products() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Dashboard Header Strip */}
-      <div className="w-full bg-[rgb(25,74,149)] py-4 px-6 shadow-md">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <h1 className="text-white text-xl font-medium">Evershine Dashboard</h1>
-          <button
-            onClick={() => router.push("https://evershine-two.vercel.app/")}
-            className="flex items-center text-white hover:text-gray-200 transition-colors"
-          >
-            <Home className="h-5 w-5" />
-            <span className="ml-2">Home</span>
-          </button>
-        </div>
-      </div>
+
 
       {/* Back Button Header */}
       <div className="sticky top-0 z-10 bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
           <div className="py-4">
             <button
-              onClick={() => router.push("https://evershine-two.vercel.app/")}
+              onClick={() => router.push("https://evershine-agent.vercel.app/admin/dashboard")}
               className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
             >
               <ArrowLeft className="h-6 w-6" />
