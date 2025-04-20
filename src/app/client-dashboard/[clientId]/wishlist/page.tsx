@@ -6,10 +6,21 @@ import Image from "next/image"
 import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input" // Added Input import
-import { Loader2, AlertCircle, Heart, ShoppingCart, Trash2, ArrowLeft, RefreshCw, Minus, Plus } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Loader2, AlertCircle, Heart, ShoppingCart, Trash2, ArrowLeft, RefreshCw } from 'lucide-react'
 import { useToast } from "@/components/ui/use-toast"
 import { ErrorBoundary } from "@/components/error-boundary"
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 interface WishlistItem {
   _id: string
@@ -47,8 +58,9 @@ export default function WishlistPage() {
   const [imageError, setImageError] = useState<Record<string, boolean>>({})
   const [cart, setCart] = useState<string[]>([])
   const [refreshing, setRefreshing] = useState(false)
+  const [clearingWishlist, setClearingWishlist] = useState(false)
   const [debugInfo, setDebugInfo] = useState<any>(null)
-  // Add state for quantities
+  // Add state for quantities with default of 100
   const [quantities, setQuantities] = useState<Record<string, number>>({})
 
   // Fetch all products to get complete product details
@@ -128,20 +140,20 @@ export default function WishlistPage() {
         if (wishlistProducts.length > 0) {
           setWishlistItems(wishlistProducts)
 
-          // Initialize quantities for each product
+          // Initialize quantities for each product with 100
           const initialQuantities: Record<string, number> = {}
           wishlistProducts.forEach((product) => {
-            initialQuantities[product.postId] = 1
+            initialQuantities[product.postId] = 1000
           })
           setQuantities(initialQuantities)
         } else {
           // Fallback to original wishlist items if no matches found
           setWishlistItems(data.data.items)
 
-          // Initialize quantities for each product
+          // Initialize quantities for each product with 100
           const initialQuantities: Record<string, number> = {}
           data.data.items.forEach((item: any) => {
-            initialQuantities[item.postId] = 1
+            initialQuantities[item.postId] = 1000
           })
           setQuantities(initialQuantities)
         }
@@ -160,10 +172,10 @@ export default function WishlistPage() {
           if (wishlistProducts.length > 0) {
             setWishlistItems(wishlistProducts)
 
-            // Initialize quantities for each product
+            // Initialize quantities for each product with 100
             const initialQuantities: Record<string, number> = {}
             wishlistProducts.forEach((product) => {
-              initialQuantities[product.postId] = 1
+              initialQuantities[product.postId] = 1000
             })
             setQuantities(initialQuantities)
           } else {
@@ -178,10 +190,10 @@ export default function WishlistPage() {
             }))
             setWishlistItems(placeholderItems)
 
-            // Initialize quantities for each product
+            // Initialize quantities for each product with 100
             const initialQuantities: Record<string, number> = {}
             placeholderItems.forEach((item) => {
-              initialQuantities[item.postId] = 1
+              initialQuantities[item.postId] = 1000
             })
             setQuantities(initialQuantities)
           }
@@ -208,10 +220,10 @@ export default function WishlistPage() {
           if (wishlistProducts.length > 0) {
             setWishlistItems(wishlistProducts)
 
-            // Initialize quantities for each product
+            // Initialize quantities for each product with 100
             const initialQuantities: Record<string, number> = {}
             wishlistProducts.forEach((product) => {
-              initialQuantities[product.postId] = 1
+              initialQuantities[product.postId] = 1000
             })
             setQuantities(initialQuantities)
           } else {
@@ -226,10 +238,10 @@ export default function WishlistPage() {
             }))
             setWishlistItems(placeholderItems)
 
-            // Initialize quantities for each product
+            // Initialize quantities for each product with 100
             const initialQuantities: Record<string, number> = {}
             placeholderItems.forEach((item) => {
-              initialQuantities[item.postId] = 1
+              initialQuantities[item.postId] = 1000
             })
             setQuantities(initialQuantities)
           }
@@ -264,6 +276,59 @@ export default function WishlistPage() {
     setRefreshing(true)
     await loadWishlist()
     setRefreshing(false)
+  }
+
+  // Handle clearing the entire wishlist
+  const handleClearWishlist = async () => {
+    if (wishlistItems.length === 0) return
+
+    setClearingWishlist(true)
+    try {
+      const token = localStorage.getItem("clientImpersonationToken")
+
+      if (!token) {
+        throw new Error("No authentication token found. Please refresh the page and try again.")
+      }
+
+      // First, update local state for immediate UI feedback
+      const itemsToRemove = [...wishlistItems]
+      setWishlistItems([])
+
+      // Update localStorage
+      localStorage.setItem("wishlist", JSON.stringify([]))
+
+      // Then make API calls to remove each item
+      const promises = itemsToRemove.map(item => 
+        fetch("https://evershinebackend-2.onrender.com/api/deleteUserWishlistItem", {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ productId: item.postId }),
+        })
+      )
+
+      await Promise.allSettled(promises)
+
+      toast({
+        title: "Wishlist cleared",
+        description: "All items have been removed from your wishlist",
+        variant: "default",
+      })
+    } catch (err: any) {
+      console.error("Error clearing wishlist:", err)
+      toast({
+        title: "Error",
+        description: err.message || "Failed to clear wishlist. Please try again.",
+        variant: "destructive",
+      })
+      
+      // Reload wishlist to get current state
+      loadWishlist()
+    } finally {
+      setClearingWishlist(false)
+    }
   }
 
   // Handle removing item from wishlist
@@ -338,26 +403,10 @@ export default function WishlistPage() {
   // Handle quantity change
   const handleQuantityChange = (postId: string, value: string) => {
     // Convert to number and ensure it's positive
-    const numValue = Math.max(1, Number.parseInt(value) || 1)
+    const numValue = Math.max(1, Number.parseInt(value) || 1000)
     setQuantities((prev) => ({
       ...prev,
       [postId]: numValue,
-    }))
-  }
-
-  // Increment quantity
-  const incrementQuantity = (postId: string) => {
-    setQuantities((prev) => ({
-      ...prev,
-      [postId]: (prev[postId] || 1) + 1,
-    }))
-  }
-
-  // Decrement quantity
-  const decrementQuantity = (postId: string) => {
-    setQuantities((prev) => ({
-      ...prev,
-      [postId]: Math.max(1, (prev[postId] || 1) - 1),
     }))
   }
 
@@ -381,7 +430,7 @@ export default function WishlistPage() {
       }
 
       // Get the quantity for this product
-      const quantity = quantities[postId] || 1
+      const quantity = quantities[postId] || 1000
 
       // Make a single API call with the quantity
       const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
@@ -472,6 +521,42 @@ export default function WishlistPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Clear Wishlist Button with Confirmation */}
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  disabled={clearingWishlist || wishlistItems.length === 0}
+                  className="text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600"
+                >
+                  {clearingWishlist ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Trash2 className="h-4 w-4 mr-2" />
+                  )}
+                  Clear Wishlist
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Clear your wishlist?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will remove all items from your wishlist. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction 
+                    onClick={handleClearWishlist}
+                    className="bg-red-500 text-white hover:bg-red-600"
+                  >
+                    Clear Wishlist
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
             <Button
               variant="outline"
               size="icon"
@@ -582,10 +667,10 @@ export default function WishlistPage() {
 
                   <div className="p-4">
                     <h3 className="font-semibold text-lg text-foreground line-clamp-1">{item.name}</h3>
-                    <p className="text-lg font-bold mt-2">₹{item.price.toLocaleString()}</p>
+                    <p className="text-lg font-bold mt-2">₹{item.price.toLocaleString()}/sqft</p>
                     <p className="text-sm text-muted-foreground mt-1">{item.category}</p>
 
-                    {/* Quantity input */}
+                    {/* Quantity input - simplified without +/- buttons */}
                     <div className="mt-4 mb-2">
                       <label
                         htmlFor={`quantity-${item.postId}`}
@@ -593,35 +678,14 @@ export default function WishlistPage() {
                       >
                         Quantity:
                       </label>
-                      <div className="flex items-center">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => decrementQuantity(item.postId)}
-                          disabled={quantities[item.postId] <= 1}
-                        >
-                          <Minus className="h-3 w-3" />
-                        </Button>
-                        <Input
-                          id={`quantity-${item.postId}`}
-                          type="number"
-                          min="1"
-                          value={quantities[item.postId] || 1}
-                          onChange={(e) => handleQuantityChange(item.postId, e.target.value)}
-                          className="h-8 w-20 mx-2 text-center"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => incrementQuantity(item.postId)}
-                        >
-                          <Plus className="h-3 w-3" />
-                        </Button>
-                      </div>
+                      <Input
+                        id={`quantity-${item.postId}`}
+                        type="number"
+                        min="1"
+                        value={quantities[item.postId] || 1000}
+                        onChange={(e) => handleQuantityChange(item.postId, e.target.value)}
+                        className="h-8 w-full text-center"
+                      />
                     </div>
 
                     <button
