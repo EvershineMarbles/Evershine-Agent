@@ -27,13 +27,13 @@ export default function Home() {
 
           <Link href="/register-agent" className="w-full">
             <Button className="w-full h-24 text-lg font-medium bg-coral hover:bg-coral/90 text-white rounded-lg">
-              Register New Agent
+              Register New Advisor
             </Button>
           </Link>
 
           <Link href="/agent-login" className="w-full">
             <Button className="w-full h-24 text-lg font-medium bg-blue hover:bg-blue/90 text-white rounded-lg">
-              Agent Login
+             Advisor Login
             </Button>
           </Link>
         </div>

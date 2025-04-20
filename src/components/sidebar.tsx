@@ -66,7 +66,7 @@ export function IconSidebar({ clientId }: IconSidebarProps) {
 
       <div className="mt-auto mb-4">
         <hr className="sidebar-hr my-2" />
-        <Link href="/" className="sidebar-icon relative group">
+        <Link href="/agent-login" className="sidebar-icon relative group">
           <LogOut size={24} />
           <div className="tooltip-wrapper">Logout</div>
         </Link>

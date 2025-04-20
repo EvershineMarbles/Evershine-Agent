@@ -77,7 +77,7 @@ export default function LoginPage() {
           <div className="flex justify-center mb-6">
             <Image src="/logo.png" alt="Evershine Logo" width={180} height={100} priority />
           </div>
-          <CardTitle className="text-2xl font-bold text-blue">Agent Login</CardTitle>
+          <CardTitle className="text-2xl font-bold text-blue">Advisor Login</CardTitle>
           <CardDescription>Enter your credentials to access the dashboard</CardDescription>
         </CardHeader>
         <CardContent>
