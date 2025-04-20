@@ -471,7 +471,8 @@ export default function ProductsPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredProducts.map((product) => (
-              <div
+              <Link
+                href={`/client-dashboard/${clientId}/product/${product.postId}`}
                 key={product._id}
                 className="group relative bg-card rounded-lg overflow-hidden border border-border hover:border-primary transition-all hover:shadow-md"
               >
@@ -511,37 +512,8 @@ export default function ProductsPage() {
                   <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
                   <p className="text-lg font-bold mt-2">₹{product.price.toLocaleString()}/sqt</p>
                   <p className="text-sm text-muted-foreground mt-1">{product.category}</p>
-
-                  <button
-                    onClick={(e) => toggleWishlist(e, product.postId)}
-                    className={`mt-4 w-full py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2
-                              ${
-                                wishlist.includes(product.postId)
-                                  ? "bg-gray-100 text-gray-600 border border-gray-200"
-                                  : addingToWishlist[product.postId]
-                                    ? "bg-gray-200 text-gray-700"
-                                    : "bg-primary hover:bg-primary/90 text-primary-foreground"
-                              } 
-                              transition-colors`}
-                    disabled={addingToWishlist[product.postId]}
-                    type="button"
-                  >
-                    {addingToWishlist[product.postId] ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                    ) : wishlist.includes(product.postId) ? (
-                      <>
-                        <Heart className="h-4 w-4 fill-gray-500 mr-1" />
-                        Added to Wishlist
-                      </>
-                    ) : (
-                      <>
-                        <Heart className="h-4 w-4 mr-1" />
-                        Add to Wishlist
-                      </>
-                    )}
-                  </button>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}
