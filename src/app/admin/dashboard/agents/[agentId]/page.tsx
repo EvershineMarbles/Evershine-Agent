@@ -107,15 +107,6 @@ export default function AgentDetailsPage() {
       <div className="flex flex-col">
         <div className="flex flex-col mb-6">
           <h1 className="text-2xl md:text-3xl font-bold mb-4">Advisor Details</h1>
-
-          <div className="relative w-full mb-4">
-            <Input
-              type="text"
-              placeholder="Search by client name, product, sales agent..."
-              className="pl-10 py-2 pr-4 border rounded-md w-full"
-            />
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-          </div>
         </div>
 
         {error && (
