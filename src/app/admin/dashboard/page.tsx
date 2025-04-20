@@ -174,15 +174,15 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
         </div>
- {/* Action Buttons - First Row */}
+ {/* Action Buttons - Firs Row */}
  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <Link href="./register-client" className="w-full">
+              <Link href="../register-client" className="w-full">
                 <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-12 text-lg font-normal w-full rounded-md">
                   Register New Client
                 </Button>
               </Link>
 
-              <Link href="./scan-qr" className="w-full">
+              <Link href="../scan-qr" className="w-full">
                 <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-12 text-lg font-normal w-full rounded-md">
                   Scan QR Code
                 </Button>
