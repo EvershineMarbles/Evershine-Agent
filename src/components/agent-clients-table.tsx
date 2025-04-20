@@ -14,9 +14,6 @@ interface Client {
   name: string
   mobile: string
   clientId: string
-  email?: string
-  city?: string
-  profession?: string
   createdAt: string
 }
 
@@ -70,8 +67,6 @@ export default function AgentClientsTable({ agentEmail, agentName }: AgentClient
     (client) =>
       client.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       client.mobile?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.city?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       client.clientId?.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
@@ -145,9 +140,7 @@ export default function AgentClientsTable({ agentEmail, agentName }: AgentClient
                   >
                     <TableCell className="font-medium">{client.name}</TableCell>
                     <TableCell>{client.mobile}</TableCell>
-                    <TableCell>{client.email || "-"}</TableCell>
-                    <TableCell>{client.city || "-"}</TableCell>
-                    <TableCell>{client.profession || "-"}</TableCell>
+          
                     <TableCell>{formatDate(client.createdAt)}</TableCell>
                     <TableCell className="text-right">
                       <Button
