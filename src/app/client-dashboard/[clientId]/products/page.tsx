@@ -424,6 +424,20 @@ export default function ProductsPage() {
     )
   }
 
+    // Add this function to handle product card clicks
+    const handleProductClick = (e: React.MouseEvent, productId: string) => {
+      // Check if the click was on a button or its children
+      const target = e.target as HTMLElement
+      if (target.closest("button")) {
+        // If clicked on a button, don't navigate
+        e.preventDefault()
+        return
+      }
+  
+      // Otherwise, allow navigation to proceed
+      router.push(`/client-dashboard/${clientId}/product/${productId}`)
+    }
+
   return (
     <ErrorBoundary>
       <div className="p-6 md:p-8">
@@ -497,6 +511,8 @@ export default function ProductsPage() {
               <div
                 key={product._id}
                 className="group relative bg-card rounded-lg overflow-hidden border border-border hover:border-primary transition-all hover:shadow-md"
+                onClick={(e) => handleProductClick(e, product.postId)}
+
               >
                 <div className="p-3">
                   <div className="relative w-full overflow-hidden rounded-xl bg-gray-50 aspect-square">
