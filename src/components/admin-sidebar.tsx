@@ -12,22 +12,22 @@ export function AdminSidebar() {
   const routes = [
     {
       name: "Dashboard",
-      href: "/admin",
+      href: "/admin/dashboard",
       icon: Home,
     },
     {
       name: "Advisors",
-      href: "/admin/agents",
+      href: "/admin/dashboard/agents",
       icon: UserCog,
     },
     {
       name: "Clients",
-      href: "/admin/all-clients",
+      href: "/admin/dashboard/all-clients",
       icon: Users,
     },
     {
       name: "Products",
-      href: "/admin/products",
+      href: "/admin/dashboard/products",
       icon: Package,
     },
   ]
