@@ -14,7 +14,15 @@ interface Client {
   mobile: string
   clientId: string
   agentAffiliated?: string
+  city?: string
+  profession?: string
   createdAt: string
+}
+
+interface Agent {
+  _id: string
+  email: string
+  name: string
 }
 
 // Function to fetch all clients
@@ -27,13 +35,16 @@ const getAllClients = async () => {
       return { success: false, message: "No authentication token found" }
     }
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/admin/clients`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"}/api/admin/clients`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
       },
-    })
+    )
 
     if (!response.ok) {
       throw new Error(`API error: ${response.status} ${response.statusText}`)
@@ -59,42 +70,100 @@ const getAllClients = async () => {
   }
 }
 
+// Function to fetch all agents
+const getAllAgents = async () => {
+  try {
+    // Get the token
+    const token = localStorage.getItem("admin_token")
+
+    if (!token) {
+      return { success: false, message: "No authentication token found" }
+    }
+
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"}/api/admin/agents`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      },
+    )
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status} ${response.statusText}`)
+    }
+
+    const data = await response.json()
+
+    if (data.success && data.data) {
+      return {
+        success: true,
+        agents: data.data.agents || [],
+      }
+    } else {
+      throw new Error(data.message || "Failed to fetch agents")
+    }
+  } catch (error: any) {
+    console.error("Error fetching agents:", error)
+    return {
+      success: false,
+      message: error.message || "An error occurred while fetching agents",
+      agents: [],
+    }
+  }
+}
+
 export default function ClientTable() {
   const [clients, setClients] = useState<Client[]>([])
+  const [agents, setAgents] = useState<Agent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
 
-  const fetchClients = async () => {
+  const fetchData = async () => {
     setLoading(true)
     setError(null)
 
     try {
-      const response = await getAllClients()
+      // Fetch clients and agents in parallel
+      const [clientsResponse, agentsResponse] = await Promise.all([getAllClients(), getAllAgents()])
 
-      if (response.success) {
-        setClients(response.clients)
+      if (clientsResponse.success && agentsResponse.success) {
+        setClients(clientsResponse.clients)
+        setAgents(agentsResponse.agents)
       } else {
-        setError(response.message || "Failed to fetch clients")
+        setError(clientsResponse.message || agentsResponse.message || "Failed to fetch data")
       }
     } catch (err: any) {
-      console.error("Error fetching clients:", err)
-      setError(err.message || "An error occurred while fetching clients")
+      console.error("Error fetching data:", err)
+      setError(err.message || "An error occurred while fetching data")
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchClients()
+    fetchData()
   }, [])
+
+  // Get agent name from email
+  const getAgentName = (agentEmail?: string) => {
+    if (!agentEmail) return "-"
+
+    const agent = agents.find((a) => a.email === agentEmail)
+    return agent ? agent.name : agentEmail
+  }
 
   // Filter clients based on search query
   const filteredClients = clients.filter(
     (client) =>
       client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       client.mobile.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.clientId.toLowerCase().includes(searchQuery.toLowerCase()),
+      client.clientId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (client.city && client.city.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (client.profession && client.profession.toLowerCase().includes(searchQuery.toLowerCase())),
   )
 
   // Format date
@@ -121,7 +190,7 @@ export default function ClientTable() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <Button variant="outline" size="icon" onClick={fetchClients} disabled={loading}>
+          <Button variant="outline" size="icon" onClick={fetchData} disabled={loading}>
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
           <Button>
@@ -137,7 +206,7 @@ export default function ClientTable() {
         ) : error ? (
           <div className="flex flex-col items-center justify-center h-64">
             <p className="text-red-500 mb-4">{error}</p>
-            <Button onClick={fetchClients}>Retry</Button>
+            <Button onClick={fetchData}>Retry</Button>
           </div>
         ) : filteredClients.length === 0 ? (
           <div className="text-center py-8">
@@ -151,9 +220,6 @@ export default function ClientTable() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Mobile</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>City</TableHead>
-                  <TableHead>Profession</TableHead>
                   <TableHead>Agent</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -166,13 +232,14 @@ export default function ClientTable() {
                     <TableCell>
                       {client.agentAffiliated ? (
                         <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                          {client.agentAffiliated}
+                          {getAgentName(client.agentAffiliated)}
                         </Badge>
                       ) : (
                         "-"
                       )}
                     </TableCell>
-                    <TableCell>{formatDate(client.createdAt)}</TableCell>
+                    <TableCell>{client.city || "-"}</TableCell>
+                    <TableCell>{client.profession || "-"}</TableCell>
                     <TableCell className="text-right">
                       <Button variant="outline" size="sm" className="mr-2">
                         View
