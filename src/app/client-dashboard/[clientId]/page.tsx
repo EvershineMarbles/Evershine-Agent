@@ -471,8 +471,7 @@ export default function ProductsPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredProducts.map((product) => (
-              <Link
-                href={`/client-dashboard/${clientId}/product/${product.postId}`}
+              <div
                 key={product._id}
                 className="group relative bg-card rounded-lg overflow-hidden border border-border hover:border-primary transition-all hover:shadow-md"
               >
@@ -512,8 +511,37 @@ export default function ProductsPage() {
                   <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
                   <p className="text-lg font-bold mt-2">₹{product.price.toLocaleString()}/sqt</p>
                   <p className="text-sm text-muted-foreground mt-1">{product.category}</p>
+
+                  <button
+                    onClick={(e) => toggleWishlist(e, product.postId)}
+                    className={`mt-4 w-full py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2
+                              ${
+                                wishlist.includes(product.postId)
+                                  ? "bg-gray-100 text-gray-600 border border-gray-200"
+                                  : addingToWishlist[product.postId]
+                                    ? "bg-gray-200 text-gray-700"
+                                    : "bg-primary hover:bg-primary/90 text-primary-foreground"
+                              } 
+                              transition-colors`}
+                    disabled={addingToWishlist[product.postId]}
+                    type="button"
+                  >
+                    {addingToWishlist[product.postId] ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                    ) : wishlist.includes(product.postId) ? (
+                      <>
+                        <Heart className="h-4 w-4 fill-gray-500 mr-1" />
+                        Added to Wishlist
+                      </>
+                    ) : (
+                      <>
+                        <Heart className="h-4 w-4 mr-1" />
+                        Add to Wishlist
+                      </>
+                    )}
+                  </button>
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
         )}
@@ -521,36 +549,8 @@ export default function ProductsPage() {
         {/* Add extra space at the bottom to ensure scrolling is possible */}
         <div className="h-[500px]"></div>
       </div>
-
-      {/* Use the BackToTop component */}
-
-      {/* Fallback button that's always visible for testing */}
-      <button
-        id="debug-back-to-top"
-        onClick={() => {
-          console.log("Debug button clicked")
-          window.scrollTo({ top: 0, behavior: "smooth" })
-        }}
-        style={{
-          position: "fixed",
-          bottom: "80px",
-          right: "24px",
-          backgroundColor: "#00ff00", // Bright green
-          color: "black",
-          borderRadius: "9999px",
-          width: "48px",
-          height: "48px",
-          border: "2px solid black",
-          boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          zIndex: "9999",
-        }}
-      >
-        ↑
-      </button>
+     
+      
     </ErrorBoundary>
   )
 }
