@@ -13,9 +13,6 @@ interface Client {
   name: string
   mobile: string
   clientId: string
-  email?: string
-  city?: string
-  profession?: string
   agentAffiliated?: string
   createdAt: string
 }
@@ -97,8 +94,6 @@ export default function ClientTable() {
     (client) =>
       client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       client.mobile.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (client.email && client.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (client.city && client.city.toLowerCase().includes(searchQuery.toLowerCase())) ||
       client.clientId.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
@@ -160,7 +155,6 @@ export default function ClientTable() {
                   <TableHead>City</TableHead>
                   <TableHead>Profession</TableHead>
                   <TableHead>Agent</TableHead>
-                  <TableHead>Created At</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -169,9 +163,6 @@ export default function ClientTable() {
                   <TableRow key={client._id}>
                     <TableCell className="font-medium">{client.name}</TableCell>
                     <TableCell>{client.mobile}</TableCell>
-                    <TableCell>{client.email || "-"}</TableCell>
-                    <TableCell>{client.city || "-"}</TableCell>
-                    <TableCell>{client.profession || "-"}</TableCell>
                     <TableCell>
                       {client.agentAffiliated ? (
                         <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
