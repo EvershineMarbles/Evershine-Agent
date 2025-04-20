@@ -83,7 +83,7 @@ export default function Dashboard() {
 
   const handleLogout = () => {
     clearAllTokens()
-    router.push("/")
+    router.push("/agent-login")
   }
 
   if (isLoading && clients.length === 0) {
@@ -176,7 +176,7 @@ export default function Dashboard() {
 
           <button
             className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg"
-            onClick={() => router.push("/scan")}
+            onClick={() => router.push("/scan-qr")}
           >
             <QrCode className="h-6 w-6" />
             <span className="text-base font-medium">Scan QR</span>
