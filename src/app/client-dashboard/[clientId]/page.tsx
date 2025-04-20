@@ -525,7 +525,7 @@ export default function ProductsPage() {
 
                 <div className="p-4">
                   <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
-                  <p className="text-lg font-bold mt-2">₹{product.price.toLocaleString()}/sqt</p>
+                  <p className="text-lg font-bold mt-2">₹{product.price.toLocaleString()}/sqft</p>
                   <p className="text-sm text-muted-foreground mt-1">{product.category}</p>
 
                   <button

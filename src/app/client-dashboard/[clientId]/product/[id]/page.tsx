@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import axios, { AxiosError } from "axios"
@@ -163,7 +165,8 @@ export default function ProductDetail() {
     }
   }
 
-  const toggleWishlist = async () => {
+  const toggleWishlist = async (e: React.MouseEvent) => {
+    e.preventDefault()
     if (!product || !clientId) return
 
     try {
@@ -176,15 +179,13 @@ export default function ProductDetail() {
 
       if (inWishlist) {
         // Remove from wishlist
-        const response = await fetch(`${API_URL}/api/removeFromWishlist`, {
-          method: "POST",
+        const response = await fetch(`${API_URL}/api/deleteUserWishlistItem`, {
+          method: "DELETE",
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            productId: product.postId,
-          }),
+          body: JSON.stringify({ productId: product.postId }),
         })
 
         if (!response.ok) {
@@ -249,7 +250,11 @@ export default function ProductDetail() {
           title: "Added to wishlist",
           description: `${product.name} has been added to your wishlist.`,
           action: (
-            <ToastAction altText="View wishlist" onClick={() => router.push(`/client-dashboard/${clientId}/wishlist`)}>
+            <ToastAction
+              altText="View wishlist"
+              onClick={() => router.push(`/client-dashboard/${clientId}/wishlist`)}
+              className="bg-[#194a95] text-white hover:bg-[#0f3a7a]"
+            >
               View Wishlist
             </ToastAction>
           ),
@@ -466,15 +471,14 @@ export default function ProductDetail() {
               <Button
                 onClick={toggleWishlist}
                 disabled={wishlistLoading}
-                variant={inWishlist ? "secondary" : "outline"}
                 className={`px-8 py-3 rounded-md flex items-center gap-2 ${
                   inWishlist
                     ? "bg-gray-200 hover:bg-gray-300 text-gray-700"
-                    : "border-[#194a95] text-[#194a95] hover:bg-[#194a95] hover:text-white"
+                    : "bg-[#194a95] hover:bg-[#0f3a7a] text-white"
                 }`}
               >
-                <Heart className="w-4 h-4" />
-                {wishlistLoading ? "Processing..." : inWishlist ? "Remove from Wishlist" : "Add to Wishlist"}
+                <Heart className={`w-4 h-4 ${inWishlist ? "fill-current" : ""}`} />
+                {wishlistLoading ? "Processing..." : "Add to Wishlist"}
               </Button>
             </div>
           </div>
