@@ -41,7 +41,7 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
       <div className="w-[125px] bg-black text-white flex flex-col">
         {/* Logo */}
         <div className="p-4 flex justify-center items-center">
-          <Image src="/logo.png" alt="Evershine Logo" width={90} height={90} className="mb-6" />
+          <Image src="/logo2.png" alt="Evershine Logo" width={90} height={90} className="mb-6" />
         </div>
 
         {/* Navigation */}
