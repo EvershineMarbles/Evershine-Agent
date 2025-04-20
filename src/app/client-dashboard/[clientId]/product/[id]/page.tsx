@@ -1,505 +1,569 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import type React from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
-import axios, { AxiosError } from "axios"
-import { ArrowLeft, ChevronLeft, ChevronRight, Download, Loader2, Trash2 } from "lucide-react"
+import Link from "next/link"
+import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode } from "lucide-react"
 import Image from "next/image"
-import { Button } from "@/components/ui/button"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { Badge } from "@/components/ui/badge"
+import { useToast } from "@/components/ui/use-toast"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { ErrorBoundary } from "@/components/error-boundary"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-
+// Define the Product interface
 interface Product {
   _id: string
   name: string
   price: number
-  category: string
-  applicationAreas: string | string[]
-  description: string
   image: string[]
   postId: string
-  quantityAvailable: number
-  size?: string
-  numberOfPieces?: number | null
-  thickness?: string
+  category: string
+  description: string
+  status?: "draft" | "pending" | "approved"
+  applicationAreas?: string
+  quantityAvailable?: number
 }
 
-interface ApiResponse {
-  success: boolean
-  data?: Product[]
-  msg?: string
-}
+export default function ProductsPage() {
+  console.log("ProductsPage rendering")
 
-// Add this enhanced debugging function at the top of the component, before the useEffect
-const debugProductData = (data: any) => {
-  console.log("========== PRODUCT DATA DEBUGGING ==========")
-  console.log("Raw product data:", JSON.stringify(data, null, 2))
-
-  // Detailed logging for size
-  console.log("SIZE FIELD:")
-  console.log("  Value:", data.size)
-  console.log("  Type:", typeof data.size)
-  console.log("  Is empty string:", data.size === "")
-  console.log("  Is null:", data.size === null)
-  console.log("  Is undefined:", data.size === undefined)
-  console.log("  Property exists:", Object.prototype.hasOwnProperty.call(data, "size"))
-
-  // Detailed logging for numberOfPieces
-  console.log("NUMBER OF PIECES FIELD:")
-  console.log("  Value:", data.numberOfPieces)
-  console.log("  Type:", typeof data.numberOfPieces)
-  console.log("  Is zero:", data.numberOfPieces === 0)
-  console.log("  Is null:", data.numberOfPieces === null)
-  console.log("  Is undefined:", data.numberOfPieces === undefined)
-  console.log("  Property exists:", Object.prototype.hasOwnProperty.call(data, "numberOfPieces"))
-
-  // Detailed logging for thickness
-  console.log("THICKNESS FIELD:")
-  console.log("  Value:", data.thickness)
-  console.log("  Type:", typeof data.thickness)
-  console.log("  Is empty string:", data.thickness === "")
-  console.log("  Is null:", data.thickness === null)
-  console.log("  Is undefined:", data.thickness === undefined)
-  console.log("  Property exists:", Object.prototype.hasOwnProperty.call(data, "thickness"))
-
-  console.log("All keys in product object:", Object.keys(data))
-  console.log("=========================================")
-}
-
-export default function ProductDetail() {
+  // Use the useParams hook to get the clientId
   const params = useParams()
   const router = useRouter()
-  const [product, setProduct] = useState<Product | null>(null)
+  const clientId = params.clientId as string
+
+  const { toast } = useToast()
+  const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string>("")
-  const [currentImageIndex, setCurrentImageIndex] = useState(0)
-  const [selectedThumbnail, setSelectedThumbnail] = useState(0)
-  const [imageLoadError, setImageLoadError] = useState<boolean[]>([])
-  const [isDeleting, setIsDeleting] = useState(false)
-  const [qrCodeUrl, setQrCodeUrl] = useState<string>("")
+  const [searchQuery, setSearchQuery] = useState("")
+  const [imageError, setImageError] = useState<Record<string, boolean>>({})
+  // Wishlist and cart state
+  const [wishlist, setWishlist] = useState<string[]>([])
+  const [cart, setCart] = useState<string[]>([])
+  const [addingToCart, setAddingToCart] = useState<Record<string, boolean>>({})
+  const [addingToWishlist, setAddingToWishlist] = useState<Record<string, boolean>>({})
+  const [error, setError] = useState<string | null>(null)
+  const [clientData, setClientData] = useState<any>(null)
 
-  // Update the useEffect to use this enhanced debugging
+  // Debug scroll event
   useEffect(() => {
-    const fetchProduct = async () => {
+    console.log("Setting up scroll debug in ProductsPage")
+    const logScroll = () => {
+      console.log("Scroll event detected in ProductsPage, window.scrollY:", window.scrollY)
+    }
+
+    window.addEventListener("scroll", logScroll)
+    return () => window.removeEventListener("scroll", logScroll)
+  }, [])
+
+  // Load wishlist and cart from localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
       try {
-        setLoading(true)
-        setError("")
-
-        if (!params.id) {
-          throw new Error("Product ID is missing")
+        const savedWishlist = localStorage.getItem("wishlist")
+        if (savedWishlist) {
+          setWishlist(JSON.parse(savedWishlist))
         }
 
-        const response = await axios.get<ApiResponse>(`${API_URL}/api/getPostDataById`, {
-          params: { id: params.id },
-        })
-
-        if (response.data.success && response.data.data?.[0]) {
-          const productData = response.data.data[0]
-          console.log("Product data received from API:", JSON.stringify(productData, null, 2))
-          debugProductData(productData)
-
-          // Add missing fields if they don't exist
-          const processedProduct = {
-            ...productData,
-            size: productData.size !== undefined ? productData.size : "",
-            numberOfPieces: productData.numberOfPieces !== undefined ? productData.numberOfPieces : null,
-            thickness: productData.thickness !== undefined ? productData.thickness : "",
-          }
-
-          console.log("Processed product with added fields:", processedProduct)
-
-          setProduct(processedProduct)
-          setImageLoadError(new Array(productData.image.length).fill(false))
-        } else {
-          throw new Error(response.data.msg || "No data found")
+        const savedCart = localStorage.getItem("cart")
+        if (savedCart) {
+          setCart(JSON.parse(savedCart))
         }
-      } catch (error) {
-        let errorMessage = "Error fetching product"
-
-        if (error instanceof AxiosError) {
-          errorMessage = error.response?.data?.msg || error.message
-        } else if (error instanceof Error) {
-          errorMessage = error.message
-        }
-
-        console.error("Error fetching product:", error)
-        setError(errorMessage)
-      } finally {
-        setLoading(false)
+      } catch (e) {
+        console.error("Error loading data from localStorage:", e)
       }
     }
+  }, [])
 
-    fetchProduct()
-  }, [params.id])
+  // Save wishlist and cart to localStorage whenever they change
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("wishlist", JSON.stringify(wishlist))
+      localStorage.setItem("cart", JSON.stringify(cart))
+    }
+  }, [wishlist, cart])
 
-  const handleDelete = async () => {
+  // Fetch products function
+  const fetchProducts = useCallback(async () => {
     try {
-      setIsDeleting(true)
-      const response = await axios.delete(`${API_URL}/api/deleteProduct/${product?.postId}`)
+      setLoading(true)
+      setError(null)
 
-      if (response.data.success) {
-        router.push("/products")
+      // Use environment variable if available, otherwise use a default URL
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
+      console.log("Fetching products from:", `${apiUrl}/api/getAllProducts`)
+
+      const response = await fetch(`${apiUrl}/api/getAllProducts`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        // Add a timeout to prevent long waiting times
+        signal: AbortSignal.timeout(8000), // 8 second timeout
+      })
+
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      if (data.success && Array.isArray(data.data)) {
+        console.log("Products fetched successfully:", data.data)
+
+        // Filter out products with missing or invalid postId
+        const validProducts = data.data.filter(
+          (product: Product) => product.postId && typeof product.postId === "string",
+        )
+
+        if (validProducts.length < data.data.length) {
+          console.warn(`Filtered out ${data.data.length - validProducts.length} products with invalid postId`)
+        }
+
+        // Process the image URLs to ensure they're valid
+        const processedProducts = validProducts.map((product: Product) => ({
+          ...product,
+          image:
+            Array.isArray(product.image) && product.image.length > 0
+              ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
+              : ["/placeholder.svg"],
+        }))
+
+        setProducts(processedProducts)
       } else {
-        throw new Error(response.data.msg || "Failed to delete product")
+        throw new Error(data.msg || "Invalid API response format")
       }
-    } catch (error) {
-      let errorMessage = "Error deleting product"
-      if (error instanceof AxiosError) {
-        errorMessage = error.response?.data?.msg || error.message
-      } else if (error instanceof Error) {
-        errorMessage = error.message
-      }
+    } catch (error: any) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to load products"
+      console.error("Error fetching products:", error)
       setError(errorMessage)
+
+      // Show error toast
+      toast({
+        title: "Error fetching products",
+        description: "Could not load products from the server. Please try again later.",
+        variant: "destructive",
+      })
+
+      // Set empty products array
+      setProducts([])
     } finally {
-      setIsDeleting(false)
+      setLoading(false)
     }
-  }
+  }, [toast])
 
-  useEffect(() => {}, [])
+  // Fetch products on component mount
+  useEffect(() => {
+    fetchProducts()
+  }, [fetchProducts])
 
-  const handleThumbnailClick = (index: number) => {
-    setCurrentImageIndex(index)
-    setSelectedThumbnail(index)
-  }
+  // Update the toggleWishlist function to make an API call instead of just updating local state
+  const toggleWishlist = useCallback(
+    async (e: React.MouseEvent, productId: string) => {
+      e.preventDefault() // Prevent navigation
 
-  const handleImageError = (index: number) => {
-    setImageLoadError((prev) => {
-      const newErrors = [...prev]
-      newErrors[index] = true
-      return newErrors
-    })
-  }
-
-  const nextImage = () => {
-    if (product) {
-      setCurrentImageIndex((prev) => (prev + 1) % product.image.length)
-      setSelectedThumbnail((prev) => (prev + 1) % product.image.length)
-    }
-  }
-
-  const previousImage = () => {
-    if (product) {
-      setCurrentImageIndex((prev) => (prev === 0 ? product.image.length - 1 : prev - 1))
-      setSelectedThumbnail((prev) => (prev === 0 ? product.image.length - 1 : prev - 1))
-    }
-  }
-
-  const generateAndDownloadQR = async () => {
-    try {
-      if (!product) return
-
-      // If we already have a QR code URL, just download it
-      if (qrCodeUrl) {
-        downloadQRCode()
+      // Add validation here
+      if (!productId || typeof productId !== "string") {
+        toast({
+          title: "Error",
+          description: "Invalid product ID. Cannot update wishlist.",
+          variant: "destructive",
+        })
         return
       }
 
-      // Import QRCode dynamically to avoid SSR issues
-      const QRCode = (await import("qrcode")).default
+      // Set loading state for this specific product
+      setAddingToWishlist((prev) => ({ ...prev, [productId]: true }))
 
-      // Generate the product URL
-      const productUrl = `${window.location.origin}/product/${product.postId}`
+      // Optimistically update UI
+      if (wishlist.includes(productId)) {
+        // Remove from wishlist
+        setWishlist((prev) => prev.filter((id) => id !== productId))
+      } else {
+        // Add to wishlist
+        setWishlist((prev) => [...prev, productId])
+      }
 
-      // Generate QR code
-      const qrCodeDataUrl = await QRCode.toDataURL(productUrl, {
-        width: 200,
-        margin: 1,
-        color: {
-          dark: "#000000",
-          light: "#ffffff",
+      try {
+        // Get the token
+        const token = localStorage.getItem("clientImpersonationToken")
+
+        if (!token) {
+          throw new Error("No authentication token found. Please refresh the token using the debug panel above")
+        }
+
+        if (wishlist.includes(productId)) {
+          // Remove from wishlist
+          const response = await fetch("https://evershinebackend-2.onrender.com/api/deleteUserWishlistItem", {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ productId }),
+          })
+
+          if (!response.ok) {
+            throw new Error(`API error: ${response.status} ${response.statusText}`)
+          }
+
+          const data = await response.json()
+
+          if (data.success) {
+            toast({
+              title: "Removed from wishlist",
+              description: "Item has been removed from your wishlist",
+              variant: "default",
+            })
+          } else {
+            throw new Error(data.message || "Failed to remove from wishlist")
+          }
+        } else {
+          // Add to wishlist
+          const response = await fetch("https://evershinebackend-2.onrender.com/api/addToWishlist", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ productId }),
+          })
+
+          if (!response.ok) {
+            throw new Error(`API error: ${response.status} ${response.statusText}`)
+          }
+
+          const data = await response.json()
+
+          if (data.success) {
+            toast({
+              title: "Added to wishlist",
+              description: "Item has been added to your wishlist",
+              variant: "default",
+            })
+          } else {
+            throw new Error(data.message || "Failed to add to wishlist")
+          }
+        }
+      } catch (error: any) {
+        console.error("Error updating wishlist:", error)
+
+        // Revert the optimistic update
+        if (wishlist.includes(productId)) {
+          // We were trying to remove, but failed, so add it back
+          setWishlist((prev) => [...prev, productId])
+        } else {
+          // We were trying to add, but failed, so remove it
+          setWishlist((prev) => prev.filter((id) => id !== productId))
+        }
+
+        toast({
+          title: "Error",
+          description: error.message || "Failed to update wishlist. Please try again.",
+          variant: "destructive",
+        })
+      } finally {
+        setAddingToWishlist((prev) => ({ ...prev, [productId]: false }))
+      }
+    },
+    [wishlist, toast],
+  )
+
+  // Add to cart function
+  const addToCart = async (e: React.MouseEvent, productId: string, productName: string) => {
+    e.preventDefault() // Prevent navigation
+
+    if (cart.includes(productId)) {
+      toast({
+        title: "Already in cart",
+        description: "This item is already in your cart",
+        variant: "default",
+      })
+      return
+    }
+
+    try {
+      // Set loading state for this specific product
+      setAddingToCart((prev) => ({ ...prev, [productId]: true }))
+
+      // Immediately update UI state to show item as added to cart
+      setCart((prev) => [...prev, productId])
+
+      // Update localStorage cart
+      const savedCart = localStorage.getItem("cart")
+      const cartItems = savedCart ? JSON.parse(savedCart) : []
+      localStorage.setItem("cart", JSON.stringify([...cartItems, productId]))
+
+      // Get the token
+      const token = localStorage.getItem("clientImpersonationToken")
+
+      if (!token) {
+        throw new Error("No authentication token found. Please refresh the token and try again.")
+      }
+
+      // Make API request in background
+      const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
+        body: JSON.stringify({ productId }),
       })
 
-      setQrCodeUrl(qrCodeDataUrl)
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`)
+      }
 
-      // Download after generating
-      setTimeout(downloadQRCode, 100)
-    } catch (error) {
-      console.error("Error generating QR code:", error)
+      const data = await response.json()
+
+      if (data.success) {
+        toast({
+          title: "Added to cart",
+          description: `${productName} has been added to your cart`,
+          variant: "default",
+        })
+      } else {
+        throw new Error(data.message || "Failed to add to cart")
+      }
+    } catch (error: any) {
+      // If there was an error, revert the cart state
+      setCart((prev) => prev.filter((id) => id !== productId))
+
+      console.error("Error adding to cart:", error)
+      toast({
+        title: "Error adding to cart",
+        description: error.message || "Failed to add item to cart. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      // Clear loading state
+      setAddingToCart((prev) => ({ ...prev, [productId]: false }))
     }
   }
 
-  const downloadQRCode = () => {
-    if (!qrCodeUrl || !product) return
+  // Filter products based on search query
+  const filteredProducts = products.filter(
+    (product) =>
+      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      product.category.toLowerCase().includes(searchQuery.toLowerCase()),
+  )
 
-    const link = document.createElement("a")
-    link.href = qrCodeUrl
-    link.download = `evershine-product-${product.postId}.png`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+  // Handle image loading errors
+  const handleImageError = useCallback((productId: string) => {
+    console.log("Image error for product:", productId)
+    setImageError((prev) => ({ ...prev, [productId]: true }))
+  }, [])
+
+  // Handle QR code scanning
+  const handleScanQR = () => {
+    router.push(`/client-dashboard/${clientId}/scan`)
   }
 
+  // Fetch client data
+  useEffect(() => {
+    const fetchClientData = async () => {
+      try {
+        const token = localStorage.getItem("clientImpersonationToken")
+        if (!token) return
+
+        const response = await fetch(`https://evershinebackend-2.onrender.com/api/getClientDetails/${clientId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.data) {
+            setClientData(data.data)
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching client data:", error)
+      }
+    }
+
+    fetchClientData()
+  }, [clientId])
+
+  // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#194a95]"></div>
+      <div className="flex flex-col items-center justify-center h-[80vh]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+        <p className="text-muted-foreground">Loading products...</p>
       </div>
     )
   }
 
-  if (error || !product) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="w-full max-w-md p-6 text-center space-y-2">
-          <h2 className="text-xl font-medium text-gray-900">{error || "No data found"}</h2>
-          <p className="text-sm text-gray-500">Product ID: {params.id}</p>
-          <Button onClick={() => router.push("/")} className="mt-4 bg-[#194a95]">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Home
-          </Button>
-        </div>
-      </div>
-    )
-  }
-
-  // Parse application areas safely, handling both string and array types
-  const getApplicationAreas = () => {
-    if (!product.applicationAreas) return []
-
-    if (typeof product.applicationAreas === "string") {
-      return product.applicationAreas
-        .split(",")
-        .filter(Boolean)
-        .map((area) => area.trim())
+  // Add this function to handle product card clicks
+  const handleProductClick = (e: React.MouseEvent, productId: string) => {
+    // Check if the click was on a button or its children
+    const target = e.target as HTMLElement
+    if (target.closest("button")) {
+      // If clicked on a button, don't navigate
+      e.preventDefault()
+      return
     }
 
-    if (Array.isArray(product.applicationAreas)) {
-      return product.applicationAreas
-    }
-
-    return []
-  }
-
-  const applicationAreas = getApplicationAreas()
-
-  // Also add debugging right before rendering
-  if (product) {
-    console.log("========== PRODUCT DATA BEFORE RENDER ==========")
-    console.log("Size:", product.size)
-    console.log("Number of Pieces:", product.numberOfPieces)
-    console.log("Thickness:", product.thickness)
-    console.log("=================================================")
+    // Otherwise, allow navigation to proceed
+    router.push(`/client-dashboard/${clientId}/product/${productId}`)
   }
 
   return (
-    <div className="min-h-screen bg-white p-6">
-      {/* Back Button */}
-      <button
-        onClick={() => router.back()}
-        className="mb-6 hover:bg-gray-100 p-2 rounded-full transition-colors"
-        aria-label="Go back"
-      >
-        <ArrowLeft className="h-6 w-6" />
-      </button>
+    <ErrorBoundary>
+      <div className="p-6 md:p-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+          <h1 className="text-3xl font-bold">Welcome, {clientData?.name?.split(" ")[0] || "Client"}</h1>
+        </div>
+        {error && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
-      <div className="max-w-6xl mx-auto">
-        <div className="flex flex-col md:flex-row md:gap-12">
-          {/* Images Section */}
-          <div className="w-full md:w-1/2 md:order-2 mb-8 md:mb-0">
-            {/* Main Image with Navigation Arrows */}
-            <div className="relative rounded-2xl overflow-hidden bg-gray-100 mb-4">
-              <div className="aspect-[4/3] relative">
-                <Image
-                  src={
-                    imageLoadError[currentImageIndex]
-                      ? "/placeholder.svg"
-                      : product.image[currentImageIndex] || "/placeholder.svg"
-                  }
-                  alt={product.name}
-                  fill
-                  className="object-cover"
-                  onError={() => handleImageError(currentImageIndex)}
-                  priority
-                />
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold">Products</h1>
 
-                {/* Navigation Arrows */}
-                {product.image.length > 1 && (
-                  <>
-                    <button
-                      onClick={previousImage}
-                      className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full shadow-lg transition-all"
-                      aria-label="Previous image"
-                    >
-                      <ChevronLeft className="h-6 w-6 text-gray-800" />
-                    </button>
-                    <button
-                      onClick={nextImage}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full shadow-lg transition-all"
-                      aria-label="Next image"
-                    >
-                      <ChevronRight className="h-6 w-6 text-gray-800" />
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
+          <div className="flex items-center gap-4">
+            {/* Scan QR Button */}
+            <button
+              onClick={handleScanQR}
+              className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+              aria-label="Scan QR Code"
+            >
+              <QrCode className="h-6 w-6 text-gray-600" />
+            </button>
 
-            {/* Thumbnails */}
-            {product.image.length > 1 && (
-              <div className="grid grid-cols-4 gap-4">
-                {product.image.map((img, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleThumbnailClick(index)}
-                    className={`relative rounded-xl overflow-hidden aspect-square ${
-                      selectedThumbnail === index ? "ring-2 ring-[#194a95]" : ""
-                    }`}
-                  >
-                    <Image
-                      src={imageLoadError[index] ? "/placeholder.svg" : img || "/placeholder.svg"}
-                      alt={`${product.name} thumbnail ${index + 1}`}
-                      fill
-                      className="object-cover"
-                      onError={() => handleImageError(index)}
-                    />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+            <Link href={`/client-dashboard/${clientId}/wishlist`} className="relative">
+              <Heart className="h-6 w-6 text-gray-600" />
+              {wishlist.length > 0 && (
+                <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {wishlist.length}
+                </span>
+              )}
+            </Link>
 
-          {/* Product Details */}
-          <div className="w-full md:w-1/2 md:order-1 space-y-6">
-            {/* Product Name */}
-            <div className="pb-4 border-b border-gray-200">
-              <p className="text-gray-500">Product Name</p>
-              <h1 className="text-3xl font-bold mt-1">{product.name}</h1>
-            </div>
-
-            {/* Price */}
-            <div className="pb-4 border-b border-gray-200">
-              <p className="text-gray-500">Price (per sqft)</p>
-              <p className="text-xl font-bold mt-1">₹{product.price}/per sqft</p>
-            </div>
-
-            {/* Product Category */}
-            <div className="pb-4 border-b border-gray-200">
-              <p className="text-gray-500">Product Category</p>
-              <p className="text-xl font-bold mt-1">{product.category}</p>
-            </div>
-
-            {/* Quantity Available */}
-            <div className="pb-4 border-b border-gray-200">
-              <p className="text-gray-500">Quality Available (in sqft)</p>
-              <p className="text-xl font-bold mt-1">{product.quantityAvailable}</p>
-            </div>
-
-            {/* Size, No. of Pieces, and Thickness in 3 columns */}
-            <div className="grid grid-cols-3 gap-4 pb-4 border-b border-gray-200">
-              <div>
-                <p className="text-gray-500">Size</p>
-                <p className="text-lg font-bold mt-1">
-                  {product.size !== undefined && product.size !== null && product.size !== "" ? product.size : "-"}
-                </p>
-              </div>
-              <div>
-                <p className="text-gray-500">No. of Pieces</p>
-                <p className="text-lg font-bold mt-1">
-                  {product.numberOfPieces !== undefined && product.numberOfPieces !== null
-                    ? product.numberOfPieces
-                    : "-"}
-                </p>
-              </div>
-              <div>
-                <p className="text-gray-500">Thickness</p>
-                <p className="text-lg font-bold mt-1">
-                  {product.thickness !== undefined && product.thickness !== null && product.thickness !== ""
-                    ? product.thickness
-                    : "-"}
-                </p>
-              </div>
-            </div>
-
-            {/* Application Areas */}
-            <div className="pb-4 border-b border-gray-200">
-              <p className="text-gray-500">Application Areas</p>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {applicationAreas.length > 0 ? (
-                  applicationAreas.map((area, index) => (
-                    <Badge key={index} className="bg-[#194a95] hover:bg-[#194a95] text-white px-3 py-1 text-sm">
-                      {area}
-                    </Badge>
-                  ))
-                ) : (
-                  <p className="text-gray-600">No application areas specified</p>
-                )}
-              </div>
-            </div>
-
-            {/* About Product */}
-            <div className="pb-4 border-b border-gray-200">
-              <p className="text-gray-500">About Product</p>
-              <p className="text-xl font-bold mt-1">{product.description || "Product mainly used for countertop"}</p>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex flex-wrap gap-4">
-              <Button
-                onClick={() => router.push(`/edit-product/${product.postId}`)}
-                className="px-8 py-3 bg-[#194a95] hover:bg-[#0f3a7a] text-white rounded-md"
-              >
-                Edit
-              </Button>
-
-              <Button
-                onClick={generateAndDownloadQR}
-                className="px-8 py-3 bg-[#194a95] hover:bg-[#0f3a7a] text-white rounded-md flex items-center gap-2"
-              >
-                <Download className="w-4 h-4" />
-                Download QR
-              </Button>
-
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" className="px-8 py-3" disabled={isDeleting}>
-                    {isDeleting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Deleting...
-                      </>
-                    ) : (
-                      <>
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </>
-                    )}
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent className="bg-white">
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This action cannot be undone. This will permanently delete the product and remove all associated
-                      data.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel className="bg-gray-100 hover:bg-gray-200">Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700 text-white">
-                      Delete
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
+            <Link href={`/client-dashboard/${clientId}/cart`} className="relative">
+              <ShoppingCart className="h-6 w-6 text-gray-600" />
+              {cart.length > 0 && (
+                <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {cart.length}
+                </span>
+              )}
+            </Link>
           </div>
         </div>
-        {/* QR Code Section */}
-  
+
+        <div className="relative mb-6">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search products by name or category..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 pr-4 py-2 w-full rounded-lg border border-input focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+          />
+        </div>
+
+        {filteredProducts.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-xl font-medium mb-4">No products found</p>
+            <p className="text-muted-foreground mb-6">
+              {searchQuery ? "Try a different search term" : "No products are currently available"}
+            </p>
+            <button
+              onClick={fetchProducts}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+            >
+              Refresh Products
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredProducts.map((product) => (
+              <div
+                key={product._id}
+                className="group relative bg-card rounded-lg overflow-hidden border border-border hover:border-primary transition-all hover:shadow-md cursor-pointer"
+                onClick={(e) => handleProductClick(e, product.postId)}
+              >
+                <div className="p-3">
+                  <div className="relative w-full overflow-hidden rounded-xl bg-gray-50 aspect-square">
+                    <Image
+                      src={imageError[product._id] ? "/placeholder.svg" : product.image?.[0] || "/placeholder.svg"}
+                      alt={product.name}
+                      fill
+                      unoptimized={true} // This bypasses Vercel's image optimization
+                      className="object-cover transition-transform group-hover:scale-105 duration-300"
+                      onError={() => handleImageError(product._id)}
+                    />
+
+                    {/* Wishlist button overlay */}
+                    <button
+                      onClick={(e) => toggleWishlist(e, product.postId)}
+                      className="absolute top-2 right-2 p-2 rounded-full bg-white/80 hover:bg-white transition-colors z-10"
+                      aria-label={wishlist.includes(product.postId) ? "Remove from wishlist" : "Add to wishlist"}
+                      type="button"
+                      disabled={addingToWishlist[product.postId]}
+                    >
+                      {addingToWishlist[product.postId] ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : (
+                        <Heart
+                          className={`h-5 w-5 ${
+                            wishlist.includes(product.postId) ? "text-red-500 fill-red-500" : "text-gray-600"
+                          }`}
+                        />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-4">
+                  <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
+                  <p className="text-lg font-bold mt-2">₹{product.price.toLocaleString()}/sqt</p>
+                  <p className="text-sm text-muted-foreground mt-1">{product.category}</p>
+                </div>
+
+                <button
+                  onClick={(e) => toggleWishlist(e, product.postId)}
+                  className={`mt-4 w-full py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2
+                              ${
+                                wishlist.includes(product.postId)
+                                  ? "bg-gray-100 text-gray-600 border border-gray-200"
+                                  : addingToWishlist[product.postId]
+                                    ? "bg-gray-200 text-gray-700"
+                                    : "bg-primary hover:bg-primary/90 text-primary-foreground"
+                              } 
+                              transition-colors`}
+                  disabled={addingToWishlist[product.postId]}
+                  type="button"
+                >
+                  {addingToWishlist[product.postId] ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                  ) : wishlist.includes(product.postId) ? (
+                    <>
+                      <Heart className="h-4 w-4 fill-gray-500 mr-1" />
+                      Added to Wishlist
+                    </>
+                  ) : (
+                    <>
+                      <Heart className="h-4 w-4 mr-1" />
+                      Add to Wishlist
+                    </>
+                  )}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Add extra space at the bottom to ensure scrolling is possible */}
+        <div className="h-[500px]"></div>
       </div>
-    </div>
+    </ErrorBoundary>
   )
 }
