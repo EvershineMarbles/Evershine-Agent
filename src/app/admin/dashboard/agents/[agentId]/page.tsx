@@ -8,6 +8,7 @@ import { Search, Trash2 } from "lucide-react"
 import { fetchWithAdminAuth } from "@/lib/admin-auth"
 import { Separator } from "@/components/ui/separator"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import AgentClientsTable from "@/components/agent-clients-table"
 
 interface Agent {
   _id: string
@@ -102,39 +103,18 @@ export default function AgentDetailsPage() {
   }
 
   return (
-    <div className="p-6">
-      <div className="flex flex-col ">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Advisor Details</h1>
+    <div className="p-4 md:p-6">
+      <div className="flex flex-col">
+        <div className="flex flex-col mb-6">
+          <h1 className="text-2xl md:text-3xl font-bold mb-4">Advisor Details</h1>
 
-          <div className="flex items-center space-x-4">
+          <div className="relative w-full mb-4">
             <Input
               type="text"
               placeholder="Search by client name, product, sales agent..."
-              className="pl-10 py-2 pr-4 border rounded-md w-[450px]"
+              className="pl-10 py-2 pr-4 border rounded-md w-full"
             />
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-            <Button className="bg-[#1e4b95] hover:bg-[#1e4b95]/90 text-white px-4 py-2 rounded-md">Edit</Button>
-            <Button
-              className="bg-[#1e4b95] hover:bg-[#1e4b95]/90 text-white px-4 py-2 rounded-md"
-              onClick={() =>
-                router.push(
-                  `/admin/dashboard/agents/${agentId}/clients?email=${agentDetails?.email}&name=${agentDetails?.name}`,
-                )
-              }
-            >
-              Client List
-            </Button>
-            <Button variant="outline" className="border-[#1e4b95] text-[#1e4b95] px-4 py-2 rounded-md">
-              Suspend
-            </Button>
-            <Button
-              variant="ghost"
-              className="text-red-500 hover:text-red-700"
-              onClick={() => setIsDeleteDialogOpen(true)}
-            >
-              <Trash2 className="h-6 w-6" />
-            </Button>
           </div>
         </div>
 
@@ -154,45 +134,83 @@ export default function AgentDetailsPage() {
             <div className="space-y-6">
               <div className="space-y-4">
                 <div>
-                  <div className="flex items-baseline">
-                    <span className="text-xl font-medium">Advisor Name - </span>
-                    <span className="text-xl font-bold ml-2">{agentDetails.name}</span>
+                  <div className="flex flex-col sm:flex-row sm:items-baseline">
+                    <span className="text-lg md:text-xl font-medium">Advisor Name - </span>
+                    <span className="text-lg md:text-xl font-bold sm:ml-2">{agentDetails.name}</span>
                   </div>
                   <Separator className="mt-2" />
                 </div>
 
                 <div>
-                  <div className="flex items-baseline">
-                    <span className="text-xl font-medium">Mobile No. - </span>
-                    <span className="text-xl font-bold ml-2">{agentDetails.mobile || "+91-XXXXXXXXXX"}</span>
+                  <div className="flex flex-col sm:flex-row sm:items-baseline">
+                    <span className="text-lg md:text-xl font-medium">Mobile No. - </span>
+                    <span className="text-lg md:text-xl font-bold sm:ml-2">
+                      {agentDetails.mobile || "+91-XXXXXXXXXX"}
+                    </span>
                   </div>
                   <Separator className="mt-2" />
                 </div>
 
                 <div>
-                  <div className="flex items-baseline">
-                    <span className="text-xl font-medium">Date of Joining - </span>
-                    <span className="text-xl font-bold ml-2">{formatDate(agentDetails.createdAt)}</span>
+                  <div className="flex flex-col sm:flex-row sm:items-baseline">
+                    <span className="text-lg md:text-xl font-medium">Date of Joining - </span>
+                    <span className="text-lg md:text-xl font-bold sm:ml-2">{formatDate(agentDetails.createdAt)}</span>
                   </div>
                   <Separator className="mt-2" />
                 </div>
 
                 <div>
-                  <div className="flex items-baseline">
-                    <span className="text-xl font-medium">Total Clients - </span>
-                    <span className="text-xl font-bold ml-2">{clientCount}</span>
+                  <div className="flex flex-col sm:flex-row sm:items-baseline">
+                    <span className="text-lg md:text-xl font-medium">Total Clients - </span>
+                    <span className="text-lg md:text-xl font-bold sm:ml-2">{clientCount}</span>
                   </div>
                   <Separator className="mt-2" />
                 </div>
 
                 <div>
-                  <div className="flex items-baseline">
-                    <span className="text-xl font-medium">Current Price Increase % - </span>
-                    <span className="text-xl font-bold ml-2">10%</span>
+                  <div className="flex flex-col sm:flex-row sm:items-baseline">
+                    <span className="text-lg md:text-xl font-medium">Current Price Increase % - </span>
+                    <span className="text-lg md:text-xl font-bold sm:ml-2">10%</span>
                   </div>
                   <Separator className="mt-2" />
                 </div>
               </div>
+
+              {/* Buttons moved to the end of the page */}
+              <div className="flex flex-col space-y-3 mt-8 pt-4 border-t">
+                <Button className="bg-[#1e4b95] hover:bg-[#1e4b95]/90 text-white px-4 py-2 rounded-md w-full">
+                  Edit
+                </Button>
+                <Button
+                  className="bg-[#1e4b95] hover:bg-[#1e4b95]/90 text-white px-4 py-2 rounded-md w-full"
+                  onClick={() =>
+                    router.push(
+                      `/admin/dashboard/agents/${agentId}/clients?email=${agentDetails?.email}&name=${agentDetails?.name}`,
+                    )
+                  }
+                >
+                  Client List
+                </Button>
+                <Button variant="outline" className="border-[#1e4b95] text-[#1e4b95] px-4 py-2 rounded-md w-full">
+                  Suspend
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="text-red-500 hover:text-red-700 hover:bg-red-50 w-full flex items-center justify-center gap-2"
+                  onClick={() => setIsDeleteDialogOpen(true)}
+                >
+                  <Trash2 className="h-5 w-5" />
+                  Delete Advisor
+                </Button>
+              </div>
+
+              {/* Affiliated Clients Table */}
+              {agentDetails && (
+                <div className="mt-10 pt-6 border-t">
+                  <h2 className="text-xl md:text-2xl font-bold mb-6">Affiliated Clients</h2>
+                  <AgentClientsTable agentEmail={agentDetails.email} agentName={agentDetails.name} />
+                </div>
+              )}
             </div>
           )
         )}
