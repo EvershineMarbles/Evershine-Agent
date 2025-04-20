@@ -133,13 +133,7 @@ export default function AgentDetailsPage() {
                 </div>
 
                 <div>
-                  <div className="flex flex-col sm:flex-row sm:items-baseline">
-                    <span className="text-lg md:text-xl font-medium">Mobile No. - </span>
-                    <span className="text-lg md:text-xl font-bold sm:ml-2">
-                      {agentDetails.mobile || "+91-XXXXXXXXXX"}
-                    </span>
-                  </div>
-                  <Separator className="mt-2" />
+
                 </div>
 
                 <div>
