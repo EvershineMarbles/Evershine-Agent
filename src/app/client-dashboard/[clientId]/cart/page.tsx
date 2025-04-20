@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowLeft, Trash2, Loader2, ShoppingBag, Plus, Minus } from "lucide-react"
+import { ArrowLeft, Trash2, Loader2, ShoppingBag, Plus, Minus } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -435,7 +435,7 @@ export default function CartPage() {
                       <h3 className="font-medium">{item.name}</h3>
                       <p className="text-sm text-muted-foreground">{item.category}</p>
                       <div className="flex items-center justify-between mt-2">
-                        <p className="font-semibold">₹{item.price.toLocaleString()}</p>
+                        <p className="font-semibold">₹{item.price.toLocaleString()}/sqft</p>
                         <div className="flex items-center">
                           {/* Quantity controls */}
                           <div className="flex items-center border rounded-md mr-2">
@@ -490,7 +490,7 @@ export default function CartPage() {
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Subtotal</span>
-                    <span>₹{calculateTotal().toLocaleString()}</span>
+                    <span>₹{calculateTotal().toLocaleString()}/sqft</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Shipping</span>
@@ -503,7 +503,7 @@ export default function CartPage() {
                   <div className="border-t border-border pt-2 mt-2">
                     <div className="flex justify-between font-semibold">
                       <span>Total</span>
-                      <span>₹{calculateTotal().toLocaleString()}</span>
+                      <span>₹{calculateTotal().toLocaleString()}/sqft</span>
                     </div>
                   </div>
                 </div>

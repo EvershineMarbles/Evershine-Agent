@@ -374,7 +374,7 @@ export default function ProductsPage() {
 
   // Handle QR code scanning
   const handleScanQR = () => {
-    router.push(`/client-dashboard/${clientId}/scan-qr`)
+    router.push(`/client-dashboard/${clientId}/scan`)
   }
 
   // Fetch client data
