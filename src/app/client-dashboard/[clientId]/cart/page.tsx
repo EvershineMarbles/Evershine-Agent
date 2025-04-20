@@ -490,7 +490,7 @@ export default function CartPage() {
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Subtotal</span>
-                    <span>₹{calculateTotal().toLocaleString()}/sqft</span>
+                    <span>₹{calculateTotal().toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Shipping</span>
@@ -503,7 +503,7 @@ export default function CartPage() {
                   <div className="border-t border-border pt-2 mt-2">
                     <div className="flex justify-between font-semibold">
                       <span>Total</span>
-                      <span>₹{calculateTotal().toLocaleString()}/sqft</span>
+                      <span>₹{calculateTotal().toLocaleString()}</span>
                     </div>
                   </div>
                 </div>
