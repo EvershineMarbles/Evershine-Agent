@@ -1,316 +1,386 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
-import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ArrowLeft, Loader2, FileText, Edit, Package } from "lucide-react"
-import { fetchWithAdminAuth } from "@/lib/admin-auth"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useToast } from "@/components/ui/use-toast"
+import { Loader2, Save } from "lucide-react"
 
-interface ClientDetails {
-  _id: string
+interface ClientSettings {
   name: string
+  email: string
   mobile: string
+  city: string
+  profession: string
+  purpose: string
   clientId: string
-  email?: string
-  city?: string
-  profession?: string
-  purpose?: string
-  quantityRequired?: number
-  agentAffiliated?: string
-  createdAt: string
-  updatedAt: string
+  quantityRequired: number
+  agentAffiliated: string
+  createdAt?: string
+  updatedAt?: string
 }
 
-interface Order {
-  orderId: string
-  clientId: string
-  agentId: string
-  items: any[]
-  totalAmount: number
-  status: string
-  paymentStatus: string
-  createdAt: string
-  shippingAddress?: {
-    street?: string
-    city?: string
-    state?: string
-    postalCode?: string
-    country?: string
-  }
-}
-
-interface ClientDetailsProps {
-  clientId: string
-}
-
-export default function ClientDetails({ clientId }: ClientDetailsProps) {
+export default function SettingsPage() {
+  const params = useParams()
   const router = useRouter()
-  const [client, setClient] = useState<ClientDetails | null>(null)
-  const [orders, setOrders] = useState<Order[]>([])
+  const { toast } = useToast()
+  const clientId = params.clientId as string
+
+  const [settings, setSettings] = useState<ClientSettings>({
+    name: "",
+    email: "",
+    mobile: "",
+    city: "",
+    profession: "",
+    purpose: "",
+    clientId: "",
+    quantityRequired: 0,
+    agentAffiliated: "",
+  })
   const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState("details")
 
   useEffect(() => {
     const fetchClientData = async () => {
-      setLoading(true)
-      setError(null)
-
       try {
-        // Fetch client details
-        const clientResponse = await fetchWithAdminAuth(`/api/admin/clients/${clientId}`)
+        setLoading(true)
+        setError(null)
 
-        if (!clientResponse.ok) {
-          throw new Error(`Failed to fetch client details: ${clientResponse.status}`)
+        // Get the token
+        const token = localStorage.getItem("clientImpersonationToken")
+
+        if (!token) {
+          throw new Error("No authentication token found. Please refresh the page and try again.")
         }
 
-        const clientData = await clientResponse.json()
+        // Use the correct API endpoint - make sure this matches your backend route
+        // Note: Changed from /api/clients/ to /api/getClientDetails/ based on your route.js file
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"}/api/getClientDetails/${clientId}`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          },
+        )
 
-        if (clientData.success && clientData.data) {
-          setClient(clientData.data)
-
-          // Fetch client orders
-          const ordersResponse = await fetchWithAdminAuth(`/api/admin/clients/${clientId}/orders`)
-
-          if (ordersResponse.ok) {
-            const ordersData = await ordersResponse.json()
-            if (ordersData.success && ordersData.data) {
-              setOrders(ordersData.data)
-            }
+        if (!response.ok) {
+          if (response.status === 404) {
+            throw new Error("Client not found. Please check the client ID.")
+          } else if (response.status === 401) {
+            throw new Error("Authentication failed. Please refresh the token and try again.")
+          } else {
+            throw new Error(`API error: ${response.status} ${response.statusText}`)
           }
-        } else {
-          throw new Error(clientData.message || "Failed to fetch client details")
         }
-      } catch (err: any) {
-        console.error("Error fetching client data:", err)
-        setError(err.message || "Failed to fetch client data")
+
+        const data = await response.json()
+
+        if (data.data) {
+          // Set client data to state, ensuring we capture all fields
+          setSettings({
+            name: data.data.name || "",
+            email: data.data.email || "",
+            mobile: data.data.mobile || "",
+            city: data.data.city || "",
+            profession: data.data.profession || "",
+            purpose: data.data.purpose || "",
+            clientId: data.data.clientId || clientId,
+            quantityRequired: data.data.quantityRequired || 0,
+            agentAffiliated: data.data.agentAffiliated || "",
+            createdAt: data.data.createdAt || "",
+            updatedAt: data.data.updatedAt || "",
+            // Add any additional fields that might be in the client data
+            // This ensures we don't lose any data when updating
+            ...data.data,
+          })
+        } else {
+          throw new Error("Invalid response format from server")
+        }
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
+        console.error("Error fetching client data:", error)
+        setError(errorMessage)
+        toast({
+          title: "Error",
+          description: errorMessage,
+          variant: "destructive",
+        })
       } finally {
         setLoading(false)
       }
     }
 
     fetchClientData()
-  }, [clientId])
+  }, [clientId, toast])
 
-  // Format date
-  const formatDate = (dateString: string) => {
-    if (!dateString) return "-"
-    const date = new Date(dateString)
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    })
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
+    setSettings((prev) => ({ ...prev, [name]: value }))
   }
 
-  // Get status badge color
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "delivered":
-        return "bg-green-100 text-green-800"
-      case "shipped":
-        return "bg-blue-100 text-blue-800"
-      case "processing":
-        return "bg-yellow-100 text-yellow-800"
-      case "cancelled":
-        return "bg-red-100 text-red-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
-  }
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    setError(null)
 
-  // Get payment status badge color
-  const getPaymentStatusColor = (status: string) => {
-    switch (status) {
-      case "paid":
-        return "bg-green-100 text-green-800"
-      case "failed":
-        return "bg-red-100 text-red-800"
-      default:
-        return "bg-yellow-100 text-yellow-800"
+    try {
+      // Get the token
+      const token = localStorage.getItem("clientImpersonationToken")
+
+      if (!token) {
+        throw new Error("No authentication token found. Please refresh the page and try again.")
+      }
+
+      // Log the data being sent for debugging
+      console.log("Updating client with data:", settings)
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"}/api/update-client`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(settings),
+        },
+      )
+
+      if (!response.ok) {
+        // Try to get more detailed error information
+        let errorMessage = `API error: ${response.status} ${response.statusText}`
+        try {
+          const errorData = await response.json()
+          if (errorData && errorData.message) {
+            errorMessage = errorData.message
+          }
+        } catch (e) {
+          // If we can't parse the error as JSON, just use the status
+        }
+
+        throw new Error(errorMessage)
+      }
+
+      const data = await response.json()
+      console.log("Update response:", data)
+
+      toast({
+        title: "Settings Saved",
+        description: "Your client settings have been updated successfully.",
+      })
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
+      console.error("Error saving settings:", error)
+      setError(errorMessage)
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      })
+    } finally {
+      setSaving(false)
     }
   }
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[400px]">
-        <p className="text-red-500 mb-4">{error}</p>
-        <Button onClick={() => router.back()}>Go Back</Button>
-      </div>
-    )
-  }
-
-  if (!client) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[400px]">
-        <p className="text-muted-foreground mb-4">Client not found</p>
-        <Button onClick={() => router.back()}>Go Back</Button>
+      <div className="flex flex-col items-center justify-center h-[80vh]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+        <p className="text-muted-foreground">Loading client settings...</p>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center">
-          <Button variant="ghost" size="sm" onClick={() => router.back()} className="mr-2">
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Back
-          </Button>
-          <h1 className="text-3xl font-bold">{client.name}</h1>
-        </div>
-        <Button onClick={() => router.push(`/admin/dashboard/clients/${clientId}/edit`)}>
-          <Edit className="h-4 w-4 mr-2" />
-          Edit Client
-        </Button>
-      </div>
+    <div className="p-6 md:p-8">
+      <h1 className="text-3xl font-bold mb-8">Client Settings</h1>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList>
-          <TabsTrigger value="details">Client Details</TabsTrigger>
-          <TabsTrigger value="orders">Orders</TabsTrigger>
+      {error && (
+        <Card className="mb-6 border-red-200 bg-red-50">
+          <CardContent className="p-4 text-red-800">
+            <p>{error}</p>
+            <Button
+              variant="outline"
+              className="mt-2 border-red-300 text-red-800 hover:bg-red-100"
+              onClick={() => window.location.reload()}
+            >
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      <Tabs defaultValue="profile" className="w-full">
+        <TabsList className="mb-6">
+          <TabsTrigger value="profile">Profile</TabsTrigger>
+          <TabsTrigger value="preferences">Preferences</TabsTrigger>
+          <TabsTrigger value="notifications">Notifications</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="details" className="mt-6">
+        <TabsContent value="profile">
           <Card>
             <CardHeader>
-              <CardTitle>Client Information</CardTitle>
+              <CardTitle>Profile Information</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Full Name</h3>
-                    <p className="text-lg font-medium">{client.name}</p>
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Full Name</Label>
+                    <Input id="name" name="name" value={settings.name} onChange={handleChange} disabled={saving} />
                   </div>
-                  <Separator />
 
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Mobile Number</h3>
-                    <p className="text-lg font-medium">{client.mobile}</p>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email Address</Label>
+                    <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      value={settings.email}
+                      onChange={handleChange}
+                      disabled={saving}
+                    />
                   </div>
-                  <Separator />
 
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Email Address</h3>
-                    <p className="text-lg font-medium">{client.email || "-"}</p>
+                  <div className="space-y-2">
+                    <Label htmlFor="mobile">Mobile Number</Label>
+                    <Input
+                      id="mobile"
+                      name="mobile"
+                      value={settings.mobile}
+                      onChange={handleChange}
+                      disabled={saving || true} // Mobile is typically immutable
+                    />
                   </div>
-                  <Separator />
 
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">City</h3>
-                    <p className="text-lg font-medium">{client.city || "-"}</p>
+                  <div className="space-y-2">
+                    <Label htmlFor="city">City</Label>
+                    <Input id="city" name="city" value={settings.city} onChange={handleChange} disabled={saving} />
                   </div>
-                  <Separator />
+
+                  <div className="space-y-2">
+                    <Label htmlFor="profession">Profession</Label>
+                    <Input
+                      id="profession"
+                      name="profession"
+                      value={settings.profession}
+                      onChange={handleChange}
+                      disabled={saving}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="purpose">Purpose</Label>
+                    <Input
+                      id="purpose"
+                      name="purpose"
+                      value={settings.purpose}
+                      onChange={handleChange}
+                      disabled={saving}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="quantityRequired">Quantity Required</Label>
+                    <Input
+                      id="quantityRequired"
+                      name="quantityRequired"
+                      type="number"
+                      value={settings.quantityRequired || 0}
+                      onChange={handleChange}
+                      disabled={saving}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="agentAffiliated">Advisor Affliated</Label>
+                    <Input
+                      id="agentAffiliated"
+                      name="agentAffiliated"
+                      value={settings.agentAffiliated || ""}
+                      onChange={handleChange}
+                      disabled={true} // Agent affiliation should be immutable
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="clientId">Client ID</Label>
+                    <Input
+                      id="clientId"
+                      name="clientId"
+                      value={settings.clientId || clientId}
+                      disabled={true} // Client ID is immutable
+                    />
+                  </div>
+
+                  {settings.createdAt && (
+                    <div className="space-y-2">
+                      <Label htmlFor="createdAt">Created At</Label>
+                      <Input
+                        id="createdAt"
+                        name="createdAt"
+                        value={new Date(settings.createdAt).toLocaleString()}
+                        disabled={true}
+                      />
+                    </div>
+                  )}
+
+                  {settings.updatedAt && (
+                    <div className="space-y-2">
+                      <Label htmlFor="updatedAt">Last Updated</Label>
+                      <Input
+                        id="updatedAt"
+                        name="updatedAt"
+                        value={new Date(settings.updatedAt).toLocaleString()}
+                        disabled={true}
+                      />
+                    </div>
+                  )}
                 </div>
 
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Profession</h3>
-                    <p className="text-lg font-medium">{client.profession || "-"}</p>
-                  </div>
-                  <Separator />
+                <Separator />
 
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Purpose</h3>
-                    <p className="text-lg font-medium">{client.purpose || "-"}</p>
-                  </div>
-                  <Separator />
-
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Quantity Required</h3>
-                    <p className="text-lg font-medium">{client.quantityRequired || "-"}</p>
-                  </div>
-                  <Separator />
-
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Advisor Name</h3>
-                    <p className="text-lg font-medium">{client.agentAffiliated || "-"}</p>
-                  </div>
-                  <Separator />
+                <div className="flex justify-end">
+                  <Button type="submit" disabled={saving}>
+                    {saving ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="mr-2 h-4 w-4" />
+                        Save Changes
+                      </>
+                    )}
+                  </Button>
                 </div>
-              </div>
-
-              <div className="mt-6">
-                <h3 className="text-sm font-medium text-muted-foreground">Registration Date</h3>
-                <p className="text-lg font-medium">{formatDate(client.createdAt)}</p>
-              </div>
+              </form>
+            
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="orders" className="mt-6">
+       
+
+        <TabsContent value="notifications">
           <Card>
             <CardHeader>
-              <CardTitle>Client Orders</CardTitle>
+              <CardTitle>Notification Settings</CardTitle>
             </CardHeader>
             <CardContent>
-              {orders.length === 0 ? (
-                <div className="text-center py-8">
-                  <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-lg font-medium mb-2">No Orders Found</p>
-                  <p className="text-muted-foreground mb-6">This client hasn't placed any orders yet.</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Order ID</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Items</TableHead>
-                        <TableHead>Total Amount</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Payment</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {orders.map((order) => (
-                        <TableRow key={order.orderId}>
-                          <TableCell className="font-medium">{order.orderId}</TableCell>
-                          <TableCell>{formatDate(order.createdAt)}</TableCell>
-                          <TableCell>{order.items.length}</TableCell>
-                          <TableCell>₹{order.totalAmount.toLocaleString()}</TableCell>
-                          <TableCell>
-                            <Badge className={getStatusColor(order.status)}>
-                              {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge className={getPaymentStatusColor(order.paymentStatus)}>
-                              {order.paymentStatus.charAt(0).toUpperCase() + order.paymentStatus.slice(1)}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => router.push(`/admin/dashboard/orders/${order.orderId}`)}
-                            >
-                              <FileText className="h-4 w-4 mr-1" />
-                              View
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
+              <p className="text-muted-foreground">Notification settings will be available soon.</p>
             </CardContent>
           </Card>
         </TabsContent>
