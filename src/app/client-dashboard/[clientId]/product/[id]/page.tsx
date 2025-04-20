@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import axios, { AxiosError } from "axios"
-import { ArrowLeft, ChevronLeft, ChevronRight, Heart, ShoppingCart } from "lucide-react"
+import { ArrowLeft, ChevronLeft, ChevronRight, Heart } from "lucide-react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/components/ui/use-toast"
+import { ToastAction } from "@/components/ui/toast"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
 
@@ -42,10 +43,8 @@ export default function ProductDetail() {
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [selectedThumbnail, setSelectedThumbnail] = useState(0)
   const [imageLoadError, setImageLoadError] = useState<boolean[]>([])
-  const [addingToCart, setAddingToCart] = useState(false)
-  const [addingToWishlist, setAddingToWishlist] = useState(false)
+  const [wishlistLoading, setWishlistLoading] = useState(false)
   const [inWishlist, setInWishlist] = useState(false)
-  const [inCart, setInCart] = useState(false)
   const clientId = params.clientId as string
 
   useEffect(() => {
@@ -78,9 +77,6 @@ export default function ProductDetail() {
 
           // Check if product is in wishlist
           checkWishlistStatus(productData.postId)
-
-          // Check if product is in cart
-          checkCartStatus(productData.postId)
         } else {
           throw new Error(response.data.msg || "No data found")
         }
@@ -109,8 +105,8 @@ export default function ProductDetail() {
       // First check localStorage
       const savedWishlist = localStorage.getItem("wishlist")
       if (savedWishlist) {
-        const wishlistIds = JSON.parse(savedWishlist)
-        if (wishlistIds.includes(productId)) {
+        const wishlistItems = JSON.parse(savedWishlist)
+        if (wishlistItems.includes(productId)) {
           setInWishlist(true)
           return
         }
@@ -137,43 +133,6 @@ export default function ProductDetail() {
       }
     } catch (error) {
       console.error("Error checking wishlist status:", error)
-    }
-  }
-
-  // Check if product is in cart
-  const checkCartStatus = async (productId: string) => {
-    try {
-      // First check localStorage
-      const savedCart = localStorage.getItem("cart")
-      if (savedCart) {
-        const cartIds = JSON.parse(savedCart)
-        if (cartIds.includes(productId)) {
-          setInCart(true)
-          return
-        }
-      }
-
-      // Then check API
-      const token = localStorage.getItem("clientImpersonationToken")
-      if (!token) return
-
-      const response = await fetch(`${API_URL}/api/getUserCart`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success && data.data && Array.isArray(data.data.items)) {
-          const isInCart = data.data.items.some((item: any) => item.postId === productId)
-          setInCart(isInCart)
-        }
-      }
-    } catch (error) {
-      console.error("Error checking cart status:", error)
     }
   }
 
@@ -204,122 +163,107 @@ export default function ProductDetail() {
     }
   }
 
-  const addToCart = async () => {
-    if (!product || !clientId || inCart) return
+  const toggleWishlist = async () => {
+    if (!product || !clientId) return
 
     try {
-      setAddingToCart(true)
+      setWishlistLoading(true)
 
       const token = localStorage.getItem("clientImpersonationToken")
       if (!token) {
         throw new Error("No authentication token found. Please refresh the page and try again.")
       }
 
-      // Make API call to add to cart
-      const response = await fetch(`${API_URL}/api/addToCart`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          productId: product.postId,
-          quantity: 1, // Fixed quantity of 1
-        }),
-      })
+      if (inWishlist) {
+        // Remove from wishlist
+        const response = await fetch(`${API_URL}/api/removeFromWishlist`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            productId: product.postId,
+          }),
+        })
 
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status} ${response.statusText}`)
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status} ${response.statusText}`)
+        }
+
+        const data = await response.json()
+
+        if (!data.success) {
+          throw new Error(data.message || "Failed to remove from wishlist")
+        }
+
+        // Update local state
+        setInWishlist(false)
+
+        // Update localStorage for wishlist
+        const savedWishlist = localStorage.getItem("wishlist")
+        if (savedWishlist) {
+          const wishlistItems = JSON.parse(savedWishlist)
+          const updatedWishlist = wishlistItems.filter((id: string) => id !== product.postId)
+          localStorage.setItem("wishlist", JSON.stringify(updatedWishlist))
+        }
+
+        toast({
+          title: "Removed from wishlist",
+          description: `${product.name} has been removed from your wishlist.`,
+        })
+      } else {
+        // Add to wishlist
+        const response = await fetch(`${API_URL}/api/addToWishlist`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            productId: product.postId,
+          }),
+        })
+
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status} ${response.statusText}`)
+        }
+
+        const data = await response.json()
+
+        if (!data.success) {
+          throw new Error(data.message || "Failed to add to wishlist")
+        }
+
+        // Update local state
+        setInWishlist(true)
+
+        // Update localStorage for wishlist
+        const savedWishlist = localStorage.getItem("wishlist")
+        const wishlistItems = savedWishlist ? JSON.parse(savedWishlist) : []
+        if (!wishlistItems.includes(product.postId)) {
+          localStorage.setItem("wishlist", JSON.stringify([...wishlistItems, product.postId]))
+        }
+
+        toast({
+          title: "Added to wishlist",
+          description: `${product.name} has been added to your wishlist.`,
+          action: (
+            <ToastAction altText="View wishlist" onClick={() => router.push(`/client-dashboard/${clientId}/wishlist`)}>
+              View Wishlist
+            </ToastAction>
+          ),
+        })
       }
-
-      const data = await response.json()
-
-      if (!data.success) {
-        throw new Error(data.message || "Failed to add to cart")
-      }
-
-      // Update local state
-      setInCart(true)
-
-      // Update localStorage for cart
-      const savedCart = localStorage.getItem("cart")
-      const cartItems = savedCart ? JSON.parse(savedCart) : []
-      if (!cartItems.includes(product.postId)) {
-        localStorage.setItem("cart", JSON.stringify([...cartItems, product.postId]))
-      }
-
-      toast({
-        title: "Added to cart",
-        description: `${product.name} has been added to your cart.`,
-      })
     } catch (error) {
-      console.error("Error adding to cart:", error)
+      console.error("Error updating wishlist:", error)
       toast({
         title: "Error",
-        description: "Failed to add item to cart. Please try again.",
+        description: "Failed to update wishlist. Please try again.",
         variant: "destructive",
       })
     } finally {
-      setAddingToCart(false)
-    }
-  }
-
-  const addToWishlist = async () => {
-    if (!product || !clientId || inWishlist) return
-
-    try {
-      setAddingToWishlist(true)
-
-      const token = localStorage.getItem("clientImpersonationToken")
-      if (!token) {
-        throw new Error("No authentication token found. Please refresh the page and try again.")
-      }
-
-      // Make API call to add to wishlist
-      const response = await fetch(`${API_URL}/api/addToWishlist`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          productId: product.postId,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status} ${response.statusText}`)
-      }
-
-      const data = await response.json()
-
-      if (!data.success) {
-        throw new Error(data.message || "Failed to add to wishlist")
-      }
-
-      // Update local state
-      setInWishlist(true)
-
-      // Update localStorage for wishlist
-      const savedWishlist = localStorage.getItem("wishlist")
-      const wishlistItems = savedWishlist ? JSON.parse(savedWishlist) : []
-      if (!wishlistItems.includes(product.postId)) {
-        localStorage.setItem("wishlist", JSON.stringify([...wishlistItems, product.postId]))
-      }
-
-      toast({
-        title: "Added to wishlist",
-        description: `${product.name} has been added to your wishlist.`,
-      })
-    } catch (error) {
-      console.error("Error adding to wishlist:", error)
-      toast({
-        title: "Error",
-        description: "Failed to add item to wishlist. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setAddingToWishlist(false)
+      setWishlistLoading(false)
     }
   }
 
@@ -520,28 +464,17 @@ export default function ProductDetail() {
             {/* Action Buttons */}
             <div className="flex flex-wrap gap-4">
               <Button
-                onClick={addToCart}
-                disabled={addingToCart || inCart}
-                className={`px-8 py-3 rounded-md flex items-center gap-2 ${
-                  inCart ? "bg-gray-300 hover:bg-gray-300 text-gray-700" : "bg-[#194a95] hover:bg-[#0f3a7a] text-white"
-                }`}
-              >
-                <ShoppingCart className="w-4 h-4" />
-                {addingToCart ? "Adding..." : inCart ? "Added to Cart" : "Add to Cart"}
-              </Button>
-
-              <Button
-                onClick={addToWishlist}
-                disabled={addingToWishlist || inWishlist}
-                variant="outline"
+                onClick={toggleWishlist}
+                disabled={wishlistLoading}
+                variant={inWishlist ? "secondary" : "outline"}
                 className={`px-8 py-3 rounded-md flex items-center gap-2 ${
                   inWishlist
-                    ? "border-gray-300 text-gray-700 hover:bg-gray-100"
+                    ? "bg-gray-200 hover:bg-gray-300 text-gray-700"
                     : "border-[#194a95] text-[#194a95] hover:bg-[#194a95] hover:text-white"
                 }`}
               >
-                <Heart className={`w-4 h-4 ${inWishlist ? "fill-red-500" : ""}`} />
-                {addingToWishlist ? "Adding..." : inWishlist ? "In Wishlist" : "Add to Wishlist"}
+                <Heart className="w-4 h-4" />
+                {wishlistLoading ? "Processing..." : inWishlist ? "Remove from Wishlist" : "Add to Wishlist"}
               </Button>
             </div>
           </div>
