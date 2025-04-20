@@ -1,12 +1,23 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Loader2, Plus, RefreshCw, Search } from "lucide-react"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { Loader2, Plus, RefreshCw, Search, Eye, Edit, Trash2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { useToast } from "@/components/ui/use-toast"
 
 interface Client {
   _id: string
@@ -116,11 +127,39 @@ const getAllAgents = async () => {
 }
 
 export default function ClientTable() {
+  const { toast } = useToast()
   const [clients, setClients] = useState<Client[]>([])
   const [agents, setAgents] = useState<Agent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
+
+  // State for edit modal
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [editingClient, setEditingClient] = useState<Client | null>(null)
+  const [editFormData, setEditFormData] = useState({
+    name: "",
+    mobile: "",
+    city: "",
+    profession: "",
+  })
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // State for delete confirmation
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [deletingClient, setDeletingClient] = useState<Client | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  // State for create modal
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [createFormData, setCreateFormData] = useState({
+    name: "",
+    mobile: "",
+    city: "",
+    profession: "",
+    agentAffiliated: "",
+  })
+  const [isCreating, setIsCreating] = useState(false)
 
   const fetchData = async () => {
     setLoading(true)
@@ -176,88 +215,427 @@ export default function ClientTable() {
     })
   }
 
+  // Handle client click to view details
+  const handleClientClick = (clientId: string) => {
+    // Navigate to client details page
+    console.log(`View client details: ${clientId}`)
+    // router.push(`/admin/clients/${clientId}`)
+  }
+
+  // Handle opening edit modal
+  const handleEditClick = (e: React.MouseEvent, client: Client) => {
+    e.stopPropagation()
+    setEditingClient(client)
+    setEditFormData({
+      name: client.name,
+      mobile: client.mobile,
+      city: client.city || "",
+      profession: client.profession || "",
+    })
+    setIsEditModalOpen(true)
+  }
+
+  // Handle edit form input change
+  const handleEditInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
+    setEditFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }))
+  }
+
+  // Handle edit form submission
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingClient) return
+
+    setIsSubmitting(true)
+
+    try {
+      // In a real app, you would make an API call to update the client
+      console.log("Updating client:", editingClient.clientId, editFormData)
+
+      // Mock success
+      toast({
+        title: "Client updated",
+        description: "The client has been updated successfully",
+      })
+
+      // Update the client in the local state
+      setClients((prev) =>
+        prev.map((client) =>
+          client.clientId === editingClient.clientId
+            ? {
+                ...client,
+                name: editFormData.name,
+                mobile: editFormData.mobile,
+                city: editFormData.city,
+                profession: editFormData.profession,
+              }
+            : client,
+        ),
+      )
+
+      setIsEditModalOpen(false)
+    } catch (err: any) {
+      console.error("Error updating client:", err)
+      toast({
+        title: "Update failed",
+        description: err.message || "Failed to update client",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Handle opening delete confirmation
+  const handleDeleteClick = (e: React.MouseEvent, client: Client) => {
+    e.stopPropagation()
+    setDeletingClient(client)
+    setIsDeleteModalOpen(true)
+  }
+
+  // Handle delete confirmation
+  const handleDeleteConfirm = async () => {
+    if (!deletingClient) return
+
+    setIsDeleting(true)
+
+    try {
+      // In a real app, you would make an API call to delete the client
+      console.log("Deleting client:", deletingClient.clientId)
+
+      // Mock success
+      toast({
+        title: "Client deleted",
+        description: `${deletingClient.name} has been successfully removed from the system.`,
+        variant: "default",
+      })
+
+      // Remove the client from the local state
+      setClients((prev) => prev.filter((client) => client.clientId !== deletingClient.clientId))
+
+      setIsDeleteModalOpen(false)
+    } catch (err: any) {
+      console.error("Error deleting client:", err)
+      toast({
+        title: "Delete failed",
+        description: err.message || "Failed to delete client. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  // Handle opening create modal
+  const handleCreateClick = () => {
+    setCreateFormData({
+      name: "",
+      mobile: "",
+      city: "",
+      profession: "",
+      agentAffiliated: "",
+    })
+    setIsCreateModalOpen(true)
+  }
+
+  // Handle create form input change
+  const handleCreateInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
+    setCreateFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }))
+  }
+
+  // Handle create form submission
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    setIsCreating(true)
+
+    try {
+      // In a real app, you would make an API call to create the client
+      console.log("Creating client:", createFormData)
+
+      // Mock success
+      toast({
+        title: "Client created",
+        description: "The client has been created successfully",
+      })
+
+      // Refresh the client list
+      fetchData()
+
+      setIsCreateModalOpen(false)
+    } catch (err: any) {
+      console.error("Error creating client:", err)
+      toast({
+        title: "Creation failed",
+        description: err.message || "Failed to create client",
+        variant: "destructive",
+      })
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Clients</CardTitle>
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search clients..."
-              className="w-[250px] pl-8"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+    <>
+      <Card className="shadow-sm border-0">
+        <CardHeader className="flex flex-row items-center justify-between p-6">
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold">Clients</h2>
+            <Badge variant="outline" className="ml-2 bg-primary/10 text-primary">
+              {clients.length}
+            </Badge>
           </div>
-          <Button variant="outline" size="icon" onClick={fetchData} disabled={loading}>
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          </Button>
-          <Button>
-            <Plus className="mr-2 h-4 w-4" /> Add Client
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {loading ? (
-          <div className="flex justify-center items-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search clients..."
+                className="w-[250px] pl-10"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <Button variant="outline" size="icon" onClick={fetchData} disabled={loading}>
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            </Button>
+            <Button className="bg-primary hover:bg-primary/90 text-white" onClick={handleCreateClick}>
+              <Plus className="mr-2 h-4 w-4" /> Add Client
+            </Button>
           </div>
-        ) : error ? (
-          <div className="flex flex-col items-center justify-center h-64">
-            <p className="text-red-500 mb-4">{error}</p>
-            <Button onClick={fetchData}>Retry</Button>
-          </div>
-        ) : filteredClients.length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-muted-foreground mb-4">No clients found</p>
-            <Button>Register Your First Client</Button>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Mobile</TableHead>
-                  <TableHead>Agent</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredClients.map((client) => (
-                  <TableRow key={client._id}>
-                    <TableCell className="font-medium">{client.name}</TableCell>
-                    <TableCell>{client.mobile}</TableCell>
-                    <TableCell>
-                      {client.agentAffiliated ? (
-                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                          {getAgentName(client.agentAffiliated)}
-                        </Badge>
-                      ) : (
-                        "-"
-                      )}
-                    </TableCell>
-                    <TableCell>{client.city || "-"}</TableCell>
-                    <TableCell>{client.profession || "-"}</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="outline" size="sm" className="mr-2">
-                        View
+        </CardHeader>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="flex justify-center items-center h-64">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center h-64">
+              <p className="text-red-500 mb-4">{error}</p>
+              <Button onClick={fetchData}>Retry</Button>
+            </div>
+          ) : filteredClients.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground mb-4">No clients found</p>
+              <Button className="bg-primary hover:bg-primary/90 text-white" onClick={handleCreateClick}>
+                Add Your First Client
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4 p-6">
+              {filteredClients.map((client) => (
+                <div
+                  key={client._id}
+                  className="p-4 border rounded-lg hover:shadow-md transition-shadow flex flex-col md:flex-row justify-between items-start md:items-center gap-4 cursor-pointer"
+                  onClick={() => handleClientClick(client.clientId)}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="bg-primary text-white rounded-full h-12 w-12 flex items-center justify-center text-xl font-bold">
+                      {client.name.charAt(0)}
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-lg">{client.name}</h3>
+                      <div className="text-sm text-gray-500">
+                        <span className="mr-3">{client.mobile}</span>
+                        {client.city && <span className="mr-3">• {client.city}</span>}
+                        {client.profession && <span>• {client.profession}</span>}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-col md:flex-row items-start md:items-center gap-3">
+                    {client.agentAffiliated && (
+                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                        {getAgentName(client.agentAffiliated)}
+                      </Badge>
+                    )}
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-primary text-primary hover:bg-primary/10"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleClientClick(client.clientId)
+                        }}
+                      >
+                        <Eye size={16} className="mr-1" /> View
                       </Button>
-                      <Button variant="outline" size="sm" className="mr-2">
-                        Edit
+                      <Button variant="outline" size="sm" onClick={(e) => handleEditClick(e, client)}>
+                        <Edit size={16} className="mr-1" /> Edit
                       </Button>
-                      <Button variant="outline" size="sm" className="text-red-500 border-red-200 hover:bg-red-50">
-                        Delete
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                        onClick={(e) => handleDeleteClick(e, client)}
+                      >
+                        <Trash2 size={16} className="mr-1" /> Delete
                       </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Edit Client Modal */}
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Client</DialogTitle>
+            <DialogDescription>Make changes to the client's information.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditSubmit}>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="name">Name</Label>
+                <Input id="name" name="name" value={editFormData.name} onChange={handleEditInputChange} required />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="mobile">Mobile</Label>
+                <Input
+                  id="mobile"
+                  name="mobile"
+                  value={editFormData.mobile}
+                  onChange={handleEditInputChange}
+                  required
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="city">City</Label>
+                <Input id="city" name="city" value={editFormData.city} onChange={handleEditInputChange} />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="profession">Profession</Label>
+                <Input
+                  id="profession"
+                  name="profession"
+                  value={editFormData.profession}
+                  onChange={handleEditInputChange}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsEditModalOpen(false)} disabled={isSubmitting}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Changes"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Modal */}
+      <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl">Confirm Deletion</DialogTitle>
+            <DialogDescription className="py-3">
+              Are you sure you want to delete client <span className="font-semibold">{deletingClient?.name}</span>?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" onClick={() => setIsDeleteModalOpen(false)} disabled={isDeleting}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDeleteConfirm}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Client"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Client Modal */}
+      <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Client</DialogTitle>
+            <DialogDescription>Add a new client to the system.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateSubmit}>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="create-name">Name</Label>
+                <Input
+                  id="create-name"
+                  name="name"
+                  value={createFormData.name}
+                  onChange={handleCreateInputChange}
+                  required
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="create-mobile">Mobile</Label>
+                <Input
+                  id="create-mobile"
+                  name="mobile"
+                  value={createFormData.mobile}
+                  onChange={handleCreateInputChange}
+                  required
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="create-city">City</Label>
+                <Input id="create-city" name="city" value={createFormData.city} onChange={handleCreateInputChange} />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="create-profession">Profession</Label>
+                <Input
+                  id="create-profession"
+                  name="profession"
+                  value={createFormData.profession}
+                  onChange={handleCreateInputChange}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsCreateModalOpen(false)} disabled={isCreating}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isCreating}>
+                {isCreating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  "Create Client"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
