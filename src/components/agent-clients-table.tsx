@@ -124,11 +124,8 @@ export default function AgentClientsTable({ agentEmail, agentName }: AgentClient
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Mobile</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>City</TableHead>
-                  <TableHead>Profession</TableHead>
                   <TableHead>Created At</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
