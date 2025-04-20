@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
@@ -7,10 +9,10 @@ import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Loader2, AlertCircle, Heart, ShoppingCart, Trash2, ArrowLeft, RefreshCw } from 'lucide-react'
+import { Loader2, AlertCircle, Heart, ShoppingCart, Trash2, ArrowLeft, RefreshCw } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { ErrorBoundary } from "@/components/error-boundary"
-import { 
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -298,7 +300,7 @@ export default function WishlistPage() {
       localStorage.setItem("wishlist", JSON.stringify([]))
 
       // Then make API calls to remove each item
-      const promises = itemsToRemove.map(item => 
+      const promises = itemsToRemove.map((item) =>
         fetch("https://evershinebackend-2.onrender.com/api/deleteUserWishlistItem", {
           method: "DELETE",
           headers: {
@@ -306,7 +308,7 @@ export default function WishlistPage() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ productId: item.postId }),
-        })
+        }),
       )
 
       await Promise.allSettled(promises)
@@ -323,7 +325,7 @@ export default function WishlistPage() {
         description: err.message || "Failed to clear wishlist. Please try again.",
         variant: "destructive",
       })
-      
+
       // Reload wishlist to get current state
       loadWishlist()
     } finally {
@@ -478,7 +480,7 @@ export default function WishlistPage() {
 
       toast({
         title: "Added to cart",
-        description: `${quantity} ${quantity > 1 ? "units" : "unit"} of ${name} added to cart and removed from wishlist`,
+        description: `${quantity} sqft of ${name} added to cart and removed from wishlist`,
         variant: "default",
       })
     } catch (err: any) {
@@ -496,6 +498,20 @@ export default function WishlistPage() {
   // Handle image loading errors
   const handleImageError = (itemId: string) => {
     setImageError((prev) => ({ ...prev, [itemId]: true }))
+  }
+
+  // Add this function to handle product card clicks
+  const handleProductClick = (e: React.MouseEvent, productId: string) => {
+    // Check if the click was on a button or its children
+    const target = e.target as HTMLElement
+    if (target.closest("button")) {
+      // If clicked on a button, don't navigate
+      e.preventDefault()
+      return
+    }
+
+    // Otherwise, allow navigation to proceed
+    router.push(`/client-dashboard/${clientId}/product/${productId}`)
   }
 
   return (
@@ -524,8 +540,8 @@ export default function WishlistPage() {
             {/* Clear Wishlist Button with Confirmation */}
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   disabled={clearingWishlist || wishlistItems.length === 0}
                   className="text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600"
@@ -547,10 +563,7 @@ export default function WishlistPage() {
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction 
-                    onClick={handleClearWishlist}
-                    className="bg-red-500 text-white hover:bg-red-600"
-                  >
+                  <AlertDialogAction onClick={handleClearWishlist} className="bg-red-500 text-white hover:bg-red-600">
                     Clear Wishlist
                   </AlertDialogAction>
                 </AlertDialogFooter>
@@ -625,6 +638,7 @@ export default function WishlistPage() {
                 <div
                   key={item._id || item.postId}
                   className="group relative bg-card rounded-lg overflow-hidden border border-border hover:border-primary transition-all hover:shadow-md"
+                  onClick={(e) => handleProductClick(e, item.postId)}
                 >
                   <div className="relative aspect-square">
                     <Image

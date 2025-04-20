@@ -25,6 +25,11 @@ interface ClientSettings {
   agentAffiliated: string
   createdAt?: string
   updatedAt?: string
+  address: string
+  dateOfBirth: string
+  businessName: string
+  gstNumber: string
+  projectType: string
 }
 
 export default function SettingsPage() {
@@ -43,6 +48,11 @@ export default function SettingsPage() {
     clientId: "",
     quantityRequired: 0,
     agentAffiliated: "",
+    address: "",
+    dateOfBirth: "",
+    businessName: "",
+    gstNumber: "",
+    projectType: "",
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -100,6 +110,11 @@ export default function SettingsPage() {
             agentAffiliated: data.data.agentAffiliated || "",
             createdAt: data.data.createdAt || "",
             updatedAt: data.data.updatedAt || "",
+            address: data.data.address || "",
+            dateOfBirth: data.data.dateOfBirth || "",
+            businessName: data.data.businessName || "",
+            gstNumber: data.data.gstNumber || "",
+            projectType: data.data.projectType || "",
             // Add any additional fields that might be in the client data
             // This ensures we don't lose any data when updating
             ...data.data,
@@ -224,6 +239,7 @@ export default function SettingsPage() {
       <Tabs defaultValue="profile" className="w-full">
         <TabsList className="mb-6">
           <TabsTrigger value="profile">Profile</TabsTrigger>
+          <TabsTrigger value="preferences">Preferences</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
         </TabsList>
 
@@ -303,7 +319,7 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="agentAffiliated">Advisor Affliated</Label>
+                    <Label htmlFor="agentAffiliated">Agent Affiliated</Label>
                     <Input
                       id="agentAffiliated"
                       name="agentAffiliated"
@@ -346,6 +362,62 @@ export default function SettingsPage() {
                       />
                     </div>
                   )}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="address">Address</Label>
+                    <Input
+                      id="address"
+                      name="address"
+                      value={settings.address}
+                      onChange={handleChange}
+                      disabled={saving}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="dateOfBirth">Date of Birth</Label>
+                    <Input
+                      id="dateOfBirth"
+                      name="dateOfBirth"
+                      type="date"
+                      value={settings.dateOfBirth}
+                      onChange={handleChange}
+                      disabled={saving}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="businessName">Business Name</Label>
+                    <Input
+                      id="businessName"
+                      name="businessName"
+                      value={settings.businessName}
+                      onChange={handleChange}
+                      disabled={saving}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="gstNumber">GST Number</Label>
+                    <Input
+                      id="gstNumber"
+                      name="gstNumber"
+                      value={settings.gstNumber}
+                      onChange={handleChange}
+                      disabled={saving}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="projectType">Project Type</Label>
+                    <Input
+                      id="projectType"
+                      name="projectType"
+                      value={settings.projectType}
+                      onChange={handleChange}
+                      disabled={saving}
+                    />
+                  </div>
                 </div>
 
                 <Separator />
@@ -366,12 +438,28 @@ export default function SettingsPage() {
                   </Button>
                 </div>
               </form>
-            
+              <div className="mt-8 pt-4 border-t">
+                <details className="text-sm">
+                  <summary className="cursor-pointer text-muted-foreground font-medium">Debug: All Client Data</summary>
+                  <pre className="mt-2 p-4 bg-muted rounded-md overflow-auto max-h-96 text-xs">
+                    {JSON.stringify(settings, null, 2)}
+                  </pre>
+                </details>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-       
+        <TabsContent value="preferences">
+          <Card>
+            <CardHeader>
+              <CardTitle>Preferences</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">Preferences settings will be available soon.</p>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="notifications">
           <Card>
