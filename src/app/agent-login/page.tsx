@@ -117,7 +117,7 @@ export default function AgentLogin() {
         <Card className="w-full shadow-lg border-0">
           <CardHeader className="space-y-1 bg-blue/5 border-b pb-4">
             <CardTitle className="text-2xl text-center text-blue">Advisor Login</CardTitle>
-            <CardDescription className="text-center">Login to access your agent dashboard</CardDescription>
+            <CardDescription className="text-center">Login to access your advisor dashboard</CardDescription>
           </CardHeader>
           <CardContent className="pt-6">
             {apiError && (
