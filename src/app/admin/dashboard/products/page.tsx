@@ -1,208 +1,244 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Search, PlusCircle, Loader2, MoreHorizontal, Package } from "lucide-react"
+import axios from "axios"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
+import { Search, Pencil, ArrowLeft, Loader2, Home } from "lucide-react"
 import Image from "next/image"
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 interface Product {
   _id: string
   name: string
   price: number
-  category: string
-  status: "active" | "draft" | "out_of_stock"
   image: string[]
-  createdAt: string
+  postId: string
+  status?: "draft" | "pending" | "approved"
 }
 
-export default function ProductsPage() {
+export default function Products() {
+  const router = useRouter()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState<"all" | "pending" | "approved" | "draft">("all")
   const [searchQuery, setSearchQuery] = useState("")
+  const [imageError, setImageError] = useState<Record<string, boolean>>({})
+  const [editLoading, setEditLoading] = useState<string | null>(null)
 
   useEffect(() => {
-    // Fetch products
-    const fetchProducts = async () => {
-      try {
-        // In a real app, you would fetch this data from your API
-        // For now, we'll use mock data
-        const mockProducts: Product[] = [
-          {
-            _id: "1",
-            name: "Italian Marble - Statuario",
-            price: 2500,
-            category: "Marble",
-            status: "active",
-            image: ["/polished-marble-swirls.png"],
-            createdAt: "2023-01-15",
-          },
-          {
-            _id: "2",
-            name: "Granite - Black Galaxy",
-            price: 1800,
-            category: "Granite",
-            status: "active",
-            image: ["/speckled-granite-slab.png"],
-            createdAt: "2023-02-20",
-          },
-          {
-            _id: "3",
-            name: "Quartz - White Sparkle",
-            price: 2200,
-            category: "Quartz",
-            status: "out_of_stock",
-            image: ["/amethyst-geode.png"],
-            createdAt: "2023-03-10",
-          },
-          {
-            _id: "4",
-            name: "Sandstone - Desert Gold",
-            price: 1500,
-            category: "Sandstone",
-            status: "draft",
-            image: ["/textured-sandstone-cliff.png"],
-            createdAt: "2023-01-05",
-          },
-        ]
-
-        setProducts(mockProducts)
-      } catch (error) {
-        console.error("Error fetching products:", error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
     fetchProducts()
   }, [])
 
-  // Filter products based on search query
-  const filteredProducts = products.filter(
-    (product) =>
-      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      product.category.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
-
-  // Get status badge color
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "active":
-        return "bg-green-100 text-green-800"
-      case "draft":
-        return "bg-yellow-100 text-yellow-800"
-      case "out_of_stock":
-        return "bg-red-100 text-red-800"
-      default:
-        return "bg-gray-100 text-gray-800"
+  const fetchProducts = async () => {
+    try {
+      setLoading(true)
+      const response = await axios.get(`${API_URL}/api/getAllProducts`)
+      if (response.data.success) {
+        setProducts(response.data.data)
+      }
+    } catch (error) {
+      console.error("Error fetching products:", error)
+    } finally {
+      setLoading(false)
     }
   }
 
-  // Format status text
-  const formatStatus = (status: string) => {
-    return status
-      .split("_")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ")
+  const handleEdit = async (e: React.MouseEvent, productId: string) => {
+    e.preventDefault()
+    try {
+      setEditLoading(productId)
+      const response = await axios.get(`${API_URL}/api/getPostDataById?id=${productId}`)
+      if (response.data.success) {
+        router.push(`/edit-product/${productId}`)
+      } else {
+        throw new Error("Product not found")
+      }
+    } catch (error) {
+      console.error("Error accessing product:", error)
+      alert("Unable to edit product at this time")
+    } finally {
+      setEditLoading(null)
+    }
+  }
+
+  const filteredProducts = products.filter((product) => {
+    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesTab = activeTab === "all" || product.status === activeTab
+    return matchesSearch && matchesTab
+  })
+
+  const handleImageError = (productId: string) => {
+    setImageError((prev) => ({ ...prev, [productId]: true }))
   }
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-[80vh]">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      <div className="flex justify-center items-center h-screen">
+        <Loader2 className="h-12 w-12 animate-spin text-[#194a95]" />
       </div>
     )
   }
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Products</h1>
-        <Button className="bg-blue hover:bg-blue/90">
-          <PlusCircle className="h-4 w-4 mr-2" />
-          Add New Product
-        </Button>
+    <div className="min-h-screen bg-white">
+      {/* Dashboard Header Strip */}
+      <div className="w-full bg-[rgb(25,74,149)] py-4 px-6 shadow-md">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <h1 className="text-white text-xl font-medium">Evershine Dashboard</h1>
+          <button
+            onClick={() => router.push("https://evershine-two.vercel.app/")}
+            className="flex items-center text-white hover:text-gray-200 transition-colors"
+          >
+            <Home className="h-5 w-5" />
+            <span className="ml-2">Home</span>
+          </button>
+        </div>
       </div>
 
-      <div className="relative mb-6">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-        <Input
-          placeholder="Search products by name or category..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10"
-        />
+      {/* Back Button Header */}
+      <div className="sticky top-0 z-10 bg-white border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+          <div className="py-4">
+            <button
+              onClick={() => router.push("https://evershine-two.vercel.app/")}
+              className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              <ArrowLeft className="h-6 w-6" />
+            </button>
+          </div>
+        </div>
       </div>
 
-      {filteredProducts.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Package className="h-16 w-16 text-muted-foreground mb-4" />
-            <p className="text-xl font-medium mb-2">No products found</p>
-            <p className="text-muted-foreground mb-6">
-              {searchQuery ? "Try a different search term" : "Add your first product to get started"}
-            </p>
-            <Button className="bg-blue hover:bg-blue/90">
-              <PlusCircle className="h-4 w-4 mr-2" />
-              Add New Product
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>All Products</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-3 px-4">Product</th>
-                    <th className="text-left py-3 px-4">Category</th>
-                    <th className="text-right py-3 px-4">Price (₹/sqft)</th>
-                    <th className="text-center py-3 px-4">Status</th>
-                    <th className="text-left py-3 px-4">Created</th>
-                    <th className="text-center py-3 px-4">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredProducts.map((product) => (
-                    <tr key={product._id} className="border-b hover:bg-gray-50">
-                      <td className="py-3 px-4">
-                        <div className="flex items-center">
-                          <div className="relative h-10 w-10 rounded-md overflow-hidden mr-3">
-                            <Image
-                              src={product.image[0] || "/placeholder.svg?height=40&width=40"}
-                              alt={product.name}
-                              fill
-                              className="object-cover"
-                            />
-                          </div>
-                          <span>{product.name}</span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4">{product.category}</td>
-                      <td className="py-3 px-4 text-right">₹{product.price.toLocaleString()}</td>
-                      <td className="py-3 px-4 text-center">
-                        <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(product.status)}`}>
-                          {formatStatus(product.status)}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-5 w-5" />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-6">
+        {/* Header with Search */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+          <h1 className="text-4xl font-bold text-[#181818]">All Products</h1>
+          <div className="relative w-full md:w-auto">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+              <input
+                type="text"
+                placeholder="Search Product..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 pr-4 py-3 w-full md:w-[300px] rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#194a95] focus:border-transparent [&::placeholder]:text-black"
+              />
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        </div>
+
+        {/* Filter Tabs and Add Button */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+          <div className="flex flex-wrap gap-2">
+            {(["all", "pending", "approved", "draft"] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  activeTab === tab ? "bg-[#194a95] text-white" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+                }`}
+              >
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => router.push("/add-product")}
+            className="px-6 py-3 rounded-lg bg-[#194a95] text-white w-full md:w-auto justify-center
+                     hover:bg-[#0f3a7a] transition-colors active:transform active:scale-95"
+          >
+            Add New Product
+          </button>
+        </div>
+
+        {/* Products Count */}
+        <p className="text-gray-600 mb-6">
+          Showing {filteredProducts.length} of {products.length} products
+        </p>
+
+        {/* Products Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 lg:gap-6 mb-8">
+          {filteredProducts.map((product) => (
+            <div
+              key={product._id}
+              className="group relative bg-white rounded-2xl overflow-hidden border border-gray-200/80 hover:border-gray-300/80 transition-colors"
+            >
+              <Link href={`/product/${product.postId}`} className="block">
+                <div className="p-3">
+                  <div
+                    className="relative w-full overflow-hidden rounded-xl bg-gray-50
+                              aspect-[4/3] sm:aspect-[4/3] md:aspect-[4/3] lg:aspect-square"
+                  >
+                    <Image
+                      src={imageError[product._id] ? "/placeholder.svg" : product.image[0] || "/placeholder.svg"}
+                      alt={product.name}
+                      fill
+                      className="object-cover transition-transform group-hover:scale-105 duration-300"
+                      onError={() => handleImageError(product._id)}
+                    />
+                  </div>
+                </div>
+                <div className="px-4 pb-4">
+                  <div className="flex justify-between items-start gap-2">
+                    <h3 className="font-semibold text-lg text-gray-900 line-clamp-1">{product.name}</h3>
+                    <div className="relative z-10 -mt-1 -mr-1 flex-shrink-0" onClick={(e) => e.preventDefault()}>
+                      <button
+                        onClick={(e) => handleEdit(e, product.postId)}
+                        className="p-1.5 rounded-full hover:bg-gray-100 disabled:opacity-50"
+                        disabled={editLoading === product.postId}
+                      >
+                        {editLoading === product.postId ? (
+                          <Loader2 className="h-4 w-4 animate-spin text-[#194a95]" />
+                        ) : (
+                          <Pencil className="h-4 w-4 text-gray-500" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-gray-600 mt-0.5">Rs. {product.price}/per sqft</p>
+                  {product.status && (
+                    <span
+                      className={`inline-block mt-2 px-2 py-1 rounded-full text-xs ${
+                        product.status === "approved"
+                          ? "bg-green-100 text-green-800"
+                          : product.status === "pending"
+                            ? "bg-yellow-100 text-yellow-800"
+                            : "bg-gray-100 text-gray-800"
+                      }`}
+                    >
+                      {product.status.charAt(0).toUpperCase() + product.status.slice(1)}
+                    </span>
+                  )}
+                </div>
+              </Link>
+            </div>
+          ))}
+        </div>
+
+        {/* Empty State */}
+        {filteredProducts.length === 0 && (
+          <div className="text-center py-12">
+            <p className="text-gray-500 text-lg">No products found</p>
+          </div>
+        )}
+
+        {/* Pagination */}
+        {filteredProducts.length > 0 && (
+          <div className="flex justify-end gap-4 mt-8">
+            <button className="px-6 py-3 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors w-32">
+              Previous
+            </button>
+            <button className="px-6 py-3 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors w-32">
+              Next
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
