@@ -379,16 +379,7 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="preferences">
-          <Card>
-            <CardHeader>
-              <CardTitle>Preferences</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">Preferences settings will be available soon.</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
+       
 
         <TabsContent value="notifications">
           <Card>
