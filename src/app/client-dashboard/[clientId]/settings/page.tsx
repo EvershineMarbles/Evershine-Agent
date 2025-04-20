@@ -367,14 +367,7 @@ export default function SettingsPage() {
                   </Button>
                 </div>
               </form>
-              <div className="mt-8 pt-4 border-t">
-                <details className="text-sm">
-                  <summary className="cursor-pointer text-muted-foreground font-medium">Debug: All Client Data</summary>
-                  <pre className="mt-2 p-4 bg-muted rounded-md overflow-auto max-h-96 text-xs">
-                    {JSON.stringify(settings, null, 2)}
-                  </pre>
-                </details>
-              </div>
+            
             </CardContent>
           </Card>
         </TabsContent>
