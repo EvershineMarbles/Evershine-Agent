@@ -470,7 +470,7 @@ export default function ProductDetail() {
             {/* Action Buttons */}
             <div className="flex flex-wrap gap-4">
               <Button
-                onClick={() => router.push(`/edit-product/${product.postId}`)}
+                onClick={() => router.push(`/admin/dashboard/edit-product/${product.postId}`)}
                 className="px-8 py-3 bg-[#194a95] hover:bg-[#0f3a7a] text-white rounded-md"
               >
                 Edit
