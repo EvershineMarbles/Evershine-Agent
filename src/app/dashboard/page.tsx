@@ -1,229 +1,269 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { AlertCircle, CheckCircle, Clock, Truck, XCircle, Search } from "lucide-react"
-import { Input } from "@/components/ui/input"
+import { useEffect, useState, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
+import Image from "next/image"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { ArrowLeft, Users, Package, Bell, Settings, LogOut, UserPlus, Loader2 } from "lucide-react"
+import { agentAPI } from "@/lib/api-utils"
+import { isAgentAuthenticated, storeClientImpersonationToken, clearAllTokens } from "@/lib/auth-utils"
+import { useToast } from "@/components/ui/use-toast"
 
-// Define types for our stats
-interface DashboardStats {
-  agentCount: number
-  clientCount: number
-  productCount: number
-  orderCount: number
-  revenue: number
-  pendingOrders: number
-  ordersByStatus: {
-    pending: number
-    processing: number
-    shipped: number
-    delivered: number
-    cancelled: number
-  }
-  recentOrders: any[]
+// Define client interface
+interface Client {
+  _id: string
+  name: string
+  mobile: string
+  clientId: string
+  profession?: string
+  city?: string
+  email?: string
 }
 
-export default function AdminDashboard() {
-  const [stats, setStats] = useState<DashboardStats>({
-    agentCount: 0,
-    clientCount: 0,
-    productCount: 0,
-    orderCount: 0,
-    revenue: 0,
-    pendingOrders: 0,
-    ordersByStatus: {
-      pending: 0,
-      processing: 0,
-      shipped: 0,
-      delivered: 0,
-      cancelled: 0,
-    },
-    recentOrders: [],
-  })
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+export default function Dashboard() {
+  const router = useRouter()
+  const { toast } = useToast()
+  const [agentEmail, setAgentEmail] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [clients, setClients] = useState<Client[]>([])
+  const [showDebug, setShowDebug] = useState(false)
+
+  // Wrap fetchClients in useCallback to prevent it from being recreated on every render
+  const fetchClients = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const response = await agentAPI.getClients()
+
+      if (response.success && Array.isArray(response.data)) {
+        setClients(response.data)
+      } else {
+        toast({
+          title: "Error",
+          description: response.message || "Failed to fetch clients",
+          variant: "destructive",
+        })
+        setClients([])
+      }
+    } catch (error) {
+      console.error("Error fetching clients:", error)
+      toast({
+        title: "Error",
+        description: "Failed to fetch clients. Please try again.",
+        variant: "destructive",
+      })
+      setClients([])
+    } finally {
+      setIsLoading(false)
+    }
+  }, [toast]) // Add toast as a dependency
 
   useEffect(() => {
-    const fetchDashboardStats = async () => {
-      try {
-        setLoading(true)
-        setError(null)
+    // Check if agent is logged in
+    if (!isAgentAuthenticated()) {
+      router.push("/agent-login")
+      return
+    }
 
-        // In a real app, you would fetch these stats from your API
-        // For now, we'll use dummy data
-        // const response = await fetchWithAdminAuth('/api/admin/dashboard');
-        // const data = await response.json();
+    // Fetch agent email from localStorage
+    const email = localStorage.getItem("agentEmail")
+    setAgentEmail(email)
 
-        // Simulate API response with dummy data
+    // Fetch clients
+    fetchClients()
+  }, [router, fetchClients]) // Add fetchClients to the dependency array
+
+  const handleClientSelect = async (clientId: string) => {
+    try {
+      console.log("Attempting to impersonate client:", clientId)
+      const response = await agentAPI.impersonateClient(clientId)
+      console.log("Impersonation response:", response)
+
+      if (response.success && response.data && response.data.impersonationToken) {
+        // Store the impersonation token
+        storeClientImpersonationToken(clientId, response.data.impersonationToken)
+        console.log("Impersonation token stored, redirecting to client dashboard")
+
+        // Add a small delay to ensure token is stored before navigation
         setTimeout(() => {
-          setStats({
-            agentCount: 12,
-            clientCount: 248,
-            productCount: 456,
-            orderCount: 132,
-            revenue: 245000,
-            pendingOrders: 24,
-            ordersByStatus: {
-              pending: 24,
-              processing: 18,
-              shipped: 32,
-              delivered: 48,
-              cancelled: 10,
-            },
-            recentOrders: [
-              { id: "ORD-001", customer: "John Doe", amount: 12500, status: "delivered", date: "2023-06-15" },
-              { id: "ORD-002", customer: "Jane Smith", amount: 8700, status: "shipped", date: "2023-06-14" },
-              { id: "ORD-003", customer: "Robert Johnson", amount: 15200, status: "processing", date: "2023-06-14" },
-              { id: "ORD-004", customer: "Emily Davis", amount: 6300, status: "pending", date: "2023-06-13" },
-              { id: "ORD-005", customer: "Michael Brown", amount: 9800, status: "delivered", date: "2023-06-12" },
-            ],
-          })
-          setLoading(false)
-        }, 1000)
-      } catch (err: any) {
-        console.error("Error fetching dashboard stats:", err)
-        setError(err.message || "Failed to load dashboard statistics")
-        setLoading(false)
+          router.push(`/client-dashboard/${clientId}`)
+        }, 100)
+      } else {
+        console.error("Failed to get impersonation token:", response)
+        toast({
+          title: "Error",
+          description: response.message || "Failed to access client dashboard",
+          variant: "destructive",
+        })
       }
-    }
-
-    fetchDashboardStats()
-  }, [])
-
-  // Helper function to get status badge color
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "delivered":
-        return "bg-green-100 text-green-800"
-      case "shipped":
-        return "bg-blue-100 text-blue-800"
-      case "processing":
-        return "bg-yellow-100 text-yellow-800"
-      case "cancelled":
-        return "bg-red-100 text-red-800"
-      default:
-        return "bg-gray-100 text-gray-800"
+    } catch (error) {
+      console.error("Error impersonating client:", error)
+      toast({
+        title: "Error",
+        description: "Failed to access client dashboard. Please try again.",
+        variant: "destructive",
+      })
     }
   }
 
-  // Helper function to get status icon
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "delivered":
-        return <CheckCircle className="h-4 w-4" />
-      case "shipped":
-        return <Truck className="h-4 w-4" />
-      case "processing":
-        return <Clock className="h-4 w-4" />
-      case "cancelled":
-        return <XCircle className="h-4 w-4" />
-      default:
-        return <AlertCircle className="h-4 w-4" />
-    }
+  const handleLogout = () => {
+    clearAllTokens()
+    router.push("/")
   }
 
-  // Calculate total orders for percentage
-  const totalOrders = Object.values(stats.ordersByStatus).reduce((sum, count) => sum + count, 0)
+  if (isLoading && clients.length === 0) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin mr-2" />
+        <p>Loading dashboard...</p>
+      </div>
+    )
+  }
 
   return (
-    <div className="flex-1 bg-white">
-      <header className="p-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">Welcome, Mr. Ankit</h1>
-          <div className="relative w-[450px]">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-            <Input
-              type="text"
-              placeholder="Search by client name, product, sales agent..."
-              className="pl-10 py-2 border rounded-full"
-            />
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white border-b p-4">
+        <div className="container mx-auto flex justify-between items-center">
+          <div className="flex items-center">
+            <Link href="https://evershine-agent.vercel.app/agent-login" className="mr-4">
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+            <Image src="/logo.png" alt="Evershine Logo" width={120} height={60} />
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-muted-foreground">Welcome, {agentEmail}</span>
+            <Button variant="outline" size="sm" onClick={() => setShowDebug(!showDebug)}>
+              {showDebug ? "Hide Debug" : "Show Debug"}
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleLogout}>
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
           </div>
         </div>
       </header>
 
-      <main className="p-6">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          <Card className="border-2 rounded-3xl overflow-hidden">
-            <CardContent className="p-6 flex flex-col items-center justify-center min-h-[120px]">
-              <h2 className="text-2xl font-semibold text-center">Total Clients</h2>
-              <p className="text-4xl font-bold mt-2">50</p>
+
+      <main className="container mx-auto py-8 px-4">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold">Agent Dashboard</h1>
+          <Link href="/register-client">
+            <Button className="bg-coral hover:bg-coral/90">
+              <UserPlus className="h-4 w-4 mr-2" />
+              Create Client
+            </Button>
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center">
+                <Users className="h-5 w-5 mr-2 text-blue" />
+                Total Clients
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold">{clients.length}</p>
             </CardContent>
           </Card>
 
-          <Card className="border-2 rounded-3xl overflow-hidden">
-            <CardContent className="p-6 flex flex-col items-center justify-center min-h-[120px]">
-              <h2 className="text-2xl font-semibold text-center">Active Sales Agents</h2>
-              <p className="text-4xl font-bold mt-2">4</p>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center">
+                <Package className="h-5 w-5 mr-2 text-blue" />
+                Active Orders
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold">12</p>
             </CardContent>
           </Card>
 
-          <Card className="border-2 rounded-3xl overflow-hidden">
-            <CardContent className="p-6 flex flex-col items-center justify-center min-h-[120px]">
-              <h2 className="text-2xl font-semibold text-center">Products Available</h2>
-              <p className="text-4xl font-bold mt-2">156</p>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center">
+                <Bell className="h-5 w-5 mr-2 text-blue" />
+                Pending Reminders
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold">8</p>
             </CardContent>
           </Card>
 
-          <Card className="border-2 rounded-3xl overflow-hidden">
-            <CardContent className="p-6 flex flex-col items-center justify-center min-h-[120px]">
-              <h2 className="text-2xl font-semibold text-center">Pending Follow-ups</h2>
-              <p className="text-4xl font-bold mt-2">250</p>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center">
+                <Settings className="h-5 w-5 mr-2 text-blue" />
+                Settings
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Button variant="outline" size="sm" className="w-full">
+                Manage Account
+              </Button>
             </CardContent>
           </Card>
         </div>
- {/* Action Buttons - Firs Row */}
- <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <Link href="/admin/dashboard/agents" className="w-full">
-                <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-12 text-lg font-normal w-full rounded-md">
-                  Advisors
-                </Button>
-              </Link>
 
-              <Link href="/admin/dashboard/all-clients" className="w-full">
-                <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-12 text-lg font-normal w-full rounded-md">
-                  Client List
-                </Button>
-              </Link>
-
-              <Link href="/scan-qr" className="w-full">
-                <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-12 text-lg font-normal w-full rounded-md">
-                  Scan QR Code
-                </Button>
-              </Link>
-
-            </div>
-
-            {/* Action Buttons - Second Row */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-              
-              <Link href="/admin/dashboard/followups" className="w-full">
-                <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-12 text-lg font-normal w-full rounded-md">
-                  Follow-up Reminders
-                </Button>
-              </Link>
-
-              <Link href="/admin/products/pricing" className="w-full">
-                <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-12 text-lg font-normal w-full rounded-md">
-                  Change Standard Price
-                </Button>
-              </Link>
-
-              <Link href="../register-client" className="w-full">
-                <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-12 text-lg font-normal w-full rounded-md">
-                  Register New Client
-                </Button>
-              </Link>
-            </div>
-
-        {/* Erase All Data Button */}
-        <div className="flex justify-center">
-          <Button className="bg-red-600 hover:bg-red-700 text-white h-12 w-full max-w-md text-lg font-normal rounded-md">
-            Erase All Data
-          </Button>
-        </div>
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Users className="h-5 w-5 mr-2" />
+              Client List
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin" />
+              </div>
+            ) : clients.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-3 px-4">Name</th>
+                      <th className="text-left py-3 px-4">Mobile</th>
+                      <th className="text-left py-3 px-4">Profession</th>
+                      <th className="text-left py-3 px-4">City</th>
+                      <th className="text-center py-3 px-4">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {clients.map((client) => (
+                      <tr key={client._id || client.clientId} className="border-b hover:bg-gray-50">
+                        <td className="py-3 px-4">{client.name}</td>
+                        <td className="py-3 px-4">{client.mobile}</td>
+                        <td className="py-3 px-4">{client.profession || "-"}</td>
+                        <td className="py-3 px-4">{client.city || "-"}</td>
+                        <td className="py-3 px-4 flex justify-center gap-2">
+                          <Button
+                            variant="default"
+                            size="sm"
+                            className="bg-blue hover:bg-blue/90 text-white"
+                            onClick={() => handleClientSelect(client.clientId)}
+                          >
+                            Access Dashboard
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground mb-4">No clients found</p>
+                <Link href="/register-client">
+                  <Button className="bg-blue hover:bg-blue/90">Create Your First Client</Button>
+                </Link>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </main>
     </div>
   )
