@@ -1,186 +1,228 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
-import { useRouter } from "next/navigation"
-import Image from "next/image"
-import { Button } from "@/components/ui/button"
+import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
-import { Users, Package, Bell, LogOut, UserPlus, Loader2, QrCode, List } from "lucide-react"
-import { agentAPI } from "@/lib/api-utils"
-import { isAgentAuthenticated, clearAllTokens } from "@/lib/auth-utils"
-import { useToast } from "@/components/ui/use-toast"
+import { Button } from "@/components/ui/button"
+import { AlertCircle, CheckCircle, Clock, Truck, XCircle, Search } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import Link from "next/link"
 
-// Define client interface
-interface Client {
-  _id: string
-  name: string
-  mobile: string
-  clientId: string
-  profession?: string
-  city?: string
-  email?: string
+// Define types for our stats
+interface DashboardStats {
+  agentCount: number
+  clientCount: number
+  productCount: number
+  orderCount: number
+  revenue: number
+  pendingOrders: number
+  ordersByStatus: {
+    pending: number
+    processing: number
+    shipped: number
+    delivered: number
+    cancelled: number
+  }
+  recentOrders: any[]
 }
 
-export default function Dashboard() {
-  const router = useRouter()
-  const { toast } = useToast()
-  const [agentEmail, setAgentEmail] = useState<string | null>(null)
-  const [agentName, setAgentName] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [clients, setClients] = useState<Client[]>([])
-
-  // Wrap fetchClients in useCallback to prevent it from being recreated on every render
-  const fetchClients = useCallback(async () => {
-    setIsLoading(true)
-    try {
-      const response = await agentAPI.getClients()
-
-      if (response.success && Array.isArray(response.data)) {
-        setClients(response.data)
-      } else {
-        toast({
-          title: "Error",
-          description: response.message || "Failed to fetch clients",
-          variant: "destructive",
-        })
-        setClients([])
-      }
-    } catch (error) {
-      console.error("Error fetching clients:", error)
-      toast({
-        title: "Error",
-        description: "Failed to fetch clients. Please try again.",
-        variant: "destructive",
-      })
-      setClients([])
-    } finally {
-      setIsLoading(false)
-    }
-  }, [toast]) // Add toast as a dependency
+export default function AdminDashboard() {
+  const [stats, setStats] = useState<DashboardStats>({
+    agentCount: 0,
+    clientCount: 0,
+    productCount: 0,
+    orderCount: 0,
+    revenue: 0,
+    pendingOrders: 0,
+    ordersByStatus: {
+      pending: 0,
+      processing: 0,
+      shipped: 0,
+      delivered: 0,
+      cancelled: 0,
+    },
+    recentOrders: [],
+  })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Check if agent is logged in
-    if (!isAgentAuthenticated()) {
-      router.push("/agent-login")
-      return
+    const fetchDashboardStats = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+
+        // In a real app, you would fetch these stats from your API
+        // For now, we'll use dummy data
+        // const response = await fetchWithAdminAuth('/api/admin/dashboard');
+        // const data = await response.json();
+
+        // Simulate API response with dummy data
+        setTimeout(() => {
+          setStats({
+            agentCount: 12,
+            clientCount: 248,
+            productCount: 456,
+            orderCount: 132,
+            revenue: 245000,
+            pendingOrders: 24,
+            ordersByStatus: {
+              pending: 24,
+              processing: 18,
+              shipped: 32,
+              delivered: 48,
+              cancelled: 10,
+            },
+            recentOrders: [
+              { id: "ORD-001", customer: "John Doe", amount: 12500, status: "delivered", date: "2023-06-15" },
+              { id: "ORD-002", customer: "Jane Smith", amount: 8700, status: "shipped", date: "2023-06-14" },
+              { id: "ORD-003", customer: "Robert Johnson", amount: 15200, status: "processing", date: "2023-06-14" },
+              { id: "ORD-004", customer: "Emily Davis", amount: 6300, status: "pending", date: "2023-06-13" },
+              { id: "ORD-005", customer: "Michael Brown", amount: 9800, status: "delivered", date: "2023-06-12" },
+            ],
+          })
+          setLoading(false)
+        }, 1000)
+      } catch (err: any) {
+        console.error("Error fetching dashboard stats:", err)
+        setError(err.message || "Failed to load dashboard statistics")
+        setLoading(false)
+      }
     }
 
-    // Fetch agent email from localStorage
-    const email = localStorage.getItem("agentEmail")
-    setAgentEmail(email)
+    fetchDashboardStats()
+  }, [])
 
-    // Extract name from email (for demo purposes)
-    if (email) {
-      const name = email.split("@")[0]
-      // Capitalize first letter and format name
-      const formattedName = name.charAt(0).toUpperCase() + name.slice(1)
-      setAgentName(formattedName)
+  // Helper function to get status badge color
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "delivered":
+        return "bg-green-100 text-green-800"
+      case "shipped":
+        return "bg-blue-100 text-blue-800"
+      case "processing":
+        return "bg-yellow-100 text-yellow-800"
+      case "cancelled":
+        return "bg-red-100 text-red-800"
+      default:
+        return "bg-gray-100 text-gray-800"
     }
-
-    // Fetch clients
-    fetchClients()
-  }, [router, fetchClients]) // Add fetchClients to the dependency array
-
-  const handleLogout = () => {
-    clearAllTokens()
-    router.push("/agent-login")
   }
 
-  if (isLoading && clients.length === 0) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin mr-2" />
-        <p>Loading dashboard...</p>
-      </div>
-    )
+  // Helper function to get status icon
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "delivered":
+        return <CheckCircle className="h-4 w-4" />
+      case "shipped":
+        return <Truck className="h-4 w-4" />
+      case "processing":
+        return <Clock className="h-4 w-4" />
+      case "cancelled":
+        return <XCircle className="h-4 w-4" />
+      default:
+        return <AlertCircle className="h-4 w-4" />
+    }
   }
+
+  // Calculate total orders for percentage
+  const totalOrders = Object.values(stats.ordersByStatus).reduce((sum, count) => sum + count, 0)
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Blue strip at the top */}
-      <div className="w-full bg-[#194a95] text-white py-4 px-6">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Image src="/logo2.png" alt="Evershine Logo" width={80} height={40} />
-            <h1 className="text-xl font-semibold">Agent Dashboard</h1>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm md:text-base">Welcome, {agentName || agentEmail}</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleLogout}
-              className="text-white hover:bg-white/20 hover:text-white"
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              <span>Logout</span>
-            </Button>
+    <div className="flex-1 bg-white">
+      <header className="p-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold">Welcome, Mr. Ankit</h1>
+          <div className="relative w-[450px]">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <Input
+              type="text"
+              placeholder="Search by client name, product, sales agent..."
+              className="pl-10 py-2 border rounded-full"
+            />
           </div>
         </div>
-      </div>
+      </header>
 
-      <main className="container mx-auto py-6 px-4 flex-1">
-        <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
-
+      <main className="p-6">
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-          <Card className="border rounded-lg overflow-hidden">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3">
-                <Users className="h-5 w-5 text-[#194a95]" />
-                <span className="text-gray-600 font-medium">Total Clients</span>
-              </div>
-              <p className="text-3xl font-bold mt-2">{clients.length}</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <Card className="border-2 rounded-3xl overflow-hidden">
+            <CardContent className="p-6 flex flex-col items-center justify-center min-h-[120px]">
+              <h2 className="text-2xl font-semibold text-center">Total Clients</h2>
+              <p className="text-4xl font-bold mt-2">250</p>
             </CardContent>
           </Card>
 
-          <Card className="border rounded-lg overflow-hidden">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3">
-                <Package className="h-5 w-5 text-[#194a95]" />
-                <span className="text-gray-600 font-medium">Active Orders</span>
-              </div>
-              <p className="text-3xl font-bold mt-2">12</p>
+          <Card className="border-2 rounded-3xl overflow-hidden">
+            <CardContent className="p-6 flex flex-col items-center justify-center min-h-[120px]">
+              <h2 className="text-2xl font-semibold text-center">Active Sales Agents</h2>
+              <p className="text-4xl font-bold mt-2">10</p>
             </CardContent>
           </Card>
 
-          <Card className="border rounded-lg overflow-hidden">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3">
-                <Bell className="h-5 w-5 text-[#194a95]" />
-                <span className="text-gray-600 font-medium">Pending Reminders</span>
-              </div>
-              <p className="text-3xl font-bold mt-2">8</p>
+          <Card className="border-2 rounded-3xl overflow-hidden">
+            <CardContent className="p-6 flex flex-col items-center justify-center min-h-[120px]">
+              <h2 className="text-2xl font-semibold text-center">Products Available</h2>
+              <p className="text-4xl font-bold mt-2">400</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-2 rounded-3xl overflow-hidden">
+            <CardContent className="p-6 flex flex-col items-center justify-center min-h-[120px]">
+              <h2 className="text-2xl font-semibold text-center">Pending Follow-ups</h2>
+              <p className="text-4xl font-bold mt-2">250</p>
             </CardContent>
           </Card>
         </div>
+ {/* Action Buttons - Firs Row */}
+ <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <Link href="/admin/dashboard/agents" className="w-full">
+                <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-12 text-lg font-normal w-full rounded-md">
+                  Advisors
+                </Button>
+              </Link>
 
-        {/* Action Buttons */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Link href="/admin/dashboard/all-clients" className="w-full">
+                <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-12 text-lg font-normal w-full rounded-md">
+                  Client List
+                </Button>
+              </Link>
 
-          <button
-            className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg"
-            onClick={() => router.push("/register-client")}
-          >
-            <UserPlus className="h-6 w-6" />
-            <span className="text-base font-medium">Register a New Client</span>
-          </button>
+              <Link href="/scan-qr" className="w-full">
+                <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-12 text-lg font-normal w-full rounded-md">
+                  Scan QR Code
+                </Button>
+              </Link>
 
-          <button
-            className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg"
-            onClick={() => router.push("/client-list")}
-          >
-            <List className="h-6 w-6" />
-            <span className="text-base font-medium">Client List</span>
-          </button>
+            </div>
 
-          <button
-            className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg"
-            onClick={() => router.push("/scan-qr")}
-          >
-            <QrCode className="h-6 w-6" />
-            <span className="text-base font-medium">Scan QR</span>
-          </button>
+            {/* Action Buttons - Second Row */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+              
+              <Link href="/admin/dashboard/followups" className="w-full">
+                <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-12 text-lg font-normal w-full rounded-md">
+                  Follow-up Reminders
+                </Button>
+              </Link>
+
+              <Link href="/admin/products/pricing" className="w-full">
+                <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-12 text-lg font-normal w-full rounded-md">
+                  Change Standard Price
+                </Button>
+              </Link>
+
+              <Link href="../register-client" className="w-full">
+                <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-12 text-lg font-normal w-full rounded-md">
+                  Register New Client
+                </Button>
+              </Link>
+            </div>
+
+        {/* Erase All Data Button */}
+        <div className="flex justify-center">
+          <Button className="bg-red-600 hover:bg-red-700 text-white h-12 w-full max-w-md text-lg font-normal rounded-md">
+            Erase All Data
+          </Button>
         </div>
       </main>
     </div>
