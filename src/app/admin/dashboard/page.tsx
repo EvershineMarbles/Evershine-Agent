@@ -149,14 +149,14 @@ export default function AdminDashboard() {
           <Card className="border-2 rounded-3xl overflow-hidden">
             <CardContent className="p-6 flex flex-col items-center justify-center min-h-[120px]">
               <h2 className="text-2xl font-semibold text-center">Total Clients</h2>
-              <p className="text-4xl font-bold mt-2">250</p>
+              <p className="text-4xl font-bold mt-2">5</p>
             </CardContent>
           </Card>
 
           <Card className="border-2 rounded-3xl overflow-hidden">
             <CardContent className="p-6 flex flex-col items-center justify-center min-h-[120px]">
               <h2 className="text-2xl font-semibold text-center">Active Sales Agents</h2>
-              <p className="text-4xl font-bold mt-2">10</p>
+              <p className="text-4xl font-bold mt-2">4</p>
             </CardContent>
           </Card>
 
@@ -170,7 +170,7 @@ export default function AdminDashboard() {
           <Card className="border-2 rounded-3xl overflow-hidden">
             <CardContent className="p-6 flex flex-col items-center justify-center min-h-[120px]">
               <h2 className="text-2xl font-semibold text-center">Pending Follow-ups</h2>
-              <p className="text-4xl font-bold mt-2">250</p>
+              <p className="text-4xl font-bold mt-2">172</p>
             </CardContent>
           </Card>
         </div>
