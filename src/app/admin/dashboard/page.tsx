@@ -62,32 +62,15 @@ export default function AdminDashboard() {
           fetch("https://evershinebackend-2.onrender.com/api/clients"),
         ])
 
-        const agentsData = await agentsResponse.json()
-        const clientsData = await clientsResponse.json()
+        const agents = await agentsResponse.json()
+        const clients = await clientsResponse.json()
 
         // Update the stats with real data for agents and clients
-        setStats({
-          agentCount: agentsData.length || 0,
-          clientCount: clientsData.length || 0,
-          productCount: 400, // Keeping this as is
-          orderCount: 132,
-          revenue: 245000,
-          pendingOrders: 24,
-          ordersByStatus: {
-            pending: 24,
-            processing: 18,
-            shipped: 32,
-            delivered: 48,
-            cancelled: 10,
-          },
-          recentOrders: [
-            { id: "ORD-001", customer: "John Doe", amount: 12500, status: "delivered", date: "2023-06-15" },
-            { id: "ORD-002", customer: "Jane Smith", amount: 8700, status: "shipped", date: "2023-06-14" },
-            { id: "ORD-003", customer: "Robert Johnson", amount: 15200, status: "processing", date: "2023-06-14" },
-            { id: "ORD-004", customer: "Emily Davis", amount: 6300, status: "pending", date: "2023-06-13" },
-            { id: "ORD-005", customer: "Michael Brown", amount: 9800, status: "delivered", date: "2023-06-12" },
-          ],
-        })
+        setStats((prevStats) => ({
+          ...prevStats,
+          agentCount: agents.length || 0,
+          clientCount: clients.length || 0,
+        }))
 
         setLoading(false)
       } catch (err: any) {
