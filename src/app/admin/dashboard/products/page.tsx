@@ -120,7 +120,7 @@ export default function Products() {
           </div>
         </div>
 
-        {/* Filter Tabs and Add Button */}
+        {/* Filter Tabs and Add Buton */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div className="flex flex-wrap gap-2">
             {(["all", "pending", "approved", "draft"] as const).map((tab) => (
