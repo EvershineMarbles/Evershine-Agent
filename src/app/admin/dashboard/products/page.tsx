@@ -6,8 +6,9 @@ import { useState, useEffect } from "react"
 import axios from "axios"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Search, Pencil, ArrowLeft, Loader2, Home } from "lucide-react"
+import { Search, Pencil, ArrowLeft, Loader2, Info } from "lucide-react"
 import Image from "next/image"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
@@ -15,6 +16,8 @@ interface Product {
   _id: string
   name: string
   price: number
+  originalPrice?: number // Original price before commission
+  commissionRate?: number // The agent's commission rate
   image: string[]
   postId: string
   status?: "draft" | "pending" | "approved"
@@ -28,6 +31,7 @@ export default function Products() {
   const [searchQuery, setSearchQuery] = useState("")
   const [imageError, setImageError] = useState<Record<string, boolean>>({})
   const [editLoading, setEditLoading] = useState<string | null>(null)
+  const [agentCommissionRate, setAgentCommissionRate] = useState<number | null>(null)
 
   useEffect(() => {
     fetchProducts()
@@ -36,9 +40,21 @@ export default function Products() {
   const fetchProducts = async () => {
     try {
       setLoading(true)
-      const response = await axios.get(`${API_URL}/api/getAllProducts`)
+      // Use the agent-specific endpoint that returns commission-adjusted prices
+      const response = await axios.get(`${API_URL}/api/agent/products`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      })
+
       if (response.data.success) {
         setProducts(response.data.data)
+
+        // If any product has commission info, extract the rate
+        const productWithCommission = response.data.data.find((p: Product) => p.commissionRate !== undefined)
+        if (productWithCommission && productWithCommission.commissionRate !== undefined) {
+          setAgentCommissionRate(productWithCommission.commissionRate)
+        }
       }
     } catch (error) {
       console.error("Error fetching products:", error)
@@ -85,8 +101,6 @@ export default function Products() {
 
   return (
     <div className="min-h-screen bg-white">
-
-
       {/* Back Button Header */}
       <div className="sticky top-0 z-10 bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
@@ -105,7 +119,27 @@ export default function Products() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-6">
         {/* Header with Search */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-          <h1 className="text-4xl font-bold text-[#181818]">All Products</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-4xl font-bold text-[#181818]">All Products</h1>
+
+            {/* Commission Rate Badge */}
+            {agentCommissionRate !== null && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1">
+                      <Info className="h-4 w-4" />
+                      {agentCommissionRate}% Commission
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Prices shown include your {agentCommissionRate}% commission rate</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
+
           <div className="relative w-full md:w-auto">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
@@ -169,6 +203,13 @@ export default function Products() {
                       className="object-cover transition-transform group-hover:scale-105 duration-300"
                       onError={() => handleImageError(product._id)}
                     />
+
+                    {/* Commission Badge */}
+                    {product.originalPrice && product.originalPrice !== product.price && (
+                      <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                        Includes Commission
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="px-4 pb-4">
@@ -188,7 +229,19 @@ export default function Products() {
                       </button>
                     </div>
                   </div>
-                  <p className="text-gray-600 mt-0.5">Rs. {product.price}/per sqft</p>
+
+                  {/* Price Display with Original Price */}
+                  <div className="mt-0.5">
+                    {product.originalPrice && product.originalPrice !== product.price ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-400 line-through">Rs. {product.originalPrice}/per sqft</span>
+                        <span className="text-gray-600 font-medium">Rs. {product.price}/per sqft</span>
+                      </div>
+                    ) : (
+                      <p className="text-gray-600">Rs. {product.price}/per sqft</p>
+                    )}
+                  </div>
+
                   {product.status && (
                     <span
                       className={`inline-block mt-2 px-2 py-1 rounded-full text-xs ${

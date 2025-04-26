@@ -27,6 +27,7 @@ interface Agent {
   email: string
   agentId: string
   createdAt: string
+  commissionRate?: number // Add commissionRate to the Agent interface
 }
 
 export default function AgentTable() {
@@ -43,6 +44,7 @@ export default function AgentTable() {
   const [editFormData, setEditFormData] = useState({
     name: "",
     email: "",
+    commissionRate: 0, // Add commissionRate to the form data
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -57,6 +59,7 @@ export default function AgentTable() {
     name: "",
     email: "",
     password: "",
+    commissionRate: 0, // Add commissionRate to create form data
   })
   const [isCreating, setIsCreating] = useState(false)
 
@@ -114,6 +117,7 @@ export default function AgentTable() {
     setEditFormData({
       name: agent.name,
       email: agent.email,
+      commissionRate: agent.commissionRate || 0, // Set the commission rate from the agent data
     })
     setIsEditModalOpen(true)
   }
@@ -121,10 +125,23 @@ export default function AgentTable() {
   // Handle edit form input change
   const handleEditInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
-    setEditFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }))
+
+    // Special handling for commission rate to ensure it's a number between 0-100
+    if (name === "commissionRate") {
+      const numValue = Number.parseFloat(value)
+      if (isNaN(numValue)) return
+
+      const clampedValue = Math.min(Math.max(numValue, 0), 100)
+      setEditFormData((prev) => ({
+        ...prev,
+        [name]: clampedValue,
+      }))
+    } else {
+      setEditFormData((prev) => ({
+        ...prev,
+        [name]: value,
+      }))
+    }
   }
 
   // Handle edit form submission
@@ -135,9 +152,13 @@ export default function AgentTable() {
     setIsSubmitting(true)
 
     try {
+      // First update the general agent info
       const response = await fetchWithAdminAuth(`/api/admin/agents/${editingAgent.agentId}`, {
         method: "PUT",
-        body: JSON.stringify(editFormData),
+        body: JSON.stringify({
+          name: editFormData.name,
+          email: editFormData.email,
+        }),
       })
 
       if (!response.ok) {
@@ -145,13 +166,29 @@ export default function AgentTable() {
         throw new Error(errorData.message || "Failed to update agent")
       }
 
-      const data = await response.json()
+      // Then update the commission rate separately
+      const commissionResponse = await fetchWithAdminAuth(`/api/admin/agents/${editingAgent.agentId}/commission`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          commissionRate: editFormData.commissionRate,
+        }),
+      })
+
+      if (!commissionResponse.ok) {
+        const errorData = await commissionResponse.json()
+        throw new Error(errorData.message || "Failed to update commission rate")
+      }
 
       // Update the agent in the local state
       setAgents((prev) =>
         prev.map((agent) =>
           agent.agentId === editingAgent.agentId
-            ? { ...agent, name: editFormData.name, email: editFormData.email }
+            ? {
+                ...agent,
+                name: editFormData.name,
+                email: editFormData.email,
+                commissionRate: editFormData.commissionRate,
+              }
             : agent,
         ),
       )
@@ -226,6 +263,7 @@ export default function AgentTable() {
       name: "",
       email: "",
       password: "",
+      commissionRate: 0, // Default commission rate
     })
     setIsCreateModalOpen(true)
   }
@@ -233,10 +271,23 @@ export default function AgentTable() {
   // Handle create form input change
   const handleCreateInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
-    setCreateFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }))
+
+    // Special handling for commission rate to ensure it's a number between 0-100
+    if (name === "commissionRate") {
+      const numValue = Number.parseFloat(value)
+      if (isNaN(numValue)) return
+
+      const clampedValue = Math.min(Math.max(numValue, 0), 100)
+      setCreateFormData((prev) => ({
+        ...prev,
+        [name]: clampedValue,
+      }))
+    } else {
+      setCreateFormData((prev) => ({
+        ...prev,
+        [name]: value,
+      }))
+    }
   }
 
   // Handle create form submission
@@ -246,9 +297,14 @@ export default function AgentTable() {
     setIsCreating(true)
 
     try {
+      // First create the agent
       const response = await fetchWithAdminAuth("/api/admin/agents", {
         method: "POST",
-        body: JSON.stringify(createFormData),
+        body: JSON.stringify({
+          name: createFormData.name,
+          email: createFormData.email,
+          password: createFormData.password,
+        }),
       })
 
       if (!response.ok) {
@@ -257,6 +313,21 @@ export default function AgentTable() {
       }
 
       const data = await response.json()
+      const newAgentId = data.data.agentId
+
+      // Then set the commission rate if it's not 0
+      if (createFormData.commissionRate > 0) {
+        const commissionResponse = await fetchWithAdminAuth(`/api/admin/agents/${newAgentId}/commission`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            commissionRate: createFormData.commissionRate,
+          }),
+        })
+
+        if (!commissionResponse.ok) {
+          console.warn("Failed to set initial commission rate, but agent was created")
+        }
+      }
 
       // Refresh the agent list
       fetchAgents()
@@ -339,6 +410,12 @@ export default function AgentTable() {
                     <div>
                       <h3 className="font-medium text-lg">{agent.name}</h3>
                       <div className="text-sm text-gray-500">Joined on {formatDate(agent.createdAt)}</div>
+                      {/* Display commission rate if available */}
+                      {agent.commissionRate !== undefined && (
+                        <div className="text-sm text-emerald-600 font-medium mt-1">
+                          Commission Rate: {agent.commissionRate}%
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex flex-col md:flex-row items-start md:items-center gap-3">
@@ -401,6 +478,28 @@ export default function AgentTable() {
                   onChange={handleEditInputChange}
                   required
                 />
+              </div>
+              {/* Add Commission Rate field */}
+              <div className="grid gap-2">
+                <Label htmlFor="commissionRate">
+                  Commission Rate (%)
+                  <span className="ml-1 text-sm text-muted-foreground">
+                    - Products will be priced higher by this percentage
+                  </span>
+                </Label>
+                <Input
+                  id="commissionRate"
+                  name="commissionRate"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={editFormData.commissionRate}
+                  onChange={handleEditInputChange}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Example: A 15% commission rate means a product with base price 100 will be shown as 115 to this agent.
+                </p>
               </div>
             </div>
             <DialogFooter>
@@ -496,6 +595,28 @@ export default function AgentTable() {
                   required
                   minLength={8}
                 />
+              </div>
+              {/* Add Commission Rate field to create form */}
+              <div className="grid gap-2">
+                <Label htmlFor="create-commissionRate">
+                  Commission Rate (%)
+                  <span className="ml-1 text-sm text-muted-foreground">
+                    - Products will be priced higher by this percentage
+                  </span>
+                </Label>
+                <Input
+                  id="create-commissionRate"
+                  name="commissionRate"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={createFormData.commissionRate}
+                  onChange={handleCreateInputChange}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Example: A 15% commission rate means a product with base price 100 will be shown as 115 to this agent.
+                </p>
               </div>
             </div>
             <DialogFooter>
