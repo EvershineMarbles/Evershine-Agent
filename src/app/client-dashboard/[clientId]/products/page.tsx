@@ -4,18 +4,19 @@ import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode, ArrowUp } from "lucide-react"
+import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode } from "lucide-react"
 import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { Button } from "@/components/ui/button"
 
-// Define the Product interface
+// Update the Product interface to include basePrice
 interface Product {
   _id: string
   name: string
   price: number
+  basePrice?: number // Add basePrice field to show original price if needed
   image: string[]
   postId: string
   category: string
@@ -99,7 +100,7 @@ export default function ProductsPage() {
     }
   }, [wishlist, cart])
 
-  // Fetch products function
+  // Update the fetchProducts function to use the agent-specific endpoint
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true)
@@ -107,12 +108,22 @@ export default function ProductsPage() {
 
       // Use environment variable if available, otherwise use a default URL
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
-      console.log("Fetching products from:", `${apiUrl}/api/getAllProducts`)
 
-      const response = await fetch(`${apiUrl}/api/getAllProducts`, {
+      // Get the token for authentication
+      const token = localStorage.getItem("clientImpersonationToken") || localStorage.getItem("agentToken")
+
+      if (!token) {
+        throw new Error("Authentication token not found. Please log in again.")
+      }
+
+      // Use the agent-specific endpoint that returns products with adjusted prices
+      console.log("Fetching products from:", `${apiUrl}/api/agent/products`)
+
+      const response = await fetch(`${apiUrl}/api/agent/products`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         // Add a timeout to prevent long waiting times
         signal: AbortSignal.timeout(8000), // 8 second timeout
@@ -558,7 +569,22 @@ export default function ProductsPage() {
 
                 <div className="p-4">
                   <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
-                  <p className="text-lg font-bold mt-2">₹{product.price.toLocaleString()}/sqft</p>
+
+                  {/* Update the product card display to show both prices if needed */}
+                  <div className="mt-2">
+                    <p className="text-lg font-bold text-foreground">₹{product.price.toLocaleString()}/sqft</p>
+                    {product.basePrice && product.basePrice !== product.price && (
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm text-muted-foreground line-through">
+                          ₹{product.basePrice.toLocaleString()}/sqft
+                        </p>
+                        <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-800 rounded-full">
+                          {Math.round(((product.price - product.basePrice) / product.basePrice) * 100)}% commission
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
                   <p className="text-sm text-muted-foreground mt-1">{product.category}</p>
 
                   <button
@@ -594,8 +620,6 @@ export default function ProductsPage() {
             ))}
           </div>
         )}
-
-   
       </div>
     </ErrorBoundary>
   )

@@ -6,7 +6,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Loader2, Plus, RefreshCw, Search, Eye, Edit, Trash2, Users } from "lucide-react"
+import { Loader2, Plus, RefreshCw, Search, Eye, Edit, Trash2, Users } from 'lucide-react'
 import { Input } from "@/components/ui/input"
 import { getAllAgents, fetchWithAdminAuth } from "@/lib/admin-auth"
 import { Badge } from "@/components/ui/badge"
@@ -27,7 +27,7 @@ interface Agent {
   email: string
   agentId: string
   createdAt: string
-  commissionRate?: number // Add commissionRate to the Agent interface
+  commissionRate?: number
 }
 
 export default function AgentTable() {
@@ -44,7 +44,7 @@ export default function AgentTable() {
   const [editFormData, setEditFormData] = useState({
     name: "",
     email: "",
-    commissionRate: 0, // Add commissionRate to the form data
+    commissionRate: 0,
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -59,7 +59,7 @@ export default function AgentTable() {
     name: "",
     email: "",
     password: "",
-    commissionRate: 0, // Add commissionRate to create form data
+    commissionRate: 0,
   })
   const [isCreating, setIsCreating] = useState(false)
 
@@ -117,7 +117,7 @@ export default function AgentTable() {
     setEditFormData({
       name: agent.name,
       email: agent.email,
-      commissionRate: agent.commissionRate || 0, // Set the commission rate from the agent data
+      commissionRate: agent.commissionRate || 0,
     })
     setIsEditModalOpen(true)
   }
@@ -213,7 +213,6 @@ export default function AgentTable() {
 
   // Handle opening delete confirmation
   const handleDeleteClick = (e: React.MouseEvent, agent: Agent) => {
-    console.log("handleDeleteClick called for agent:", agent) // ADD THIS LINE
     e.stopPropagation()
     setDeletingAgent(agent)
     setIsDeleteModalOpen(true)
@@ -304,6 +303,7 @@ export default function AgentTable() {
           name: createFormData.name,
           email: createFormData.email,
           password: createFormData.password,
+          commissionRate: createFormData.commissionRate, // Include commission rate in initial creation
         }),
       })
 
@@ -315,8 +315,8 @@ export default function AgentTable() {
       const data = await response.json()
       const newAgentId = data.data.agentId
 
-      // Then set the commission rate if it's not 0
-      if (createFormData.commissionRate > 0) {
+      // Only set commission rate separately if the API doesn't support setting it during creation
+      if (createFormData.commissionRate > 0 && !data.data.commissionRate) {
         const commissionResponse = await fetchWithAdminAuth(`/api/admin/agents/${newAgentId}/commission`, {
           method: "PATCH",
           body: JSON.stringify({
@@ -479,7 +479,7 @@ export default function AgentTable() {
                   required
                 />
               </div>
-              {/* Add Commission Rate field */}
+              {/* Commission Rate field */}
               <div className="grid gap-2">
                 <Label htmlFor="commissionRate">
                   Commission Rate (%)
@@ -596,7 +596,7 @@ export default function AgentTable() {
                   minLength={8}
                 />
               </div>
-              {/* Add Commission Rate field to create form */}
+              {/* Commission Rate field */}
               <div className="grid gap-2">
                 <Label htmlFor="create-commissionRate">
                   Commission Rate (%)
