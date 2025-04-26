@@ -574,7 +574,6 @@ export default function ProductsPage() {
                 <div className="p-4">
                   <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
 
-                  {/* Updated price display with commission information */}
                   <div className="mt-2">
                     <p className="text-lg font-bold text-foreground">₹{product.price.toLocaleString()}/sqft</p>
                     {product.basePrice && product.basePrice !== product.price && (
