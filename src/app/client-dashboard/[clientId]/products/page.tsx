@@ -25,7 +25,7 @@ interface Product {
   quantityAvailable?: number
 }
 
-// Interface for agent data
+// Define the agent data interface
 interface AgentData {
   _id: string
   name: string
@@ -48,7 +48,7 @@ export default function ProductsPage() {
   const [addingToCart, setAddingToCart] = useState<Record<string, boolean>>({})
   const [error, setError] = useState<string | null>(null)
   const [debugInfo, setDebugInfo] = useState<any>(null)
-  // Agent data state
+  // Agent data state - store this in localStorage to prevent infinite loops
   const [agentData, setAgentData] = useState<AgentData | null>(null)
 
   // Load wishlist and cart from localStorage
@@ -64,11 +64,34 @@ export default function ProductsPage() {
         if (savedCart) {
           setCart(JSON.parse(savedCart))
         }
+
+        // Try to load agent data from localStorage
+        const savedAgentData = localStorage.getItem(`agentData_${clientId}`)
+        if (savedAgentData) {
+          setAgentData(JSON.parse(savedAgentData))
+        } else {
+          // Generate mock agent data with a fixed commission rate for this session
+          const mockAgentId = Math.floor(Math.random() * 1000)
+          const mockCommissionRate = 10 + Math.floor(Math.random() * 20) // Random between 10-30%
+
+          const mockAgent = {
+            _id: `agent_${mockAgentId}`,
+            name: `Agent ${mockAgentId}`,
+            email: `agent${mockAgentId}@example.com`,
+            commissionRate: mockCommissionRate,
+          }
+
+          // Save to localStorage to prevent regenerating on each render
+          localStorage.setItem(`agentData_${clientId}`, JSON.stringify(mockAgent))
+          setAgentData(mockAgent)
+
+          console.log(`Created mock agent data with commission rate: ${mockCommissionRate}%`)
+        }
       } catch (e) {
         console.error("Error loading data from localStorage:", e)
       }
     }
-  }, [])
+  }, [clientId]) // Only depend on clientId
 
   // Save wishlist and cart to localStorage whenever they change
   useEffect(() => {
@@ -78,81 +101,17 @@ export default function ProductsPage() {
     }
   }, [wishlist, cart])
 
-  // Fetch agent data for the client
-  const fetchAgentData = useCallback(async () => {
-    try {
-      // Get the client impersonation token
-      const token = localStorage.getItem("clientImpersonationToken")
-
-      if (!token) {
-        throw new Error("No authentication token found")
-      }
-
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
-
-      // This is a placeholder endpoint - you'll need to create this endpoint on your backend
-      const response = await fetch(`${apiUrl}/api/client/${clientId}/agent-info`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        signal: AbortSignal.timeout(5000),
-      })
-
-      if (!response.ok) {
-        // For now, use a mock agent data with a random commission rate
-        // This simulates different agents having different commission rates
-        const mockAgentId = Math.floor(Math.random() * 1000)
-        const mockCommissionRate = 10 + Math.floor(Math.random() * 20) // Random between 10-30%
-
-        setAgentData({
-          _id: `agent_${mockAgentId}`,
-          name: `Agent ${mockAgentId}`,
-          email: `agent${mockAgentId}@example.com`,
-          commissionRate: mockCommissionRate,
-        })
-
-        console.log(`Using mock agent data with commission rate: ${mockCommissionRate}%`)
-        return
-      }
-
-      const data = await response.json()
-
-      if (data.success && data.data) {
-        setAgentData(data.data)
-      } else {
-        // Fallback to mock data if API doesn't return expected format
-        setAgentData({
-          _id: "default_agent",
-          name: "Default Agent",
-          email: "default@example.com",
-          commissionRate: 15, // Default 15% commission
-        })
-      }
-    } catch (error) {
-      console.error("Error fetching agent data:", error)
-      // Fallback to a default commission rate
-      setAgentData({
-        _id: "default_agent",
-        name: "Default Agent",
-        email: "default@example.com",
-        commissionRate: 15, // Default 15% commission
-      })
-    }
-  }, [clientId])
-
   // Fetch products function - Try both endpoints
   const fetchProducts = useCallback(async () => {
+    if (!agentData) {
+      console.log("Waiting for agent data before fetching products")
+      return // Don't fetch products until we have agent data
+    }
+
     try {
       setLoading(true)
       setError(null)
       setDebugInfo(null)
-
-      // First, ensure we have agent data (for commission rate)
-      if (!agentData) {
-        await fetchAgentData()
-      }
 
       // Get the client impersonation token
       const token = localStorage.getItem("clientImpersonationToken")
@@ -224,8 +183,8 @@ export default function ProductsPage() {
           data.data.map((p: Product) => ({ id: p._id, price: p.price })),
         )
 
-        // Get the commission rate from agent data or use a default
-        const commissionRate = agentData?.commissionRate || 15 // Default to 15% if no agent data
+        // Get the commission rate from agent data
+        const commissionRate = agentData.commissionRate
 
         const productsWithCommission = data.data.map((product: Product) => {
           const originalPrice = product.price
@@ -255,8 +214,8 @@ export default function ProductsPage() {
           ...prev,
           commissionApplied: true,
           commissionRate: `${commissionRate}%`,
-          agentId: agentData?._id || "unknown",
-          agentName: agentData?.name || "Unknown Agent",
+          agentId: agentData._id,
+          agentName: agentData.name,
           sampleProduct:
             productsWithCommission.length > 0
               ? {
@@ -286,7 +245,7 @@ export default function ProductsPage() {
     } finally {
       setLoading(false)
     }
-  }, [toast, agentData, fetchAgentData])
+  }, [agentData, toast]) // Only depend on agentData and toast
 
   // Helper function to process products data
   const processProductsData = (data: any) => {
@@ -308,15 +267,12 @@ export default function ProductsPage() {
     }
   }
 
-  // Fetch agent data and then products on component mount
+  // Fetch products when agentData is available
   useEffect(() => {
-    const loadData = async () => {
-      await fetchAgentData()
+    if (agentData) {
       fetchProducts()
     }
-
-    loadData()
-  }, [fetchAgentData, fetchProducts])
+  }, [agentData, fetchProducts])
 
   // Toggle wishlist function
   const toggleWishlist = useCallback(
