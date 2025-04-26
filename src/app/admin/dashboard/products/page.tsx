@@ -21,6 +21,7 @@ interface Product {
   image: string[]
   postId: string
   status?: "draft" | "pending" | "approved"
+  category?: string
 }
 
 export default function Products() {
@@ -47,11 +48,25 @@ export default function Products() {
         },
       })
 
+      console.log("API Response:", response.data) // Debug log to see the actual response
+
       if (response.data.success) {
-        setProducts(response.data.data)
+        // Make sure we're getting the correct data structure
+        const productsData = response.data.data || []
+
+        // Validate that we have proper price data
+        const validatedProducts = productsData.map((product: any) => {
+          return {
+            ...product,
+            price: typeof product.price === "number" ? product.price : 0,
+            originalPrice: typeof product.originalPrice === "number" ? product.originalPrice : product.price,
+          }
+        })
+
+        setProducts(validatedProducts)
 
         // If any product has commission info, extract the rate
-        const productWithCommission = response.data.data.find((p: Product) => p.commissionRate !== undefined)
+        const productWithCommission = validatedProducts.find((p: Product) => p.commissionRate !== undefined)
         if (productWithCommission && productWithCommission.commissionRate !== undefined) {
           setAgentCommissionRate(productWithCommission.commissionRate)
         }
@@ -82,7 +97,7 @@ export default function Products() {
   }
 
   const filteredProducts = products.filter((product) => {
-    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesSearch = product.name?.toLowerCase().includes(searchQuery.toLowerCase()) || false
     const matchesTab = activeTab === "all" || product.status === activeTab
     return matchesSearch && matchesTab
   })
@@ -233,7 +248,7 @@ export default function Products() {
                   {/* Price Display with Original Price */}
                   <div className="mt-0.5">
                     {product.originalPrice && product.originalPrice !== product.price ? (
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-col">
                         <span className="text-gray-400 line-through">Rs. {product.originalPrice}/per sqft</span>
                         <span className="text-gray-600 font-medium">Rs. {product.price}/per sqft</span>
                       </div>
@@ -241,6 +256,9 @@ export default function Products() {
                       <p className="text-gray-600">Rs. {product.price}/per sqft</p>
                     )}
                   </div>
+
+                  {/* Category */}
+                  <p className="text-gray-500 text-sm mt-1">{product.category}</p>
 
                   {product.status && (
                     <span
