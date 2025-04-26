@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
-import { Search, Loader2, Heart, ShoppingCart, AlertCircle, RefreshCw } from "lucide-react"
+import { Search, Loader2, Heart, ShoppingCart, AlertCircle, RefreshCw } from 'lucide-react'
 import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -48,7 +48,7 @@ export default function ProductsPage() {
   const [addingToCart, setAddingToCart] = useState<Record<string, boolean>>({})
   const [error, setError] = useState<string | null>(null)
   const [debugInfo, setDebugInfo] = useState<any>(null)
-  // Agent data state - store this in localStorage to prevent infinite loops
+  // Agent data state
   const [agentData, setAgentData] = useState<AgentData | null>(null)
 
   // Load wishlist and cart from localStorage
@@ -81,95 +81,44 @@ export default function ProductsPage() {
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
 
-      // First try to get the agent data from the client-specific endpoint
-      console.log("Fetching agent data from client endpoint...")
-
-      // This endpoint is specifically for when an agent is impersonating a client
-      const clientResponse = await fetch(`${apiUrl}/api/client/agent-info`, {
+      // Fetch agent data from the API
+      const response = await fetch(`${apiUrl}/api/agent/commission-info`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        signal: AbortSignal.timeout(5000),
       })
 
-      if (clientResponse.ok) {
-        const data = await clientResponse.json()
-        console.log("Agent data response from client endpoint:", data)
-
-        if (data.success && data.data) {
-          // Use the actual agent data from the database
-          setAgentData(data.data)
-          console.log(`Using real agent data with commission rate: ${data.data.commissionRate}%`)
-
-          // Save to localStorage to prevent refetching on each render
-          localStorage.setItem(`agentData_${clientId}`, JSON.stringify(data.data))
-          return
-        }
+      if (!response.ok) {
+        throw new Error(`Failed to fetch agent data: ${response.status}`)
       }
 
-      // If client endpoint fails, try the agent profile endpoint as fallback
-      console.log("Client endpoint failed, trying agent profile endpoint...")
-      const agentResponse = await fetch(`${apiUrl}/api/agent/profile`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        signal: AbortSignal.timeout(5000),
-      })
-
-      if (agentResponse.ok) {
-        const data = await agentResponse.json()
-        console.log("Agent data response from profile endpoint:", data)
-
-        if (data.success && data.data) {
-          // Use the actual agent data from the database
-          setAgentData(data.data)
-          console.log(`Using real agent data with commission rate: ${data.data.commissionRate}%`)
-
-          // Save to localStorage to prevent refetching on each render
-          localStorage.setItem(`agentData_${clientId}`, JSON.stringify(data.data))
-          return
-        }
+      const data = await response.json()
+      
+      if (data.success && data.data) {
+        setAgentData(data.data)
+        console.log(`Agent data fetched successfully with commission rate: ${data.data.commissionRate}%`)
+        
+        // Save to localStorage as a cache
+        localStorage.setItem(`agentData_${clientId}`, JSON.stringify(data.data))
+      } else {
+        throw new Error("Invalid agent data response")
       }
-
-      // If we couldn't get the real agent data, check if we have cached data
-      const savedAgentData = localStorage.getItem(`agentData_${clientId}`)
-      if (savedAgentData) {
-        const parsedData = JSON.parse(savedAgentData)
-        setAgentData(parsedData)
-        console.log(`Using cached agent data with commission rate: ${parsedData.commissionRate}%`)
-        return
-      }
-
-      // As a last resort, use hardcoded data with the correct commission rate
-      console.log("Using hardcoded agent data")
-      const hardcodedAgent = {
-        _id: "680cb109d48d142ea4fbd751",
-        name: "yedqw",
-        email: "del@gmail.com",
-        commissionRate: 10, // Use the correct commission rate from your database
-      }
-
-      // Save to localStorage to prevent refetching on each render
-      localStorage.setItem(`agentData_${clientId}`, JSON.stringify(hardcodedAgent))
-      setAgentData(hardcodedAgent)
     } catch (error) {
       console.error("Error fetching agent data:", error)
-
-      // Use hardcoded data with the correct commission rate as fallback
-      const hardcodedAgent = {
-        _id: "680cb109d48d142ea4fbd751",
-        name: "yedqw",
-        email: "del@gmail.com",
-        commissionRate: 10, // Use the correct commission rate from your database
+      
+      // Try to use cached data if available
+      const cachedData = localStorage.getItem(`agentData_${clientId}`)
+      if (cachedData) {
+        try {
+          const parsedData = JSON.parse(cachedData)
+          setAgentData(parsedData)
+          console.log(`Using cached agent data with commission rate: ${parsedData.commissionRate}%`)
+        } catch (e) {
+          console.error("Error parsing cached agent data:", e)
+        }
       }
-
-      // Save to localStorage to prevent refetching on each render
-      localStorage.setItem(`agentData_${clientId}`, JSON.stringify(hardcodedAgent))
-      setAgentData(hardcodedAgent)
     }
   }, [clientId])
 
@@ -186,13 +135,8 @@ export default function ProductsPage() {
     }
   }, [wishlist, cart])
 
-  // Fetch products function - Try both endpoints
+  // Fetch products function
   const fetchProducts = useCallback(async () => {
-    if (!agentData) {
-      console.log("Waiting for agent data before fetching products")
-      return // Don't fetch products until we have agent data
-    }
-
     try {
       setLoading(true)
       setError(null)
@@ -208,49 +152,13 @@ export default function ProductsPage() {
       // Use environment variable if available, otherwise use a default URL
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
 
-      // First try the client-specific endpoint
-      console.log("Trying client-specific endpoint:", `${apiUrl}/api/client/products`)
-
-      try {
-        const clientResponse = await fetch(`${apiUrl}/api/client/products`, {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          signal: AbortSignal.timeout(5000), // 5 second timeout
-        })
-
-        const clientData = await clientResponse.json()
-        console.log("Client endpoint response:", clientData)
-
-        if (clientResponse.ok && clientData.success && Array.isArray(clientData.data) && clientData.data.length > 0) {
-          console.log("Using client-specific products")
-          processProductsData(clientData)
-          return
-        } else {
-          console.log("Client endpoint returned no products, falling back to general endpoint")
-          setDebugInfo({
-            endpoint: "client/products",
-            status: clientResponse.status,
-            response: clientData,
-          })
-        }
-      } catch (clientError) {
-        console.error("Error with client endpoint:", clientError)
-        // Continue to fallback
-      }
-
-      // Fallback to the general products endpoint
-      console.log("Fetching from general endpoint:", `${apiUrl}/api/getAllProducts`)
-
+      // Fetch products from the API
       const response = await fetch(`${apiUrl}/api/getAllProducts`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        signal: AbortSignal.timeout(8000), // 8 second timeout
       })
 
       if (!response.ok) {
@@ -258,18 +166,11 @@ export default function ProductsPage() {
       }
 
       const data = await response.json()
-      console.log("General endpoint response:", data)
 
-      // Apply agent-specific commission to the products
-      if (data.success && Array.isArray(data.data)) {
-        // Log original prices for debugging
-        console.log(
-          "Original prices:",
-          data.data.map((p: Product) => ({ id: p._id, price: p.price })),
-        )
-
+      // Apply agent-specific commission to the products if we have agent data
+      if (data.success && Array.isArray(data.data) && agentData) {
         // Get the commission rate from agent data
-        const commissionRate = agentData.commissionRate
+        const commissionRate = agentData.commissionRate || 0
 
         const productsWithCommission = data.data.map((product: Product) => {
           const originalPrice = product.price
@@ -282,21 +183,10 @@ export default function ProductsPage() {
           }
         })
 
-        // Log adjusted prices for debugging
-        console.log(
-          "Adjusted prices:",
-          productsWithCommission.map((p: Product) => ({
-            id: p._id,
-            originalPrice: p.basePrice,
-            adjustedPrice: p.price,
-          })),
-        )
-
         data.data = productsWithCommission
 
-        // Add debug info to show commission was applied
-        setDebugInfo((prev) => ({
-          ...prev,
+        // Add debug info
+        setDebugInfo({
           commissionApplied: true,
           commissionRate: `${commissionRate}%`,
           agentId: agentData._id,
@@ -309,10 +199,24 @@ export default function ProductsPage() {
                   adjustedPrice: productsWithCommission[0].price,
                 }
               : null,
-        }))
+        })
       }
 
-      processProductsData(data)
+      // Process the products data
+      if (data.success && Array.isArray(data.data)) {
+        // Process the image URLs to ensure they're valid
+        const processedProducts = data.data.map((product: Product) => ({
+          ...product,
+          image:
+            Array.isArray(product.image) && product.image.length > 0
+              ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
+              : ["/placeholder.svg?height=300&width=300"],
+        }))
+
+        setProducts(processedProducts)
+      } else {
+        throw new Error(data.msg || "Invalid API response format")
+      }
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : "Failed to load products"
       console.error("Error fetching products:", error)
@@ -330,34 +234,12 @@ export default function ProductsPage() {
     } finally {
       setLoading(false)
     }
-  }, [agentData, toast]) // Only depend on agentData and toast
+  }, [agentData, toast])
 
-  // Helper function to process products data
-  const processProductsData = (data: any) => {
-    if (data.success && Array.isArray(data.data)) {
-      console.log("Products fetched successfully:", data.data)
-
-      // Process the image URLs to ensure they're valid
-      const processedProducts = data.data.map((product: Product) => ({
-        ...product,
-        image:
-          Array.isArray(product.image) && product.image.length > 0
-            ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
-            : ["/placeholder.svg?height=300&width=300"],
-      }))
-
-      setProducts(processedProducts)
-    } else {
-      throw new Error(data.msg || "Invalid API response format")
-    }
-  }
-
-  // Fetch products when agentData is available
+  // Fetch products when component mounts and when agentData changes
   useEffect(() => {
-    if (agentData) {
-      fetchProducts()
-    }
-  }, [agentData, fetchProducts])
+    fetchProducts()
+  }, [fetchProducts])
 
   // Toggle wishlist function
   const toggleWishlist = useCallback(
@@ -401,24 +283,17 @@ export default function ProductsPage() {
         // Set loading state for this specific product
         setAddingToCart((prev) => ({ ...prev, [productId]: true }))
 
-        console.log("Adding to cart:", productId, productName)
-
         // Get the token
         const token = localStorage.getItem("clientImpersonationToken")
 
         if (!token) {
-          console.error("No impersonation token found")
-          toast({
-            title: "Authentication Error",
-            description: "Please refresh your token using the debug panel above",
-            variant: "destructive",
-          })
           throw new Error("No authentication token found")
         }
 
-        console.log("Using token:", token.substring(0, 15) + "...")
-        console.log("Full request details:", {
-          url: "https://evershinebackend-2.onrender.com/api/addToCart",
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
+
+        // Make API request to add to cart
+        const response = await fetch(`${apiUrl}/api/addToCart`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -427,40 +302,15 @@ export default function ProductsPage() {
           body: JSON.stringify({ productId }),
         })
 
-        // Make a direct fetch request with the token
-        const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ productId }),
-        })
-
-        console.log("Response status:", response.status, response.statusText)
-
-        // Get the response text for debugging
-        const responseText = await response.text()
-        console.log("Response text:", responseText)
-
-        // Try to parse the response a JSON
-        let data
-        try {
-          data = JSON.parse(responseText)
-          console.log("Parsed response data:", data)
-        } catch (e) {
-          console.error("Failed to parse response as JSON:", e)
-          throw new Error(`Invalid response format: ${responseText}`)
-        }
-
-        // Check for errors
         if (!response.ok) {
           if (response.status === 401) {
-            throw new Error("Authentication failed. Please refresh the token using the debug panel above.")
+            throw new Error("Authentication failed. Please refresh the token.")
           } else {
-            throw new Error(`API error: ${response.status} ${response.statusText}. Details: ${responseText}`)
+            throw new Error(`API error: ${response.status}`)
           }
         }
+
+        const data = await response.json()
 
         if (data.success) {
           toast({
