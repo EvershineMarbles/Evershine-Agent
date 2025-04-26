@@ -25,6 +25,14 @@ interface Product {
   quantityAvailable?: number
 }
 
+// Interface for agent data
+interface AgentData {
+  _id: string
+  name: string
+  email: string
+  commissionRate: number
+}
+
 export default function ProductsPage() {
   // Use the useParams hook to get the clientId
   const params = useParams()
@@ -40,6 +48,8 @@ export default function ProductsPage() {
   const [addingToCart, setAddingToCart] = useState<Record<string, boolean>>({})
   const [error, setError] = useState<string | null>(null)
   const [debugInfo, setDebugInfo] = useState<any>(null)
+  // Agent data state
+  const [agentData, setAgentData] = useState<AgentData | null>(null)
 
   // Load wishlist and cart from localStorage
   useEffect(() => {
@@ -68,12 +78,81 @@ export default function ProductsPage() {
     }
   }, [wishlist, cart])
 
+  // Fetch agent data for the client
+  const fetchAgentData = useCallback(async () => {
+    try {
+      // Get the client impersonation token
+      const token = localStorage.getItem("clientImpersonationToken")
+
+      if (!token) {
+        throw new Error("No authentication token found")
+      }
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
+
+      // This is a placeholder endpoint - you'll need to create this endpoint on your backend
+      const response = await fetch(`${apiUrl}/api/client/${clientId}/agent-info`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        signal: AbortSignal.timeout(5000),
+      })
+
+      if (!response.ok) {
+        // For now, use a mock agent data with a random commission rate
+        // This simulates different agents having different commission rates
+        const mockAgentId = Math.floor(Math.random() * 1000)
+        const mockCommissionRate = 10 + Math.floor(Math.random() * 20) // Random between 10-30%
+
+        setAgentData({
+          _id: `agent_${mockAgentId}`,
+          name: `Agent ${mockAgentId}`,
+          email: `agent${mockAgentId}@example.com`,
+          commissionRate: mockCommissionRate,
+        })
+
+        console.log(`Using mock agent data with commission rate: ${mockCommissionRate}%`)
+        return
+      }
+
+      const data = await response.json()
+
+      if (data.success && data.data) {
+        setAgentData(data.data)
+      } else {
+        // Fallback to mock data if API doesn't return expected format
+        setAgentData({
+          _id: "default_agent",
+          name: "Default Agent",
+          email: "default@example.com",
+          commissionRate: 15, // Default 15% commission
+        })
+      }
+    } catch (error) {
+      console.error("Error fetching agent data:", error)
+      // Fallback to a default commission rate
+      setAgentData({
+        _id: "default_agent",
+        name: "Default Agent",
+        email: "default@example.com",
+        commissionRate: 15, // Default 15% commission
+      })
+    }
+  }, [clientId])
+
   // Fetch products function - Try both endpoints
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
       setDebugInfo(null)
+
+      // First, ensure we have agent data (for commission rate)
+      if (!agentData) {
+        await fetchAgentData()
+      }
 
       // Get the client impersonation token
       const token = localStorage.getItem("clientImpersonationToken")
@@ -137,15 +216,56 @@ export default function ProductsPage() {
       const data = await response.json()
       console.log("General endpoint response:", data)
 
-      // Apply a simulated commission to the products (10% markup)
+      // Apply agent-specific commission to the products
       if (data.success && Array.isArray(data.data)) {
-        const productsWithCommission = data.data.map((product: Product) => ({
-          ...product,
-          basePrice: product.price,
-          price: Math.round(product.price * 1.1), // 10% commission
-        }))
+        // Log original prices for debugging
+        console.log(
+          "Original prices:",
+          data.data.map((p: Product) => ({ id: p._id, price: p.price })),
+        )
+
+        // Get the commission rate from agent data or use a default
+        const commissionRate = agentData?.commissionRate || 15 // Default to 15% if no agent data
+
+        const productsWithCommission = data.data.map((product: Product) => {
+          const originalPrice = product.price
+          const adjustedPrice = Math.round(originalPrice * (1 + commissionRate / 100))
+
+          return {
+            ...product,
+            basePrice: originalPrice,
+            price: adjustedPrice,
+          }
+        })
+
+        // Log adjusted prices for debugging
+        console.log(
+          "Adjusted prices:",
+          productsWithCommission.map((p: Product) => ({
+            id: p._id,
+            originalPrice: p.basePrice,
+            adjustedPrice: p.price,
+          })),
+        )
 
         data.data = productsWithCommission
+
+        // Add debug info to show commission was applied
+        setDebugInfo((prev) => ({
+          ...prev,
+          commissionApplied: true,
+          commissionRate: `${commissionRate}%`,
+          agentId: agentData?._id || "unknown",
+          agentName: agentData?.name || "Unknown Agent",
+          sampleProduct:
+            productsWithCommission.length > 0
+              ? {
+                  name: productsWithCommission[0].name,
+                  originalPrice: productsWithCommission[0].basePrice,
+                  adjustedPrice: productsWithCommission[0].price,
+                }
+              : null,
+        }))
       }
 
       processProductsData(data)
@@ -166,7 +286,7 @@ export default function ProductsPage() {
     } finally {
       setLoading(false)
     }
-  }, [toast])
+  }, [toast, agentData, fetchAgentData])
 
   // Helper function to process products data
   const processProductsData = (data: any) => {
@@ -188,10 +308,15 @@ export default function ProductsPage() {
     }
   }
 
-  // Fetch products on component mount
+  // Fetch agent data and then products on component mount
   useEffect(() => {
-    fetchProducts()
-  }, [fetchProducts])
+    const loadData = async () => {
+      await fetchAgentData()
+      fetchProducts()
+    }
+
+    loadData()
+  }, [fetchAgentData, fetchProducts])
 
   // Toggle wishlist function
   const toggleWishlist = useCallback(
@@ -397,6 +522,16 @@ export default function ProductsPage() {
         />
       </div>
 
+      {agentData && (
+        <Alert className="mb-4 bg-blue-50 border-blue-200">
+          <div className="text-sm">
+            <p className="font-semibold">Agent Commission Info:</p>
+            <p>Agent: {agentData.name}</p>
+            <p>Commission Rate: {agentData.commissionRate}%</p>
+          </div>
+        </Alert>
+      )}
+
       {filteredProducts.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-xl font-medium mb-4">No products found</p>
@@ -453,13 +588,18 @@ export default function ProductsPage() {
 
                 {/* Price display - now showing the commission-adjusted price */}
                 <div className="mt-2">
-                  <p className="text-lg font-bold">₹{product.price.toLocaleString()}</p>
+                  <p className="text-lg font-bold text-blue">₹{product.price.toLocaleString()}</p>
 
-                  {/* If you want to show the base price for comparison (optional) */}
+                  {/* Show the base price for comparison */}
                   {product.basePrice && product.basePrice !== product.price && (
-                    <p className="text-sm text-muted-foreground">
-                      MRP: <span className="line-through">₹{product.basePrice.toLocaleString()}</span>
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm text-muted-foreground">
+                        <span className="line-through">₹{product.basePrice.toLocaleString()}</span>
+                      </p>
+                      <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-800 rounded-full">
+                        Agent Price
+                      </span>
+                    </div>
                   )}
                 </div>
 
