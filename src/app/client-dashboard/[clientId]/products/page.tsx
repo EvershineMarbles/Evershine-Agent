@@ -213,6 +213,7 @@ export default function ProductsPage() {
 
       try {
         // Get the token
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
         const token = localStorage.getItem("clientImpersonationToken")
 
         if (!token) {
@@ -221,7 +222,7 @@ export default function ProductsPage() {
 
         if (wishlist.includes(productId)) {
           // Remove from wishlist
-          const response = await fetch("https://evershinebackend-2.onrender.com/api/deleteUserWishlistItem", {
+          const response = await fetch(`${apiUrl}/api/deleteUserWishlistItem`, {
             method: "DELETE",
             headers: {
               Authorization: `Bearer ${token}`,
@@ -247,7 +248,7 @@ export default function ProductsPage() {
           }
         } else {
           // Add to wishlist
-          const response = await fetch("https://evershinebackend-2.onrender.com/api/addToWishlist", {
+          const response = await fetch(`${apiUrl}/api/addToWishlist`, {
             method: "POST",
             headers: {
               Authorization: `Bearer ${token}`,
@@ -333,6 +334,7 @@ export default function ProductsPage() {
       localStorage.setItem("cart", JSON.stringify([...cartItems, productId]))
 
       // Get the token
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
       const token = localStorage.getItem("clientImpersonationToken")
 
       if (!token) {
@@ -340,7 +342,7 @@ export default function ProductsPage() {
       }
 
       // Make API request in background
-      const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
+      const response = await fetch(`${apiUrl}/api/addToCart`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -412,10 +414,11 @@ export default function ProductsPage() {
   useEffect(() => {
     const fetchClientData = async () => {
       try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
         const token = localStorage.getItem("clientImpersonationToken")
         if (!token) return
 
-        const response = await fetch(`https://evershinebackend-2.onrender.com/api/getClientDetails/${clientId}`, {
+        const response = await fetch(`${apiUrl}/api/getClientDetails/${clientId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
@@ -579,8 +582,8 @@ export default function ProductsPage() {
                         <p className="text-sm text-muted-foreground line-through">
                           ₹{product.basePrice.toLocaleString()}/sqft
                         </p>
-                        <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-800 rounded-full">
-                          {Math.round(((product.price - product.basePrice) / product.basePrice) * 100)}% commission
+                        <span className="text-xs px-1.5 py-0.5 bg-green-50 text-green-700 rounded-full">
+                          Agent price
                         </span>
                       </div>
                     )}
@@ -616,10 +619,59 @@ export default function ProductsPage() {
                       </>
                     )}
                   </button>
+                  <button
+                    onClick={(e) => addToCart(e, product.postId, product.name)}
+                    className={`mt-2 w-full py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2
+  ${
+    cart.includes(product.postId)
+      ? "bg-gray-100 text-gray-600 border border-gray-200"
+      : addingToCart[product.postId]
+        ? "bg-gray-200 text-gray-700"
+        : "bg-secondary hover:bg-secondary/90 text-secondary-foreground"
+  } 
+  transition-colors`}
+                    disabled={addingToCart[product.postId] || cart.includes(product.postId)}
+                    type="button"
+                  >
+                    {addingToCart[product.postId] ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                    ) : cart.includes(product.postId) ? (
+                      <>
+                        <ShoppingCart className="h-4 w-4 mr-1" />
+                        Added to Cart
+                      </>
+                    ) : (
+                      <>
+                        <ShoppingCart className="h-4 w-4 mr-1" />
+                        Add to Cart
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
             ))}
           </div>
+        )}
+        {showBackToTop && (
+          <button
+            onClick={scrollToTop}
+            className="fixed bottom-6 right-6 p-3 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-all"
+            aria-label="Back to top"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="m18 15-6-6-6 6" />
+            </svg>
+          </button>
         )}
       </div>
     </ErrorBoundary>
