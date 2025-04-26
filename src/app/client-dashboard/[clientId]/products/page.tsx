@@ -4,10 +4,11 @@ import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
-import { Search, Loader2, Heart, ShoppingCart, AlertCircle } from "lucide-react"
+import { Search, Loader2, Heart, ShoppingCart, AlertCircle, RefreshCw } from "lucide-react"
 import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Button } from "@/components/ui/button"
 
 // Define the Product interface
 interface Product {
@@ -38,6 +39,7 @@ export default function ProductsPage() {
   const [cart, setCart] = useState<string[]>([])
   const [addingToCart, setAddingToCart] = useState<Record<string, boolean>>({})
   const [error, setError] = useState<string | null>(null)
+  const [debugInfo, setDebugInfo] = useState<any>(null)
 
   // Load wishlist and cart from localStorage
   useEffect(() => {
@@ -66,11 +68,12 @@ export default function ProductsPage() {
     }
   }, [wishlist, cart])
 
-  // Fetch products function - Updated to use client-specific endpoint
+  // Fetch products function - Try both endpoints
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
+      setDebugInfo(null)
 
       // Get the client impersonation token
       const token = localStorage.getItem("clientImpersonationToken")
@@ -81,15 +84,49 @@ export default function ProductsPage() {
 
       // Use environment variable if available, otherwise use a default URL
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
-      console.log("Fetching products from:", `${apiUrl}/api/client/products`)
 
-      const response = await fetch(`${apiUrl}/api/client/products`, {
+      // First try the client-specific endpoint
+      console.log("Trying client-specific endpoint:", `${apiUrl}/api/client/products`)
+
+      try {
+        const clientResponse = await fetch(`${apiUrl}/api/client/products`, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          signal: AbortSignal.timeout(5000), // 5 second timeout
+        })
+
+        const clientData = await clientResponse.json()
+        console.log("Client endpoint response:", clientData)
+
+        if (clientResponse.ok && clientData.success && Array.isArray(clientData.data) && clientData.data.length > 0) {
+          console.log("Using client-specific products")
+          processProductsData(clientData)
+          return
+        } else {
+          console.log("Client endpoint returned no products, falling back to general endpoint")
+          setDebugInfo({
+            endpoint: "client/products",
+            status: clientResponse.status,
+            response: clientData,
+          })
+        }
+      } catch (clientError) {
+        console.error("Error with client endpoint:", clientError)
+        // Continue to fallback
+      }
+
+      // Fallback to the general products endpoint
+      console.log("Fetching from general endpoint:", `${apiUrl}/api/getAllProducts`)
+
+      const response = await fetch(`${apiUrl}/api/getAllProducts`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        // Add a timeout to prevent long waiting times
         signal: AbortSignal.timeout(8000), // 8 second timeout
       })
 
@@ -98,23 +135,20 @@ export default function ProductsPage() {
       }
 
       const data = await response.json()
+      console.log("General endpoint response:", data)
 
+      // Apply a simulated commission to the products (10% markup)
       if (data.success && Array.isArray(data.data)) {
-        console.log("Products fetched successfully:", data.data)
-
-        // Process the image URLs to ensure they're valid
-        const processedProducts = data.data.map((product: Product) => ({
+        const productsWithCommission = data.data.map((product: Product) => ({
           ...product,
-          image:
-            Array.isArray(product.image) && product.image.length > 0
-              ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
-              : ["/placeholder.svg?height=300&width=300"],
+          basePrice: product.price,
+          price: Math.round(product.price * 1.1), // 10% commission
         }))
 
-        setProducts(processedProducts)
-      } else {
-        throw new Error(data.msg || "Invalid API response format")
+        data.data = productsWithCommission
       }
+
+      processProductsData(data)
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : "Failed to load products"
       console.error("Error fetching products:", error)
@@ -133,6 +167,26 @@ export default function ProductsPage() {
       setLoading(false)
     }
   }, [toast])
+
+  // Helper function to process products data
+  const processProductsData = (data: any) => {
+    if (data.success && Array.isArray(data.data)) {
+      console.log("Products fetched successfully:", data.data)
+
+      // Process the image URLs to ensure they're valid
+      const processedProducts = data.data.map((product: Product) => ({
+        ...product,
+        image:
+          Array.isArray(product.image) && product.image.length > 0
+            ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
+            : ["/placeholder.svg?height=300&width=300"],
+      }))
+
+      setProducts(processedProducts)
+    } else {
+      throw new Error(data.msg || "Invalid API response format")
+    }
+  }
 
   // Fetch products on component mount
   useEffect(() => {
@@ -252,7 +306,7 @@ export default function ProductsPage() {
         } else {
           throw new Error(data.message || "Failed to add to cart")
         }
-      } catch (error: Error | unknown) {
+      } catch (error: any) {
         const errorMessage = error instanceof Error ? error.message : "Failed to add item to cart. Please try again."
         console.error("Error adding to cart:", error)
         toast({
@@ -285,7 +339,7 @@ export default function ProductsPage() {
     return (
       <div className="flex flex-col items-center justify-center h-[80vh]">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-muted-foreground">Loading products..</p>
+        <p className="text-muted-foreground">Loading products...</p>
       </div>
     )
   }
@@ -296,6 +350,15 @@ export default function ProductsPage() {
         <Alert variant="destructive" className="mb-4">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {debugInfo && (
+        <Alert variant="default" className="mb-4 bg-yellow-50 border-yellow-200">
+          <div className="text-xs font-mono overflow-auto">
+            <p className="font-semibold">Debug Info:</p>
+            <pre>{JSON.stringify(debugInfo, null, 2)}</pre>
+          </div>
         </Alert>
       )}
 
@@ -340,12 +403,13 @@ export default function ProductsPage() {
           <p className="text-muted-foreground mb-6">
             {searchQuery ? "Try a different search term" : "No products are currently available"}
           </p>
-          <button
+          <Button
             onClick={fetchProducts}
             className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
           >
+            <RefreshCw className="h-4 w-4 mr-2" />
             Refresh Products
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -358,10 +422,10 @@ export default function ProductsPage() {
                 <Image
                   src={
                     imageError[product._id]
-                      ? "/placeholder.svg?height=300&width=300"
+                      ? "/placeholder.svg?height=300&width=300&query=product"
                       : product.image && product.image.length > 0 && product.image[0]
                         ? product.image[0]
-                        : "/placeholder.svg?height=300&width=300"
+                        : "/placeholder.svg?height=300&width=300&query=product"
                   }
                   alt={product.name}
                   fill
