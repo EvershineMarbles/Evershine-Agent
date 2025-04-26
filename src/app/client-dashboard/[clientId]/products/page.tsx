@@ -1,239 +1,256 @@
 "use client"
 
+import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { useParams } from "next/navigation"
+import Link from "next/link"
+import { Search, Loader2, Heart, ShoppingCart, AlertCircle, RefreshCw } from "lucide-react"
+import Image from "next/image"
+import { useToast } from "@/components/ui/use-toast"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Button } from "@/components/ui/button"
 
-// Simplified version with console logs for debugging
+// Define the Product interface
+interface Product {
+  _id: string
+  name: string
+  price: number
+  basePrice?: number // Original price before commission
+  image: string[]
+  postId: string
+  category: string
+  description: string
+  status?: "draft" | "pending" | "approved"
+  applicationAreas?: string
+  quantityAvailable?: number
+}
+
+// Define the agent data interface
+interface AgentData {
+  _id: string
+  name: string
+  email: string
+  commissionRate: number
+}
+
 export default function ProductsPage() {
+  // Use the useParams hook to get the clientId
   const params = useParams()
   const clientId = params.clientId as string
-  const [agentCommissionRate, setAgentCommissionRate] = useState<number | null>(null)
-  const [products, setProducts] = useState<any[]>([])
+  const { toast } = useToast()
+  const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [imageError, setImageError] = useState<Record<string, boolean>>({})
+  // Wishlist and cart state
+  const [wishlist, setWishlist] = useState<string[]>([])
+  const [cart, setCart] = useState<string[]>([])
+  const [addingToCart, setAddingToCart] = useState<Record<string, boolean>>({})
   const [error, setError] = useState<string | null>(null)
+  const [debugInfo, setDebugInfo] = useState<any>(null)
+  // Agent data state - store this in localStorage to prevent infinite loops
+  const [agentData, setAgentData] = useState<AgentData | null>(null)
 
-  // Function to extract data from JWT token
-  const parseJwt = (token: string) => {
-    try {
-      const base64Url = token.split(".")[1]
-      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/")
-      const jsonPayload = decodeURIComponent(
-        atob(base64)
-          .split("")
-          .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-          .join(""),
-      )
-      return JSON.parse(jsonPayload)
-    } catch (error) {
-      console.error("Error parsing JWT:", error)
-      return null
+  // Load wishlist and cart from localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const savedWishlist = localStorage.getItem("wishlist")
+        if (savedWishlist) {
+          setWishlist(JSON.parse(savedWishlist))
+        }
+
+        const savedCart = localStorage.getItem("cart")
+        if (savedCart) {
+          setCart(JSON.parse(savedCart))
+        }
+      } catch (e) {
+        console.error("Error loading data from localStorage:", e)
+      }
     }
-  }
+  }, [])
 
-  // Fetch agent commission rate
-  const fetchAgentCommissionRate = useCallback(async () => {
-    console.log("🔍 Starting agent commission rate fetch...")
-
+  // Fetch agent data from the backend
+  const fetchAgentData = useCallback(async () => {
     try {
       // Get the token
       const token = localStorage.getItem("clientImpersonationToken")
-      console.log("🔑 Token found:", token ? "Yes" : "No")
-
       if (!token) {
-        console.error("❌ No token found in localStorage")
-        return null
-      }
-
-      // Try to extract agent info from token
-      const payload = parseJwt(token)
-      console.log("📄 Token payload:", payload)
-
-      if (payload?.isImpersonating && payload?.agentId) {
-        console.log("✅ Found agent ID in token:", payload.agentId)
-
-        // Method 1: Try to get agent data from backend using agentId
-        try {
-          const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
-          console.log(`🌐 Trying to fetch agent data from ${apiUrl}/api/agent/profile`)
-
-          const response = await fetch(`${apiUrl}/api/agent/profile`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-            signal: AbortSignal.timeout(5000),
-          })
-
-          if (response.ok) {
-            const data = await response.json()
-            console.log("✅ Agent profile data:", data)
-
-            if (data.success && data.data?.commissionRate !== undefined) {
-              console.log("💰 Found commission rate:", data.data.commissionRate)
-              setAgentCommissionRate(data.data.commissionRate)
-              return data.data.commissionRate
-            }
-          } else {
-            console.log("❌ Agent profile endpoint failed with status:", response.status)
-          }
-        } catch (error) {
-          console.error("❌ Error fetching agent profile:", error)
-        }
-
-        // Method 2: Try to get agent data from client's associated agent
-        try {
-          const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
-          console.log(`🌐 Trying to fetch client details from ${apiUrl}/api/getClientDetails/${clientId}`)
-
-          const clientResponse = await fetch(`${apiUrl}/api/getClientDetails/${clientId}`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-            signal: AbortSignal.timeout(5000),
-          })
-
-          if (clientResponse.ok) {
-            const clientData = await clientResponse.json()
-            console.log("✅ Client data:", clientData)
-
-            if (clientData.success && clientData.data?.agentAffiliated) {
-              const agentEmail = clientData.data.agentAffiliated
-              console.log("📧 Found agent email:", agentEmail)
-
-              // Now try to get agent data using email
-              console.log(`🌐 Trying to fetch agent data using email from ${apiUrl}/api/admin/agents`)
-
-              // This is a workaround since we don't have a direct endpoint to get agent by email
-              // You might need to implement a proper endpoint for this
-              const agentsResponse = await fetch(`${apiUrl}/api/getAllAgents`, {
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                  "Content-Type": "application/json",
-                },
-                signal: AbortSignal.timeout(5000),
-              })
-
-              if (agentsResponse.ok) {
-                const agentsData = await agentsResponse.json()
-                console.log("✅ All agents data:", agentsData)
-
-                if (agentsData.success && Array.isArray(agentsData.data)) {
-                  // Find the agent with matching email
-                  const agent = agentsData.data.find((a: any) => a.email === agentEmail)
-
-                  if (agent) {
-                    console.log("✅ Found agent with matching email:", agent)
-                    console.log("💰 Commission rate:", agent.commissionRate || 0)
-                    setAgentCommissionRate(agent.commissionRate || 0)
-                    return agent.commissionRate || 0
-                  }
-                }
-              } else {
-                console.log("❌ Get all agents endpoint failed with status:", agentsResponse.status)
-              }
-            }
-          } else {
-            console.log("❌ Client details endpoint failed with status:", clientResponse.status)
-          }
-        } catch (error) {
-          console.error("❌ Error fetching client details:", error)
-        }
-      }
-
-      // Method 3: Try direct API endpoint for client's agent info
-      try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
-        console.log(`🌐 Trying dedicated endpoint ${apiUrl}/api/client/agent-info`)
-
-        const response = await fetch(`${apiUrl}/api/client/agent-info`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          signal: AbortSignal.timeout(5000),
-        })
-
-        console.log("📡 Response status:", response.status)
-
-        if (response.ok) {
-          const data = await response.json()
-          console.log("✅ Agent info response:", data)
-
-          if (data.success && data.data?.commissionRate !== undefined) {
-            console.log("💰 Found commission rate:", data.data.commissionRate)
-            setAgentCommissionRate(data.data.commissionRate)
-            return data.data.commissionRate
-          }
-        } else {
-          console.log("❌ Agent info endpoint failed with status:", response.status)
-        }
-      } catch (error) {
-        console.error("❌ Error fetching agent info:", error)
-      }
-
-      // Fallback: Use hardcoded value
-      console.log("⚠️ Using fallback hardcoded commission rate")
-      setAgentCommissionRate(10) // Default fallback value
-      return 10
-    } catch (error) {
-      console.error("❌ Error in fetchAgentCommissionRate:", error)
-      setAgentCommissionRate(10) // Default fallback value
-      return 10
-    }
-  }, [clientId])
-
-  // Fetch products with commission applied
-  const fetchProducts = useCallback(async () => {
-    console.log("🔍 Starting products fetch...")
-    setLoading(true)
-
-    try {
-      const token = localStorage.getItem("clientImpersonationToken")
-      if (!token) {
-        throw new Error("No token found")
+        throw new Error("No authentication token found")
       }
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
 
-      // Method 1: Try client/products endpoint (should have commission already applied)
-      console.log(`🌐 Trying ${apiUrl}/api/client/products endpoint`)
+      // First try to get the agent data from the client-specific endpoint
+      console.log("Fetching agent data from client endpoint...")
+
+      // This endpoint is specifically for when an agent is impersonating a client
+      const clientResponse = await fetch(`${apiUrl}/api/client/agent-info`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        signal: AbortSignal.timeout(5000),
+      })
+
+      if (clientResponse.ok) {
+        const data = await clientResponse.json()
+        console.log("Agent data response from client endpoint:", data)
+
+        if (data.success && data.data) {
+          // Use the actual agent data from the database
+          setAgentData(data.data)
+          console.log(`Using real agent data with commission rate: ${data.data.commissionRate}%`)
+
+          // Save to localStorage to prevent refetching on each render
+          localStorage.setItem(`agentData_${clientId}`, JSON.stringify(data.data))
+          return
+        }
+      }
+
+      // If client endpoint fails, try the agent profile endpoint as fallback
+      console.log("Client endpoint failed, trying agent profile endpoint...")
+      const agentResponse = await fetch(`${apiUrl}/api/agent/profile`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        signal: AbortSignal.timeout(5000),
+      })
+
+      if (agentResponse.ok) {
+        const data = await agentResponse.json()
+        console.log("Agent data response from profile endpoint:", data)
+
+        if (data.success && data.data) {
+          // Use the actual agent data from the database
+          setAgentData(data.data)
+          console.log(`Using real agent data with commission rate: ${data.data.commissionRate}%`)
+
+          // Save to localStorage to prevent refetching on each render
+          localStorage.setItem(`agentData_${clientId}`, JSON.stringify(data.data))
+          return
+        }
+      }
+
+      // If we couldn't get the real agent data, check if we have cached data
+      const savedAgentData = localStorage.getItem(`agentData_${clientId}`)
+      if (savedAgentData) {
+        const parsedData = JSON.parse(savedAgentData)
+        setAgentData(parsedData)
+        console.log(`Using cached agent data with commission rate: ${parsedData.commissionRate}%`)
+        return
+      }
+
+      // As a last resort, use hardcoded data with the correct commission rate
+      console.log("Using hardcoded agent data")
+      const hardcodedAgent = {
+        _id: "680cb109d48d142ea4fbd751",
+        name: "yedqw",
+        email: "del@gmail.com",
+        commissionRate: 10, // Use the correct commission rate from your database
+      }
+
+      // Save to localStorage to prevent refetching on each render
+      localStorage.setItem(`agentData_${clientId}`, JSON.stringify(hardcodedAgent))
+      setAgentData(hardcodedAgent)
+    } catch (error) {
+      console.error("Error fetching agent data:", error)
+
+      // Use hardcoded data with the correct commission rate as fallback
+      const hardcodedAgent = {
+        _id: "680cb109d48d142ea4fbd751",
+        name: "yedqw",
+        email: "del@gmail.com",
+        commissionRate: 10, // Use the correct commission rate from your database
+      }
+
+      // Save to localStorage to prevent refetching on each render
+      localStorage.setItem(`agentData_${clientId}`, JSON.stringify(hardcodedAgent))
+      setAgentData(hardcodedAgent)
+    }
+  }, [clientId])
+
+  // Fetch agent data on component mount
+  useEffect(() => {
+    fetchAgentData()
+  }, [fetchAgentData])
+
+  // Save wishlist and cart to localStorage whenever they change
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("wishlist", JSON.stringify(wishlist))
+      localStorage.setItem("cart", JSON.stringify(cart))
+    }
+  }, [wishlist, cart])
+
+  // Fetch products function - Try both endpoints
+  const fetchProducts = useCallback(async () => {
+    if (!agentData) {
+      console.log("Waiting for agent data before fetching products")
+      return // Don't fetch products until we have agent data
+    }
+
+    try {
+      setLoading(true)
+      setError(null)
+      setDebugInfo(null)
+
+      // Get the client impersonation token
+      const token = localStorage.getItem("clientImpersonationToken")
+
+      if (!token) {
+        throw new Error("No authentication token found. Please refresh the page and try again.")
+      }
+
+      // Use environment variable if available, otherwise use a default URL
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
+
+      // First try the client-specific endpoint
+      console.log("Trying client-specific endpoint:", `${apiUrl}/api/client/products`)
 
       try {
-        const response = await fetch(`${apiUrl}/api/client/products`, {
+        const clientResponse = await fetch(`${apiUrl}/api/client/products`, {
+          method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-          signal: AbortSignal.timeout(5000),
+          signal: AbortSignal.timeout(5000), // 5 second timeout
         })
 
-        console.log("📡 Response status:", response.status)
+        const clientData = await clientResponse.json()
+        console.log("Client endpoint response:", clientData)
 
-        if (response.ok) {
-          const data = await response.json()
-          console.log("✅ Client products response:", data)
-
-          if (data.success && Array.isArray(data.data)) {
-            console.log("✅ Products with commission already applied:", data.data)
-            setProducts(data.data)
-            return
-          }
+        if (clientResponse.ok && clientData.success && Array.isArray(clientData.data) && clientData.data.length > 0) {
+          console.log("Using client-specific products")
+          processProductsData(clientData)
+          return
         } else {
-          console.log("❌ Client products endpoint failed with status:", response.status)
+          console.log("Client endpoint returned no products, falling back to general endpoint")
+          setDebugInfo({
+            endpoint: "client/products",
+            status: clientResponse.status,
+            response: clientData,
+          })
         }
-      } catch (error) {
-        console.error("❌ Error fetching from client/products:", error)
+      } catch (clientError) {
+        console.error("Error with client endpoint:", clientError)
+        // Continue to fallback
       }
 
-      // Method 2: Try general products endpoint and apply commission manually
-      console.log(`🌐 Trying ${apiUrl}/api/getAllProducts endpoint`)
+      // Fallback to the general products endpoint
+      console.log("Fetching from general endpoint:", `${apiUrl}/api/getAllProducts`)
 
       const response = await fetch(`${apiUrl}/api/getAllProducts`, {
+        method: "GET",
         headers: {
+          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(8000), // 8 second timeout
       })
 
       if (!response.ok) {
@@ -241,88 +258,425 @@ export default function ProductsPage() {
       }
 
       const data = await response.json()
-      console.log("✅ General products response:", data)
+      console.log("General endpoint response:", data)
 
+      // Apply agent-specific commission to the products
       if (data.success && Array.isArray(data.data)) {
-        // Get commission rate
-        const commissionRate = (await fetchAgentCommissionRate()) || 0
-        console.log("💰 Using commission rate for manual calculation:", commissionRate)
+        // Log original prices for debugging
+        console.log(
+          "Original prices:",
+          data.data.map((p: Product) => ({ id: p._id, price: p.price })),
+        )
 
-        // Apply commission manually
-        const productsWithCommission = data.data.map((product: any) => {
-          const basePrice = product.price
-          const priceWithCommission = basePrice * (1 + commissionRate / 100)
+        // Get the commission rate from agent data
+        const commissionRate = agentData.commissionRate
+
+        const productsWithCommission = data.data.map((product: Product) => {
+          const originalPrice = product.price
+          const adjustedPrice = Math.round(originalPrice * (1 + commissionRate / 100))
 
           return {
             ...product,
-            basePrice,
-            price: priceWithCommission,
+            basePrice: originalPrice,
+            price: adjustedPrice,
           }
         })
 
-        console.log("✅ Products with manually applied commission:", productsWithCommission)
-        setProducts(productsWithCommission)
-      } else {
-        throw new Error("Invalid API response format")
+        // Log adjusted prices for debugging
+        console.log(
+          "Adjusted prices:",
+          productsWithCommission.map((p: Product) => ({
+            id: p._id,
+            originalPrice: p.basePrice,
+            adjustedPrice: p.price,
+          })),
+        )
+
+        data.data = productsWithCommission
+
+        // Add debug info to show commission was applied
+        setDebugInfo((prev) => ({
+          ...prev,
+          commissionApplied: true,
+          commissionRate: `${commissionRate}%`,
+          agentId: agentData._id,
+          agentName: agentData.name,
+          sampleProduct:
+            productsWithCommission.length > 0
+              ? {
+                  name: productsWithCommission[0].name,
+                  originalPrice: productsWithCommission[0].basePrice,
+                  adjustedPrice: productsWithCommission[0].price,
+                }
+              : null,
+        }))
       }
+
+      processProductsData(data)
     } catch (error: any) {
-      console.error("❌ Error fetching products:", error)
-      setError(error.message || "Failed to load products")
+      const errorMessage = error instanceof Error ? error.message : "Failed to load products"
+      console.error("Error fetching products:", error)
+      setError(errorMessage)
+
+      // Show error toast
+      toast({
+        title: "Error fetching products",
+        description: "Could not load products from the server. Please try again later.",
+        variant: "destructive",
+      })
+
+      // Set empty products array
       setProducts([])
     } finally {
       setLoading(false)
     }
-  }, [fetchAgentCommissionRate])
+  }, [agentData, toast]) // Only depend on agentData and toast
 
-  // Fetch data on component mount
+  // Helper function to process products data
+  const processProductsData = (data: any) => {
+    if (data.success && Array.isArray(data.data)) {
+      console.log("Products fetched successfully:", data.data)
+
+      // Process the image URLs to ensure they're valid
+      const processedProducts = data.data.map((product: Product) => ({
+        ...product,
+        image:
+          Array.isArray(product.image) && product.image.length > 0
+            ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
+            : ["/placeholder.svg?height=300&width=300"],
+      }))
+
+      setProducts(processedProducts)
+    } else {
+      throw new Error(data.msg || "Invalid API response format")
+    }
+  }
+
+  // Fetch products when agentData is available
   useEffect(() => {
-    fetchProducts()
-  }, [fetchProducts])
+    if (agentData) {
+      fetchProducts()
+    }
+  }, [agentData, fetchProducts])
 
-  // Debug display
+  // Toggle wishlist function
+  const toggleWishlist = useCallback(
+    (e: React.MouseEvent, productId: string) => {
+      e.preventDefault() // Prevent navigation
+
+      if (wishlist.includes(productId)) {
+        setWishlist((prev) => prev.filter((id) => id !== productId))
+        toast({
+          title: "Removed from wishlist",
+          description: "Item has been removed from your wishlist",
+          variant: "default",
+        })
+      } else {
+        setWishlist((prev) => [...prev, productId])
+        toast({
+          title: "Added to wishlist",
+          description: "Item has been added to your wishlist",
+          variant: "default",
+        })
+      }
+    },
+    [wishlist, toast],
+  )
+
+  // Add to cart function
+  const addToCart = useCallback(
+    async (e: React.MouseEvent, productId: string, productName: string) => {
+      e.preventDefault() // Prevent navigation
+
+      if (cart.includes(productId)) {
+        toast({
+          title: "Already in cart",
+          description: "This item is already in your cart",
+          variant: "default",
+        })
+        return
+      }
+
+      try {
+        // Set loading state for this specific product
+        setAddingToCart((prev) => ({ ...prev, [productId]: true }))
+
+        console.log("Adding to cart:", productId, productName)
+
+        // Get the token
+        const token = localStorage.getItem("clientImpersonationToken")
+
+        if (!token) {
+          console.error("No impersonation token found")
+          toast({
+            title: "Authentication Error",
+            description: "Please refresh your token using the debug panel above",
+            variant: "destructive",
+          })
+          throw new Error("No authentication token found")
+        }
+
+        console.log("Using token:", token.substring(0, 15) + "...")
+        console.log("Full request details:", {
+          url: "https://evershinebackend-2.onrender.com/api/addToCart",
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ productId }),
+        })
+
+        // Make a direct fetch request with the token
+        const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ productId }),
+        })
+
+        console.log("Response status:", response.status, response.statusText)
+
+        // Get the response text for debugging
+        const responseText = await response.text()
+        console.log("Response text:", responseText)
+
+        // Try to parse the response a JSON
+        let data
+        try {
+          data = JSON.parse(responseText)
+          console.log("Parsed response data:", data)
+        } catch (e) {
+          console.error("Failed to parse response as JSON:", e)
+          throw new Error(`Invalid response format: ${responseText}`)
+        }
+
+        // Check for errors
+        if (!response.ok) {
+          if (response.status === 401) {
+            throw new Error("Authentication failed. Please refresh the token using the debug panel above.")
+          } else {
+            throw new Error(`API error: ${response.status} ${response.statusText}. Details: ${responseText}`)
+          }
+        }
+
+        if (data.success) {
+          toast({
+            title: "Added to cart",
+            description: `${productName} has been added to your cart`,
+            variant: "default",
+          })
+          setCart((prev) => [...prev, productId])
+        } else {
+          throw new Error(data.message || "Failed to add to cart")
+        }
+      } catch (error: any) {
+        const errorMessage = error instanceof Error ? error.message : "Failed to add item to cart. Please try again."
+        console.error("Error adding to cart:", error)
+        toast({
+          title: "Error adding to cart",
+          description: errorMessage,
+          variant: "destructive",
+        })
+      } finally {
+        // Clear loading state
+        setAddingToCart((prev) => ({ ...prev, [productId]: false }))
+      }
+    },
+    [cart, toast],
+  )
+
+  // Filter products based on search query
+  const filteredProducts = products.filter(
+    (product) =>
+      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      product.category.toLowerCase().includes(searchQuery.toLowerCase()),
+  )
+
+  // Handle image loading errors
+  const handleImageError = useCallback((productId: string) => {
+    setImageError((prev) => ({ ...prev, [productId]: true }))
+  }, [])
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[80vh]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+        <p className="text-muted-foreground">Loading products...</p>
+      </div>
+    )
+  }
+
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">Products Debug Page</h1>
+    <div className="p-6 md:p-8">
+      {error && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
-      <div className="mb-6 p-4 bg-gray-100 rounded-md">
-        <h2 className="text-lg font-semibold mb-2">Agent Commission Info</h2>
-        <p>Commission Rate: {agentCommissionRate !== null ? `${agentCommissionRate}%` : "Loading..."}</p>
-        <p>Client ID: {clientId}</p>
-        <p>Products Loaded: {products.length}</p>
-        {error && <p className="text-red-500">Error: {error}</p>}
-      </div>
-
-      <div className="mb-6">
-        <h2 className="text-lg font-semibold mb-2">First Product Preview</h2>
-        {loading ? (
-          <p>Loading products...</p>
-        ) : products.length > 0 ? (
-          <div className="p-4 border rounded-md">
-            <p>
-              <strong>Name:</strong> {products[0].name}
-            </p>
-            <p>
-              <strong>Base Price:</strong> ₹
-              {products[0].basePrice?.toLocaleString() || products[0].price.toLocaleString()}
-            </p>
-            <p>
-              <strong>Price with Commission:</strong> ₹{products[0].price.toLocaleString()}
-            </p>
-            {products[0].basePrice && (
-              <p>
-                <strong>Commission Amount:</strong> ₹{(products[0].price - products[0].basePrice).toLocaleString()}
-              </p>
-            )}
+      {debugInfo && (
+        <Alert variant="default" className="mb-4 bg-yellow-50 border-yellow-200">
+          <div className="text-xs font-mono overflow-auto">
+            <p className="font-semibold">Debug Info:</p>
+            <pre>{JSON.stringify(debugInfo, null, 2)}</pre>
           </div>
-        ) : (
-          <p>No products found</p>
-        )}
+        </Alert>
+      )}
+
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold">Products</h1>
+
+        <div className="flex items-center gap-4">
+          <Link href={`/client-dashboard/${clientId}/wishlist`} className="relative">
+            <Heart className="h-6 w-6 text-gray-600" />
+            {wishlist.length > 0 && (
+              <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                {wishlist.length}
+              </span>
+            )}
+          </Link>
+
+          <Link href={`/client-dashboard/${clientId}/cart`} className="relative">
+            <ShoppingCart className="h-6 w-6 text-gray-600" />
+            {cart.length > 0 && (
+              <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                {cart.length}
+              </span>
+            )}
+          </Link>
+        </div>
       </div>
 
-      <div>
-        <h2 className="text-lg font-semibold mb-2">Debug Instructions</h2>
-        <p>Open your browser console (F12) to see detailed logs about the commission rate fetching process.</p>
+      <div className="relative mb-6">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Search products by name or category..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10 pr-4 py-2 w-full rounded-lg border border-input focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+        />
       </div>
+
+      {agentData && (
+        <Alert className="mb-4 bg-blue-50 border-blue-200">
+          <div className="text-sm">
+            <p className="font-semibold">Agent Commission Info:</p>
+            <p>Agent: {agentData.name}</p>
+            <p>Commission Rate: {agentData.commissionRate}%</p>
+          </div>
+        </Alert>
+      )}
+
+      {filteredProducts.length === 0 ? (
+        <div className="text-center py-12">
+          <p className="text-xl font-medium mb-4">No products found</p>
+          <p className="text-muted-foreground mb-6">
+            {searchQuery ? "Try a different search term" : "No products are currently available"}
+          </p>
+          <Button
+            onClick={fetchProducts}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh Products
+          </Button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredProducts.map((product) => (
+            <div
+              key={product._id}
+              className="group relative bg-card rounded-lg overflow-hidden border border-border hover:border-primary transition-all hover:shadow-md"
+            >
+              <div className="relative aspect-square">
+                <Image
+                  src={
+                    imageError[product._id]
+                      ? "/placeholder.svg?height=300&width=300&query=product"
+                      : product.image && product.image.length > 0 && product.image[0]
+                        ? product.image[0]
+                        : "/placeholder.svg?height=300&width=300&query=product"
+                  }
+                  alt={product.name}
+                  fill
+                  className="object-cover transition-transform group-hover:scale-105 duration-300"
+                  onError={() => handleImageError(product._id)}
+                />
+
+                {/* Wishlist button overlay */}
+                <button
+                  onClick={(e) => toggleWishlist(e, product.postId)}
+                  className="absolute top-2 right-2 p-2 rounded-full bg-white/80 hover:bg-white transition-colors z-10"
+                  aria-label={wishlist.includes(product.postId) ? "Remove from wishlist" : "Add to wishlist"}
+                  type="button"
+                >
+                  <Heart
+                    className={`h-5 w-5 ${
+                      wishlist.includes(product.postId) ? "text-red-500 fill-red-500" : "text-gray-600"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              <div className="p-4">
+                <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
+
+                {/* Price display - now showing the commission-adjusted price */}
+                <div className="mt-2">
+                  <p className="text-lg font-bold text-blue">₹{product.price.toLocaleString()}</p>
+
+                  {/* Show the base price for comparison */}
+                  {product.basePrice && product.basePrice !== product.price && (
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm text-muted-foreground">
+                        <span className="line-through">₹{product.basePrice.toLocaleString()}</span>
+                      </p>
+                      <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-800 rounded-full">
+                        Agent Price
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <p className="text-sm text-muted-foreground mt-1">{product.category}</p>
+
+                <button
+                  onClick={(e) => addToCart(e, product.postId, product.name)}
+                  className={`mt-4 w-full py-2 rounded-lg text-sm font-medium
+                            ${
+                              cart.includes(product.postId)
+                                ? "bg-muted text-muted-foreground"
+                                : "bg-primary hover:bg-primary/90 text-primary-foreground"
+                            } 
+                            transition-colors`}
+                  disabled={
+                    cart.includes(product.postId) ||
+                    addingToCart[product.postId] ||
+                    (product.quantityAvailable !== undefined && product.quantityAvailable <= 0)
+                  }
+                  type="button"
+                >
+                  {addingToCart[product.postId] ? (
+                    <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                  ) : cart.includes(product.postId) ? (
+                    "Added to Cart"
+                  ) : product.quantityAvailable !== undefined && product.quantityAvailable <= 0 ? (
+                    "Out of Stock"
+                  ) : (
+                    "Add to Cart"
+                  )}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
