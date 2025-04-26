@@ -1,9 +1,10 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import type React from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode } from 'lucide-react'
+import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode } from "lucide-react"
 import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -44,15 +45,41 @@ export default function ProductsPage() {
   const [error, setError] = useState<string | null>(null)
   const [clientData, setClientData] = useState<any>(null)
   const [showBackToTop, setShowBackToTop] = useState(false)
-  
-  // Add debug logging
+
+  // Debug token information on component mount
   useEffect(() => {
-    console.log("ProductsPage rendering");
-  }, []);
+    // Debug token information
+    const token = localStorage.getItem("clientImpersonationToken") || localStorage.getItem("agentToken")
+    if (token) {
+      try {
+        const base64Url = token.split(".")[1]
+        const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/")
+        const jsonPayload = decodeURIComponent(
+          atob(base64)
+            .split("")
+            .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+            .join(""),
+        )
+
+        const decoded = JSON.parse(jsonPayload)
+        console.log("TOKEN DEBUG INFO:", decoded)
+
+        // Check if token has agent information
+        if (decoded.agentId) {
+          console.log("✅ Token contains agent ID:", decoded.agentId)
+        } else {
+          console.warn("⚠️ Token does NOT contain agent ID!")
+        }
+      } catch (error) {
+        console.error("Error decoding token:", error)
+      }
+    } else {
+      console.error("No authentication token found!")
+    }
+  }, [])
 
   // Handle scroll for Back to Top button
   useEffect(() => {
-    console.log("Setting up scroll debug in ProductsPage");
     const handleScroll = () => {
       if (window.scrollY > 300) {
         setShowBackToTop(true)
@@ -105,11 +132,13 @@ export default function ProductsPage() {
     }
   }, [wishlist, cart])
 
-  // CRITICAL FIX: Explicitly use the agent products endpoint
+  // Updated fetchProducts function with explicit agent endpoint and detailed console logs
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
+
+      console.log("🔍 Starting product fetch...")
 
       // Use environment variable if available, otherwise use a default URL
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
@@ -121,9 +150,9 @@ export default function ProductsPage() {
         throw new Error("Authentication token not found. Please log in again.")
       }
 
-      // IMPORTANT: Force the agent-specific endpoint
-      const endpoint = `${apiUrl}/api/agent/products`;
-      console.log("Fetching products from AGENT endpoint:", endpoint);
+      // IMPORTANT: Explicitly use the agent endpoint
+      const endpoint = `${apiUrl}/api/agent/products`
+      console.log("🌐 Fetching products from:", endpoint)
 
       const response = await fetch(endpoint, {
         method: "GET",
@@ -142,29 +171,44 @@ export default function ProductsPage() {
       const data = await response.json()
 
       if (data.success && Array.isArray(data.data)) {
-        console.log("Products fetched successfully from AGENT endpoint:", data.data)
+        console.log(`✅ Products fetched successfully: ${data.data.length} products`)
 
-        // Log products with commission pricing for debugging
-        const productsWithCommission = data.data.filter(
-          (product: any) => product.basePrice && product.basePrice !== product.price,
+        // Check for products with basePrice
+        const productsWithBasePrice = data.data.filter(
+          (product: Product) => product.basePrice && product.basePrice !== product.price,
         )
-        console.log(`Found ${productsWithCommission.length} products with commission pricing`)
 
-        if (productsWithCommission.length > 0) {
-          console.log("Sample product with commission:", productsWithCommission[0])
-        }
+        console.log(`📊 BASE PRICE SUMMARY:`)
+        console.log(`   Total products: ${data.data.length}`)
+        console.log(`   Products with different basePrice: ${productsWithBasePrice.length}`)
+
+        // Log the first 5 products with their price details
+        console.log("📋 SAMPLE PRODUCT PRICES:")
+        data.data.slice(0, 5).forEach((product: Product, index: number) => {
+          console.log(`   Product ${index + 1}: ${product.name}`)
+          console.log(`     - Display Price: ₹${product.price}`)
+          console.log(`     - Base Price: ${product.basePrice !== undefined ? `₹${product.basePrice}` : "Not set"}`)
+
+          if (product.basePrice && product.basePrice !== product.price) {
+            const diff = product.price - product.basePrice
+            const percentage = ((diff / product.basePrice) * 100).toFixed(2)
+            console.log(`     - Difference: ₹${diff} (${percentage}%)`)
+          } else {
+            console.log(`     - No commission pricing`)
+          }
+        })
 
         // Filter out products with missing or invalid postId
         const validProducts = data.data.filter(
-          (product: any) => product.postId && typeof product.postId === "string",
+          (product: Product) => product.postId && typeof product.postId === "string",
         )
 
         if (validProducts.length < data.data.length) {
-          console.warn(`Filtered out ${data.data.length - validProducts.length} products with invalid postId`)
+          console.warn(`⚠️ Filtered out ${data.data.length - validProducts.length} products with invalid postId`)
         }
 
         // Process the image URLs to ensure they're valid
-        const processedProducts = validProducts.map((product: any) => ({
+        const processedProducts = validProducts.map((product: Product) => ({
           ...product,
           image:
             Array.isArray(product.image) && product.image.length > 0
@@ -178,7 +222,7 @@ export default function ProductsPage() {
       }
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : "Failed to load products"
-      console.error("Error fetching products:", error)
+      console.error("❌ Error fetching products:", error)
       setError(errorMessage)
 
       // Show error toast
@@ -411,6 +455,39 @@ export default function ProductsPage() {
     setImageError((prev) => ({ ...prev, [productId]: true }))
   }, [])
 
+  // Debug logging for products
+  useEffect(() => {
+    // Check for problematic products
+    const productsWithoutPostId = products.filter((product) => !product.postId)
+    const productsWithInvalidPostId = products.filter((product) => product.postId && typeof product.postId !== "string")
+
+    if (productsWithoutPostId.length > 0) {
+      console.warn("Products without postId:", productsWithoutPostId)
+    }
+
+    if (productsWithInvalidPostId.length > 0) {
+      console.warn("Products with invalid postId:", productsWithInvalidPostId)
+    }
+
+    // Log products with basePrice for debugging
+    const productsWithBasePrice = products.filter((product) => product.basePrice && product.basePrice !== product.price)
+    console.log(`🔍 PRODUCTS WITH BASE PRICE: ${productsWithBasePrice.length} out of ${products.length}`)
+
+    if (productsWithBasePrice.length > 0) {
+      console.log("Example products with basePrice:")
+      productsWithBasePrice.slice(0, 3).forEach((product, index) => {
+        console.log(`Product ${index + 1}: ${product.name}`)
+        console.log(`  - Display Price: ₹${product.price}`)
+        console.log(`  - Base Price: ₹${product.basePrice}`)
+        const diff = product.price - (product.basePrice || 0)
+        const percentage = ((diff / (product.basePrice || 1)) * 100).toFixed(2)
+        console.log(`  - Commission: ₹${diff} (${percentage}%)`)
+      })
+    } else {
+      console.warn("⚠️ No products with basePrice found! Commission pricing is not working.")
+    }
+  }, [products])
+
   // Fetch client data
   useEffect(() => {
     const fetchClientData = async () => {
@@ -440,6 +517,16 @@ export default function ProductsPage() {
     fetchClientData()
   }, [clientId])
 
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[80vh]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+        <p className="text-muted-foreground">Loading products...</p>
+      </div>
+    )
+  }
+
   // Add this function to handle product card clicks
   const handleProductClick = (e: React.MouseEvent, productId: string) => {
     // Check if the click was on a button or its children
@@ -452,16 +539,6 @@ export default function ProductsPage() {
 
     // Otherwise, allow navigation to proceed
     router.push(`/client-dashboard/${clientId}/product/${productId}`)
-  }
-
-  // Loading state
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[80vh]">
-        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-muted-foreground">Loading products...</p>
-      </div>
-    )
   }
 
   return (
@@ -571,7 +648,7 @@ export default function ProductsPage() {
                   </div>
                 </div>
 
-                {/* Product details with commission pricing */}
+                {/* Product price display with base price and commission */}
                 <div className="p-4">
                   <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
 
@@ -582,8 +659,8 @@ export default function ProductsPage() {
                         <p className="text-sm text-muted-foreground line-through">
                           ₹{product.basePrice.toLocaleString()}/sqft
                         </p>
-                        <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-800 rounded-full">
-                          {Math.round(((product.price - product.basePrice) / product.basePrice) * 100)}% commission
+                        <span className="text-xs px-1.5 py-0.5 bg-green-50 text-green-700 rounded-full">
+                          Agent price
                         </span>
                       </div>
                     )}
