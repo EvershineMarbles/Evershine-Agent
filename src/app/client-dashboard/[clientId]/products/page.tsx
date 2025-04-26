@@ -1,10 +1,9 @@
 "use client"
 
-import type React from "react"
-import { useState, useEffect, useCallback } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode } from "lucide-react"
+import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode } from 'lucide-react'
 import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -45,6 +44,37 @@ export default function ProductsPage() {
   const [error, setError] = useState<string | null>(null)
   const [clientData, setClientData] = useState<any>(null)
   const [showBackToTop, setShowBackToTop] = useState(false)
+
+  // Debug token information
+  useEffect(() => {
+    const token = localStorage.getItem("clientImpersonationToken") || localStorage.getItem("agentToken")
+    if (token) {
+      try {
+        const base64Url = token.split(".")[1]
+        const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/")
+        const jsonPayload = decodeURIComponent(
+          atob(base64)
+            .split("")
+            .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+            .join(""),
+        )
+
+        const decoded = JSON.parse(jsonPayload)
+        console.log("Token information:", decoded)
+
+        // Check if token has agent information
+        if (decoded.agentId) {
+          console.log("Token contains agent ID:", decoded.agentId)
+        } else {
+          console.warn("Token does NOT contain agent ID!")
+        }
+      } catch (error) {
+        console.error("Error decoding token:", error)
+      }
+    } else {
+      console.error("No authentication token found!")
+    }
+  }, [])
 
   // Handle scroll for Back to Top button
   useEffect(() => {
@@ -100,7 +130,12 @@ export default function ProductsPage() {
     }
   }, [wishlist, cart])
 
-  // Replace the fetchProducts function with this updated version that uses the agent-specific endpoint
+  // Fetch products on component mount
+  useEffect(() => {
+    fetchProducts()
+  }, [])
+
+  // Update the fetchProducts function to use the agent-specific endpoint
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true)
@@ -116,7 +151,7 @@ export default function ProductsPage() {
         throw new Error("Authentication token not found. Please log in again.")
       }
 
-      // Use the agent-specific endpoint that returns products with adjusted prices
+      // IMPORTANT: Use the agent-specific endpoint that returns products with adjusted prices
       console.log("Fetching products from:", `${apiUrl}/api/agent/products`)
 
       const response = await fetch(`${apiUrl}/api/agent/products`, {
@@ -138,21 +173,29 @@ export default function ProductsPage() {
       if (data.success && Array.isArray(data.data)) {
         console.log("Products fetched successfully:", data.data)
 
-        // Filter out products with missing or invalid postId
-        const validProducts = data.data.filter(
-          (product: Product) => product.postId && typeof product.postId === "string",
+        // Log products with commission pricing for debugging
+        const productsWithCommission = data.data.filter(
+          (product) => product.basePrice && product.basePrice !== product.price,
         )
+        console.log(`Found ${productsWithCommission.length} products with commission pricing`)
+
+        if (productsWithCommission.length > 0) {
+          console.log("Sample product with commission:", productsWithCommission[0])
+        }
+
+        // Filter out products with missing or invalid postId
+        const validProducts = data.data.filter((product) => product.postId && typeof product.postId === "string")
 
         if (validProducts.length < data.data.length) {
           console.warn(`Filtered out ${data.data.length - validProducts.length} products with invalid postId`)
         }
 
         // Process the image URLs to ensure they're valid
-        const processedProducts = validProducts.map((product: Product) => ({
+        const processedProducts = validProducts.map((product) => ({
           ...product,
           image:
             Array.isArray(product.image) && product.image.length > 0
-              ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
+              ? product.image.filter((url) => typeof url === "string" && url.trim() !== "")
               : ["/placeholder.svg"],
         }))
 
@@ -178,11 +221,6 @@ export default function ProductsPage() {
       setLoading(false)
     }
   }, [toast])
-
-  // Fetch products on component mount
-  useEffect(() => {
-    fetchProducts()
-  }, [fetchProducts])
 
   // Update the toggleWishlist function to make an API call instead of just updating local state
   const toggleWishlist = useCallback(
@@ -395,21 +433,6 @@ export default function ProductsPage() {
     setImageError((prev) => ({ ...prev, [productId]: true }))
   }, [])
 
-  // Debug logging for products
-  useEffect(() => {
-    // Check for problematic products
-    const productsWithoutPostId = products.filter((product) => !product.postId)
-    const productsWithInvalidPostId = products.filter((product) => product.postId && typeof product.postId !== "string")
-
-    if (productsWithoutPostId.length > 0) {
-      console.warn("Products without postId:", productsWithoutPostId)
-    }
-
-    if (productsWithInvalidPostId.length > 0) {
-      console.warn("Products with invalid postId:", productsWithInvalidPostId)
-    }
-  }, [products])
-
   // Fetch client data
   useEffect(() => {
     const fetchClientData = async () => {
@@ -439,16 +462,6 @@ export default function ProductsPage() {
     fetchClientData()
   }, [clientId])
 
-  // Loading state
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[80vh]">
-        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-muted-foreground">Loading products...</p>
-      </div>
-    )
-  }
-
   // Add this function to handle product card clicks
   const handleProductClick = (e: React.MouseEvent, productId: string) => {
     // Check if the click was on a button or its children
@@ -463,18 +476,35 @@ export default function ProductsPage() {
     router.push(`/client-dashboard/${clientId}/product/${productId}`)
   }
 
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[80vh]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+        <p className="text-muted-foreground">Loading products...</p>
+      </div>
+    )
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <Alert variant="destructive" className="m-6">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>{error}</AlertDescription>
+        <Button onClick={fetchProducts} className="mt-4">
+          Retry
+        </Button>
+      </Alert>
+    )
+  }
+
   return (
     <ErrorBoundary>
       <div className="p-6 md:p-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <h1 className="text-3xl font-bold">Welcome, {clientData?.name?.split(" ")[0] || "Client"}</h1>
         </div>
-        {error && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
 
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Products</h1>
@@ -570,7 +600,7 @@ export default function ProductsPage() {
                   </div>
                 </div>
 
-                {/* Replace the product price display in the product card with this updated version */}
+                {/* Product details with commission pricing */}
                 <div className="p-4">
                   <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
 
@@ -581,8 +611,8 @@ export default function ProductsPage() {
                         <p className="text-sm text-muted-foreground line-through">
                           ₹{product.basePrice.toLocaleString()}/sqft
                         </p>
-                        <span className="text-xs px-1.5 py-0.5 bg-green-50 text-green-700 rounded-full">
-                          Agent price
+                        <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-800 rounded-full">
+                          {Math.round(((product.price - product.basePrice) / product.basePrice) * 100)}% commission
                         </span>
                       </div>
                     )}
