@@ -44,40 +44,15 @@ export default function ProductsPage() {
   const [error, setError] = useState<string | null>(null)
   const [clientData, setClientData] = useState<any>(null)
   const [showBackToTop, setShowBackToTop] = useState(false)
-
-  // Debug token information
+  
+  // Add debug logging
   useEffect(() => {
-    const token = localStorage.getItem("clientImpersonationToken") || localStorage.getItem("agentToken")
-    if (token) {
-      try {
-        const base64Url = token.split(".")[1]
-        const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/")
-        const jsonPayload = decodeURIComponent(
-          atob(base64)
-            .split("")
-            .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-            .join(""),
-        )
-
-        const decoded = JSON.parse(jsonPayload)
-        console.log("Token information:", decoded)
-
-        // Check if token has agent information
-        if (decoded.agentId) {
-          console.log("Token contains agent ID:", decoded.agentId)
-        } else {
-          console.warn("Token does NOT contain agent ID!")
-        }
-      } catch (error) {
-        console.error("Error decoding token:", error)
-      }
-    } else {
-      console.error("No authentication token found!")
-    }
-  }, [])
+    console.log("ProductsPage rendering");
+  }, []);
 
   // Handle scroll for Back to Top button
   useEffect(() => {
+    console.log("Setting up scroll debug in ProductsPage");
     const handleScroll = () => {
       if (window.scrollY > 300) {
         setShowBackToTop(true)
@@ -130,12 +105,7 @@ export default function ProductsPage() {
     }
   }, [wishlist, cart])
 
-  // Fetch products on component mount
-  useEffect(() => {
-    fetchProducts()
-  }, [])
-
-  // Update the fetchProducts function to use the agent-specific endpoint
+  // CRITICAL FIX: Explicitly use the agent products endpoint
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true)
@@ -151,10 +121,11 @@ export default function ProductsPage() {
         throw new Error("Authentication token not found. Please log in again.")
       }
 
-      // IMPORTANT: Use the agent-specific endpoint that returns products with adjusted prices
-      console.log("Fetching products from:", `${apiUrl}/api/agent/products`)
+      // IMPORTANT: Force the agent-specific endpoint
+      const endpoint = `${apiUrl}/api/agent/products`;
+      console.log("Fetching products from AGENT endpoint:", endpoint);
 
-      const response = await fetch(`${apiUrl}/api/agent/products`, {
+      const response = await fetch(endpoint, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -171,11 +142,11 @@ export default function ProductsPage() {
       const data = await response.json()
 
       if (data.success && Array.isArray(data.data)) {
-        console.log("Products fetched successfully:", data.data)
+        console.log("Products fetched successfully from AGENT endpoint:", data.data)
 
         // Log products with commission pricing for debugging
         const productsWithCommission = data.data.filter(
-          (product) => product.basePrice && product.basePrice !== product.price,
+          (product: any) => product.basePrice && product.basePrice !== product.price,
         )
         console.log(`Found ${productsWithCommission.length} products with commission pricing`)
 
@@ -184,18 +155,20 @@ export default function ProductsPage() {
         }
 
         // Filter out products with missing or invalid postId
-        const validProducts = data.data.filter((product) => product.postId && typeof product.postId === "string")
+        const validProducts = data.data.filter(
+          (product: any) => product.postId && typeof product.postId === "string",
+        )
 
         if (validProducts.length < data.data.length) {
           console.warn(`Filtered out ${data.data.length - validProducts.length} products with invalid postId`)
         }
 
         // Process the image URLs to ensure they're valid
-        const processedProducts = validProducts.map((product) => ({
+        const processedProducts = validProducts.map((product: any) => ({
           ...product,
           image:
             Array.isArray(product.image) && product.image.length > 0
-              ? product.image.filter((url) => typeof url === "string" && url.trim() !== "")
+              ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
               : ["/placeholder.svg"],
         }))
 
@@ -221,6 +194,11 @@ export default function ProductsPage() {
       setLoading(false)
     }
   }, [toast])
+
+  // Fetch products on component mount
+  useEffect(() => {
+    fetchProducts()
+  }, [fetchProducts])
 
   // Update the toggleWishlist function to make an API call instead of just updating local state
   const toggleWishlist = useCallback(
@@ -486,25 +464,18 @@ export default function ProductsPage() {
     )
   }
 
-  // Error state
-  if (error) {
-    return (
-      <Alert variant="destructive" className="m-6">
-        <AlertCircle className="h-4 w-4" />
-        <AlertDescription>{error}</AlertDescription>
-        <Button onClick={fetchProducts} className="mt-4">
-          Retry
-        </Button>
-      </Alert>
-    )
-  }
-
   return (
     <ErrorBoundary>
       <div className="p-6 md:p-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <h1 className="text-3xl font-bold">Welcome, {clientData?.name?.split(" ")[0] || "Client"}</h1>
         </div>
+        {error && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Products</h1>
