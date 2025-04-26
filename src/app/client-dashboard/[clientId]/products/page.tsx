@@ -85,7 +85,7 @@ export default function ProductsPage() {
       console.log("Fetching agent data...")
 
       // This should be the endpoint that returns the agent data for the current client
-      const response = await fetch(`${apiUrl}/api/agent/info`, {
+      const response = await fetch(`${apiUrl}/api/agent/profile`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
