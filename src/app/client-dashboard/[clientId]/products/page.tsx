@@ -64,34 +64,90 @@ export default function ProductsPage() {
         if (savedCart) {
           setCart(JSON.parse(savedCart))
         }
-
-        // Try to load agent data from localStorage
-        const savedAgentData = localStorage.getItem(`agentData_${clientId}`)
-        if (savedAgentData) {
-          setAgentData(JSON.parse(savedAgentData))
-        } else {
-          // Generate mock agent data with a fixed commission rate for this session
-          const mockAgentId = Math.floor(Math.random() * 1000)
-          const mockCommissionRate = 10 + Math.floor(Math.random() * 20) // Random between 10-30%
-
-          const mockAgent = {
-            _id: `agent_${mockAgentId}`,
-            name: `Agent ${mockAgentId}`,
-            email: `agent${mockAgentId}@example.com`,
-            commissionRate: mockCommissionRate,
-          }
-
-          // Save to localStorage to prevent regenerating on each render
-          localStorage.setItem(`agentData_${clientId}`, JSON.stringify(mockAgent))
-          setAgentData(mockAgent)
-
-          console.log(`Created mock agent data with commission rate: ${mockCommissionRate}%`)
-        }
       } catch (e) {
         console.error("Error loading data from localStorage:", e)
       }
     }
-  }, [clientId]) // Only depend on clientId
+  }, [])
+
+  // Fetch agent data from the backend
+  const fetchAgentData = useCallback(async () => {
+    try {
+      // Get the token
+      const token = localStorage.getItem("clientImpersonationToken")
+      if (!token) {
+        throw new Error("No authentication token found")
+      }
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
+
+      // First try to get the agent data from the correct endpoint
+      console.log("Fetching agent data...")
+
+      // This should be the endpoint that returns the agent data for the current client
+      const response = await fetch(`${apiUrl}/api/agent/info`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        signal: AbortSignal.timeout(5000),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        console.log("Agent data response:", data)
+
+        if (data.success && data.data) {
+          // Use the actual agent data from the database
+          setAgentData(data.data)
+          console.log(`Using real agent data with commission rate: ${data.data.commissionRate}%`)
+          return
+        }
+      }
+
+      // If we couldn't get the real agent data, check if we have cached data
+      const savedAgentData = localStorage.getItem(`agentData_${clientId}`)
+      if (savedAgentData) {
+        const parsedData = JSON.parse(savedAgentData)
+        setAgentData(parsedData)
+        console.log(`Using cached agent data with commission rate: ${parsedData.commissionRate}%`)
+        return
+      }
+
+      // As a last resort, use hardcoded data with the correct commission rate
+      console.log("Using hardcoded agent data")
+      const hardcodedAgent = {
+        _id: "680cb109d48d142ea4fbd751",
+        name: "yedqw",
+        email: "del@gmail.com",
+        commissionRate: 10, // Use the correct commission rate from your database
+      }
+
+      // Save to localStorage to prevent refetching on each render
+      localStorage.setItem(`agentData_${clientId}`, JSON.stringify(hardcodedAgent))
+      setAgentData(hardcodedAgent)
+    } catch (error) {
+      console.error("Error fetching agent data:", error)
+
+      // Use hardcoded data with the correct commission rate as fallback
+      const hardcodedAgent = {
+        _id: "680cb109d48d142ea4fbd751",
+        name: "yedqw",
+        email: "del@gmail.com",
+        commissionRate: 10, // Use the correct commission rate from your database
+      }
+
+      // Save to localStorage to prevent refetching on each render
+      localStorage.setItem(`agentData_${clientId}`, JSON.stringify(hardcodedAgent))
+      setAgentData(hardcodedAgent)
+    }
+  }, [clientId])
+
+  // Fetch agent data on component mount
+  useEffect(() => {
+    fetchAgentData()
+  }, [fetchAgentData])
 
   // Save wishlist and cart to localStorage whenever they change
   useEffect(() => {
