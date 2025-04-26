@@ -107,7 +107,7 @@ export default function ProductsPage() {
           _id: data.data._id || "unknown",
           name: data.data.name || "Unknown Agent",
           email: data.data.email || "unknown@example.com",
-          commissionRate: data.data.commissionRate || 10, // Default to 10% if not provided
+          commissionRate: data.data.commissionRate || "unknown", // Default to 10% if not provided
           agentId: data.data.agentId || "unknown",
         }
         
