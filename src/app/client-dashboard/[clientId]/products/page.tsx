@@ -100,7 +100,7 @@ export default function ProductsPage() {
     }
   }, [wishlist, cart])
 
-  // Update the fetchProducts function to use the agent-specific endpoint
+  // Replace the fetchProducts function with this updated version that uses the agent-specific endpoint
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true)
@@ -567,10 +567,11 @@ export default function ProductsPage() {
                   </div>
                 </div>
 
+                {/* Replace the product price display in the product card with this updated version */}
                 <div className="p-4">
                   <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
 
-                  {/* Update the product card display to show both prices if needed */}
+                  {/* Updated price display with commission information */}
                   <div className="mt-2">
                     <p className="text-lg font-bold text-foreground">₹{product.price.toLocaleString()}/sqft</p>
                     {product.basePrice && product.basePrice !== product.price && (
