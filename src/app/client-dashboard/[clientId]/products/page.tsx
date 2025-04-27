@@ -39,6 +39,8 @@ export default function ProductsPage() {
   const params = useParams()
   const clientId = params.clientId as string
 
+  // Remove the unused router variable
+  // const router = useRouter()
   const { toast } = useToast()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
@@ -140,6 +142,7 @@ export default function ProductsPage() {
 
       // Use environment variable if available, otherwise use a default URL
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
+      console.log("Fetching products from:", `${apiUrl}/api/getAllProducts`)
 
       const token = localStorage.getItem("clientImpersonationToken")
       const headers: Record<string, string> = {
@@ -153,6 +156,7 @@ export default function ProductsPage() {
       const response = await fetch(`${apiUrl}/api/getAllProducts`, {
         method: "GET",
         headers,
+        // Add a timeout to prevent long waiting times
         signal: AbortSignal.timeout(8000), // 8 second timeout
       })
 
@@ -163,6 +167,8 @@ export default function ProductsPage() {
       const data = await response.json()
 
       if (data.success && Array.isArray(data.data)) {
+        console.log("Products fetched successfully:", data.data)
+
         // Process the image URLs to ensure they're valid
         const processedProducts = data.data.map((product: Product) => ({
           ...product,
@@ -178,6 +184,7 @@ export default function ProductsPage() {
       }
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : "Failed to load products"
+      console.error("Error fetching products:", error)
       setError(errorMessage)
 
       // Show error toast
@@ -226,7 +233,7 @@ export default function ProductsPage() {
   // Add to cart function
   const addToCart = useCallback(
     async (e: React.MouseEvent, productId: string, productName: string) => {
-      e.preventDefault() // Prevent navigation
+      e.preventDefault() // Prevent navigati
 
       if (cart.includes(productId)) {
         toast({
@@ -241,10 +248,13 @@ export default function ProductsPage() {
         // Set loading state for this specific product
         setAddingToCart((prev) => ({ ...prev, [productId]: true }))
 
+        console.log("Adding to cart:", productId, productName)
+
         // Get the token
         const token = localStorage.getItem("clientImpersonationToken")
 
         if (!token) {
+          console.error("No impersonation token found")
           toast({
             title: "Authentication Error",
             description: "Please refresh your token using the debug panel above",
@@ -253,9 +263,9 @@ export default function ProductsPage() {
           throw new Error("No authentication token found")
         }
 
-        // Make a direct fetch request with the token
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
-        const response = await fetch(`${apiUrl}/api/addToCart`, {
+        console.log("Using token:", token.substring(0, 15) + "...")
+        console.log("Full request details:", {
+          url: "https://evershinebackend-2.onrender.com/api/addToCart",
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -264,14 +274,29 @@ export default function ProductsPage() {
           body: JSON.stringify({ productId }),
         })
 
+        // Make a direct fetch request with the token
+        const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ productId }),
+        })
+
+        console.log("Response status:", response.status, response.statusText)
+
         // Get the response text for debugging
         const responseText = await response.text()
+        console.log("Response text:", responseText)
 
         // Try to parse the response a JSON
         let data
         try {
           data = JSON.parse(responseText)
+          console.log("Parsed response data:", data)
         } catch (e) {
+          console.error("Failed to parse response as JSON:", e)
           throw new Error(`Invalid response format: ${responseText}`)
         }
 
@@ -296,6 +321,7 @@ export default function ProductsPage() {
         }
       } catch (error: any) {
         const errorMessage = error instanceof Error ? error.message : "Failed to add item to cart. Please try again."
+        console.error("Error adding to cart:", error)
         toast({
           title: "Error adding to cart",
           description: errorMessage,
@@ -422,9 +448,7 @@ export default function ProductsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProducts.map((product) => {
             // Calculate adjusted price for each product
-            const originalPrice = product.price
             const adjustedPrice = calculateAdjustedPrice(product)
-            const hasCommission = commissionData && adjustedPrice > originalPrice
 
             return (
               <div
@@ -435,10 +459,10 @@ export default function ProductsPage() {
                   <Image
                     src={
                       imageError[product._id]
-                        ? "/placeholder.svg?height=300&width=300&query=marble"
+                        ? "/placeholder.svg?height=300&width=300"
                         : product.image && product.image.length > 0 && product.image[0]
                           ? product.image[0]
-                          : "/placeholder.svg?height=300&width=300&query=marble"
+                          : "/placeholder.svg?height=300&width=300"
                     }
                     alt={product.name}
                     fill
@@ -463,28 +487,8 @@ export default function ProductsPage() {
 
                 <div className="p-4">
                   <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
-
+                  <p className="text-lg font-bold mt-2">₹{adjustedPrice.toLocaleString()}</p>
                   <p className="text-sm text-muted-foreground mt-1">{product.category}</p>
-
-                  {/* Price display with original and adjusted prices */}
-                  <div className="mt-2">
-                    {hasCommission ? (
-                      <>
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm text-muted-foreground line-through">{formatPrice(originalPrice)}</p>
-                          <Badge variant="outline" className="text-xs">
-                            Base Price
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <p className="text-lg font-bold text-green-600">{formatPrice(adjustedPrice)}</p>
-                          <Badge className="text-xs bg-green-100 text-green-800 hover:bg-green-100">Final Price</Badge>
-                        </div>
-                      </>
-                    ) : (
-                      <p className="text-lg font-bold mt-1">{formatPrice(originalPrice)}</p>
-                    )}
-                  </div>
 
                   <button
                     onClick={(e) => addToCart(e, product.postId, product.name)}
