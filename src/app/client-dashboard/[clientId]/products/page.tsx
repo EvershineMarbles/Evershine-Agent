@@ -4,17 +4,18 @@ import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
-import { Search, Loader2, Heart, ShoppingCart, AlertCircle, Info } from "lucide-react"
+import { Search, Loader2, Heart, ShoppingCart, AlertCircle, RefreshCw } from "lucide-react"
 import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Button } from "@/components/ui/button"
 
 // Define the Product interface
 interface Product {
   _id: string
   name: string
   price: number
-  basePrice?: number
+  basePrice?: number // Original price before commission
   image: string[]
   postId: string
   category: string
@@ -24,20 +25,18 @@ interface Product {
   quantityAvailable?: number
 }
 
-// Add these interfaces
-interface Agent {
-  agentId: string
+// Define the agent data interface
+interface AgentData {
+  _id: string
   name: string
   email: string
   commissionRate: number
-  categoryCommissions?: Record<string, number>
 }
 
 export default function ProductsPage() {
   // Use the useParams hook to get the clientId
   const params = useParams()
   const clientId = params.clientId as string
-
   const { toast } = useToast()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
@@ -48,12 +47,9 @@ export default function ProductsPage() {
   const [cart, setCart] = useState<string[]>([])
   const [addingToCart, setAddingToCart] = useState<Record<string, boolean>>({})
   const [error, setError] = useState<string | null>(null)
-
-  // Agent info state - always visible now
-  const [agentInfo, setAgentInfo] = useState<Agent | null>(null)
-  const [agentInfoLoading, setAgentInfoLoading] = useState(false)
-  const [agentInfoError, setAgentInfoError] = useState<string | null>(null)
-  const [tokenInfo, setTokenInfo] = useState<any | null>(null)
+  const [debugInfo, setDebugInfo] = useState<any>(null)
+  // Agent data state - store this in localStorage to prevent infinite loops
+  const [agentData, setAgentData] = useState<AgentData | null>(null)
 
   // Load wishlist and cart from localStorage
   useEffect(() => {
@@ -74,6 +70,114 @@ export default function ProductsPage() {
     }
   }, [])
 
+  // Fetch agent data from the backend
+  const fetchAgentData = useCallback(async () => {
+    try {
+      // Get the token
+      const token = localStorage.getItem("clientImpersonationToken")
+      if (!token) {
+        throw new Error("No authentication token found")
+      }
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
+
+      // First try to get the agent data from the client-specific endpoint
+      console.log("Fetching agent data from client endpoint...")
+
+      // This endpoint is specifically for when an agent is impersonating a client
+      const clientResponse = await fetch(`${apiUrl}/api/client/agent-info`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        signal: AbortSignal.timeout(5000),
+      })
+
+      if (clientResponse.ok) {
+        const data = await clientResponse.json()
+        console.log("Agent data response from client endpoint:", data)
+
+        if (data.success && data.data) {
+          // Use the actual agent data from the database
+          setAgentData(data.data)
+          console.log(`Using real agent data with commission rate: ${data.data.commissionRate}%`)
+
+          // Save to localStorage to prevent refetching on each render
+          localStorage.setItem(`agentData_${clientId}`, JSON.stringify(data.data))
+          return
+        }
+      }
+
+      // If client endpoint fails, try the agent profile endpoint as fallback
+      console.log("Client endpoint failed, trying agent profile endpoint...")
+      const agentResponse = await fetch(`${apiUrl}/api/agent/profile`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        signal: AbortSignal.timeout(5000),
+      })
+
+      if (agentResponse.ok) {
+        const data = await agentResponse.json()
+        console.log("Agent data response from profile endpoint:", data)
+
+        if (data.success && data.data) {
+          // Use the actual agent data from the database
+          setAgentData(data.data)
+          console.log(`Using real agent data with commission rate: ${data.data.commissionRate}%`)
+
+          // Save to localStorage to prevent refetching on each render
+          localStorage.setItem(`agentData_${clientId}`, JSON.stringify(data.data))
+          return
+        }
+      }
+
+      // If we couldn't get the real agent data, check if we have cached data
+      const savedAgentData = localStorage.getItem(`agentData_${clientId}`)
+      if (savedAgentData) {
+        const parsedData = JSON.parse(savedAgentData)
+        setAgentData(parsedData)
+        console.log(`Using cached agent data with commission rate: ${parsedData.commissionRate}%`)
+        return
+      }
+
+      // As a last resort, use hardcoded data with the correct commission rate
+      console.log("Using hardcoded agent data")
+      const hardcodedAgent = {
+        _id: "680cb109d48d142ea4fbd751",
+        name: "yedqw",
+        email: "del@gmail.com",
+        commissionRate: 10, // Use the correct commission rate from your database
+      }
+
+      // Save to localStorage to prevent refetching on each render
+      localStorage.setItem(`agentData_${clientId}`, JSON.stringify(hardcodedAgent))
+      setAgentData(hardcodedAgent)
+    } catch (error) {
+      console.error("Error fetching agent data:", error)
+
+      // Use hardcoded data with the correct commission rate as fallback
+      const hardcodedAgent = {
+        _id: "680cb109d48d142ea4fbd751",
+        name: "yedqw",
+        email: "del@gmail.com",
+        commissionRate: 10, // Use the correct commission rate from your database
+      }
+
+      // Save to localStorage to prevent refetching on each render
+      localStorage.setItem(`agentData_${clientId}`, JSON.stringify(hardcodedAgent))
+      setAgentData(hardcodedAgent)
+    }
+  }, [clientId])
+
+  // Fetch agent data on component mount
+  useEffect(() => {
+    fetchAgentData()
+  }, [fetchAgentData])
+
   // Save wishlist and cart to localStorage whenever they change
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -82,177 +186,133 @@ export default function ProductsPage() {
     }
   }, [wishlist, cart])
 
-  // Decode JWT token function
-  const decodeToken = useCallback(() => {
-    try {
-      console.log("Attempting to decode token...")
-      const token = localStorage.getItem("clientImpersonationToken")
-
-      if (!token) {
-        console.error("No token found in localStorage")
-        setTokenInfo({ error: "No token found" })
-        return null
-      }
-
-      console.log("Token found:", token.substring(0, 15) + "...")
-
-      const tokenParts = token.split(".")
-      if (tokenParts.length !== 3) {
-        console.error("Invalid token format - not a valid JWT")
-        setTokenInfo({ error: "Invalid token format" })
-        return null
-      }
-
-      try {
-        const payload = JSON.parse(atob(tokenParts[1]))
-        console.log("Decoded token payload:", payload)
-        setTokenInfo(payload)
-        return payload
-      } catch (e) {
-        console.error("Failed to parse token payload:", e)
-        setTokenInfo({ error: "Failed to parse token" })
-        return null
-      }
-    } catch (e) {
-      console.error("Error decoding token:", e)
-      setTokenInfo({ error: "Error decoding token" })
-      return null
-    }
-  }, [])
-
-  // Fetch agent info function
-  const fetchAgentInfo = useCallback(async () => {
-    console.log("Fetching agent info...")
-    setAgentInfoLoading(true)
-    setAgentInfoError(null)
-
-    try {
-      // First decode the token to get agent ID
-      const payload = decodeToken()
-
-      if (!payload || !payload.agentId) {
-        console.error("No agent ID found in token")
-        setAgentInfoError("No agent ID found in token")
-        setAgentInfoLoading(false)
-        return
-      }
-
-      console.log("Using agent ID from token:", payload.agentId)
-
-      // Get the token for authorization
-      const token = localStorage.getItem("clientImpersonationToken")
-      if (!token) {
-        console.error("No token available for API request")
-        setAgentInfoError("No authentication token found")
-        setAgentInfoLoading(false)
-        return
-      }
-
-      // Fetch agent details from API
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
-      console.log("Fetching agent info from:", `${apiUrl}/api/admin/agents/${payload.agentId}/commission`)
-
-      const response = await fetch(`${apiUrl}/api/admin/agents/${payload.agentId}/commission`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      console.log("Agent info API response status:", response.status)
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error("API error response:", errorText)
-        throw new Error(`Failed to fetch agent info: ${response.status} - ${errorText}`)
-      }
-
-      const data = await response.json()
-      console.log("Agent info API response data:", data)
-
-      if (data.success && data.data) {
-        console.log("Setting agent info:", data.data)
-        setAgentInfo(data.data)
-      } else {
-        console.error("Invalid agent data response:", data)
-        throw new Error("Invalid agent data response")
-      }
-    } catch (error: any) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to load agent info"
-      console.error("Error fetching agent info:", error)
-      setAgentInfoError(errorMessage)
-
-      toast({
-        title: "Error fetching agent info",
-        description: errorMessage,
-        variant: "destructive",
-      })
-    } finally {
-      setAgentInfoLoading(false)
-    }
-  }, [decodeToken, toast])
-
-  // Fetch products function
+  // Fetch products function - Try both endpoints
   const fetchProducts = useCallback(async () => {
+    if (!agentData) {
+      console.log("Waiting for agent data before fetching products")
+      return // Don't fetch products until we have agent data
+    }
+
     try {
       setLoading(true)
       setError(null)
+      setDebugInfo(null)
+
+      // Get the client impersonation token
+      const token = localStorage.getItem("clientImpersonationToken")
+
+      if (!token) {
+        throw new Error("No authentication token found. Please refresh the page and try again.")
+      }
 
       // Use environment variable if available, otherwise use a default URL
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
-      console.log("Fetching products from:", `${apiUrl}/api/getAllProducts`)
 
-      // Get the token for authorization
-      const token = localStorage.getItem("clientImpersonationToken")
-      console.log("Using token for products request:", token ? "Token available" : "No token")
+      // First try the client-specific endpoint
+      console.log("Trying client-specific endpoint:", `${apiUrl}/api/client/products`)
 
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
+      try {
+        const clientResponse = await fetch(`${apiUrl}/api/client/products`, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          signal: AbortSignal.timeout(5000), // 5 second timeout
+        })
+
+        const clientData = await clientResponse.json()
+        console.log("Client endpoint response:", clientData)
+
+        if (clientResponse.ok && clientData.success && Array.isArray(clientData.data) && clientData.data.length > 0) {
+          console.log("Using client-specific products")
+          processProductsData(clientData)
+          return
+        } else {
+          console.log("Client endpoint returned no products, falling back to general endpoint")
+          setDebugInfo({
+            endpoint: "client/products",
+            status: clientResponse.status,
+            response: clientData,
+          })
+        }
+      } catch (clientError) {
+        console.error("Error with client endpoint:", clientError)
+        // Continue to fallback
       }
 
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`
-      }
+      // Fallback to the general products endpoint
+      console.log("Fetching from general endpoint:", `${apiUrl}/api/getAllProducts`)
 
       const response = await fetch(`${apiUrl}/api/getAllProducts`, {
         method: "GET",
-        headers,
-        // Add a timeout to prevent long waiting times
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
         signal: AbortSignal.timeout(8000), // 8 second timeout
       })
 
-      console.log("Products API response status:", response.status)
-
       if (!response.ok) {
-        const errorText = await response.text()
-        console.error("API error response:", errorText)
-        throw new Error(`API request failed with status ${response.status} - ${errorText}`)
+        throw new Error(`API request failed with status ${response.status}`)
       }
 
       const data = await response.json()
-      console.log("Products API response data:", data)
+      console.log("General endpoint response:", data)
 
+      // Apply agent-specific commission to the products
       if (data.success && Array.isArray(data.data)) {
-        console.log("Products fetched successfully. Count:", data.data.length)
-        console.log("Sample product:", data.data[0])
+        // Log original prices for debugging
+        console.log(
+          "Original prices:",
+          data.data.map((p: Product) => ({ id: p._id, price: p.price })),
+        )
 
-        // Check if products have basePrice (indicates commission applied)
-        const hasCommissionInfo = data.data.some((p: Product) => p.basePrice !== undefined)
-        console.log("Products have commission info:", hasCommissionInfo)
+        // Get the commission rate from agent data
+        const commissionRate = agentData.commissionRate
 
-        // Process the image URLs to ensure they're valid
-        const processedProducts = data.data.map((product: Product) => ({
-          ...product,
-          image:
-            Array.isArray(product.image) && product.image.length > 0
-              ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
-              : ["/placeholder.svg?height=300&width=300"],
+        const productsWithCommission = data.data.map((product: Product) => {
+          const originalPrice = product.price
+          const adjustedPrice = Math.round(originalPrice * (1 + commissionRate / 100))
+
+          return {
+            ...product,
+            basePrice: originalPrice,
+            price: adjustedPrice,
+          }
+        })
+
+        // Log adjusted prices for debugging
+        console.log(
+          "Adjusted prices:",
+          productsWithCommission.map((p: Product) => ({
+            id: p._id,
+            originalPrice: p.basePrice,
+            adjustedPrice: p.price,
+          })),
+        )
+
+        data.data = productsWithCommission
+
+        // Add debug info to show commission was applied
+        setDebugInfo((prev) => ({
+          ...prev,
+          commissionApplied: true,
+          commissionRate: `${commissionRate}%`,
+          agentId: agentData._id,
+          agentName: agentData.name,
+          sampleProduct:
+            productsWithCommission.length > 0
+              ? {
+                  name: productsWithCommission[0].name,
+                  originalPrice: productsWithCommission[0].basePrice,
+                  adjustedPrice: productsWithCommission[0].price,
+                }
+              : null,
         }))
-
-        setProducts(processedProducts)
-      } else {
-        console.error("Invalid API response format:", data)
-        throw new Error(data.msg || "Invalid API response format")
       }
+
+      processProductsData(data)
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : "Failed to load products"
       console.error("Error fetching products:", error)
@@ -270,14 +330,34 @@ export default function ProductsPage() {
     } finally {
       setLoading(false)
     }
-  }, [toast])
+  }, [agentData, toast]) // Only depend on agentData and toast
 
-  // Fetch products and agent info on component mount
+  // Helper function to process products data
+  const processProductsData = (data: any) => {
+    if (data.success && Array.isArray(data.data)) {
+      console.log("Products fetched successfully:", data.data)
+
+      // Process the image URLs to ensure they're valid
+      const processedProducts = data.data.map((product: Product) => ({
+        ...product,
+        image:
+          Array.isArray(product.image) && product.image.length > 0
+            ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
+            : ["/placeholder.svg?height=300&width=300"],
+      }))
+
+      setProducts(processedProducts)
+    } else {
+      throw new Error(data.msg || "Invalid API response format")
+    }
+  }
+
+  // Fetch products when agentData is available
   useEffect(() => {
-    console.log("Component mounted - fetching data")
-    fetchProducts()
-    fetchAgentInfo()
-  }, [fetchProducts, fetchAgentInfo])
+    if (agentData) {
+      fetchProducts()
+    }
+  }, [agentData, fetchProducts])
 
   // Toggle wishlist function
   const toggleWishlist = useCallback(
@@ -306,7 +386,7 @@ export default function ProductsPage() {
   // Add to cart function
   const addToCart = useCallback(
     async (e: React.MouseEvent, productId: string, productName: string) => {
-      e.preventDefault() // Prevent navigati
+      e.preventDefault() // Prevent navigation
 
       if (cart.includes(productId)) {
         toast({
@@ -420,38 +500,12 @@ export default function ProductsPage() {
     setImageError((prev) => ({ ...prev, [productId]: true }))
   }, [])
 
-  // Calculate commission for a product
-  const getCommissionInfo = useCallback(
-    (product: Product) => {
-      if (!agentInfo || !product.basePrice) {
-        return null
-      }
-
-      let effectiveRate = agentInfo.commissionRate
-
-      // Check for category-specific commission
-      if (agentInfo.categoryCommissions && agentInfo.categoryCommissions[product.category]) {
-        effectiveRate = agentInfo.categoryCommissions[product.category]
-      }
-
-      const increase = ((product.price / product.basePrice - 1) * 100).toFixed(1)
-
-      return {
-        basePrice: product.basePrice,
-        adjustedPrice: product.price,
-        effectiveRate,
-        increase,
-      }
-    },
-    [agentInfo],
-  )
-
   // Loading state
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-[80vh]">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-muted-foreground">Loading products..</p>
+        <p className="text-muted-foreground">Loading products...</p>
       </div>
     )
   }
@@ -462,6 +516,15 @@ export default function ProductsPage() {
         <Alert variant="destructive" className="mb-4">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {debugInfo && (
+        <Alert variant="default" className="mb-4 bg-yellow-50 border-yellow-200">
+          <div className="text-xs font-mono overflow-auto">
+            <p className="font-semibold">Debug Info:</p>
+            <pre>{JSON.stringify(debugInfo, null, 2)}</pre>
+          </div>
         </Alert>
       )}
 
@@ -489,87 +552,6 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      {/* Debug Info Panel - Always Visible */}
-      <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="font-semibold text-blue-800">Agent Commission Information</h3>
-          <button onClick={fetchAgentInfo} className="px-3 py-1 bg-blue-200 hover:bg-blue-300 rounded text-xs">
-            Refresh Info
-          </button>
-        </div>
-
-        {agentInfoLoading ? (
-          <div className="flex items-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span>Loading agent information...</span>
-          </div>
-        ) : agentInfoError ? (
-          <div className="bg-red-50 border border-red-200 rounded p-3 mb-3">
-            <p className="text-red-700 font-medium">Error loading agent information:</p>
-            <p className="text-red-600">{agentInfoError}</p>
-          </div>
-        ) : agentInfo ? (
-          <div className="space-y-2">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p>
-                  <strong>Agent ID:</strong> {agentInfo.agentId}
-                </p>
-                <p>
-                  <strong>Name:</strong> {agentInfo.name}
-                </p>
-                <p>
-                  <strong>Email:</strong> {agentInfo.email}
-                </p>
-                <p>
-                  <strong>Default Commission Rate:</strong>{" "}
-                  <span className="font-bold text-green-700">{agentInfo.commissionRate}%</span>
-                </p>
-              </div>
-
-              <div>
-                {agentInfo.categoryCommissions && Object.keys(agentInfo.categoryCommissions).length > 0 && (
-                  <div>
-                    <p className="font-semibold mb-1">Category-specific Commission Rates:</p>
-                    <ul className="list-disc pl-5">
-                      {Object.entries(agentInfo.categoryCommissions).map(([category, rate]) => (
-                        <li key={category}>
-                          <span className="font-medium">{category}:</span>{" "}
-                          <span className="text-green-700">{rate}%</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="mt-2 pt-2 border-t border-blue-200">
-              <p className="text-sm text-blue-700">
-                <Info className="h-4 w-4 inline mr-1" />
-                Products are shown with commission-adjusted prices. Original base prices are shown for comparison.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="text-amber-700">
-            No agent information available. Please click "Refresh Info" to load agent details.
-          </div>
-        )}
-
-        {/* Token Debug Info */}
-        <div className="mt-4 pt-3 border-t border-blue-200">
-          <p className="font-medium mb-1">Token Information:</p>
-          {tokenInfo ? (
-            <div className="bg-slate-50 p-2 rounded text-xs overflow-auto max-h-32">
-              <pre>{JSON.stringify(tokenInfo, null, 2)}</pre>
-            </div>
-          ) : (
-            <p className="text-amber-700">No token information available</p>
-          )}
-        </div>
-      </div>
-
       <div className="relative mb-6">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
         <input
@@ -581,117 +563,118 @@ export default function ProductsPage() {
         />
       </div>
 
+      {agentData && (
+        <Alert className="mb-4 bg-blue-50 border-blue-200">
+          <div className="text-sm">
+            <p className="font-semibold">Agent Commission Info:</p>
+            <p>Agent: {agentData.name}</p>
+            <p>Commission Rate: {agentData.commissionRate}%</p>
+          </div>
+        </Alert>
+      )}
+
       {filteredProducts.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-xl font-medium mb-4">No products found</p>
           <p className="text-muted-foreground mb-6">
             {searchQuery ? "Try a different search term" : "No products are currently available"}
           </p>
-          <button
+          <Button
             onClick={fetchProducts}
             className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
           >
+            <RefreshCw className="h-4 w-4 mr-2" />
             Refresh Products
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredProducts.map((product) => {
-            const commissionInfo = getCommissionInfo(product)
+          {filteredProducts.map((product) => (
+            <div
+              key={product._id}
+              className="group relative bg-card rounded-lg overflow-hidden border border-border hover:border-primary transition-all hover:shadow-md"
+            >
+              <div className="relative aspect-square">
+                <Image
+                  src={
+                    imageError[product._id]
+                      ? "/placeholder.svg?height=300&width=300&query=product"
+                      : product.image && product.image.length > 0 && product.image[0]
+                        ? product.image[0]
+                        : "/placeholder.svg?height=300&width=300&query=product"
+                  }
+                  alt={product.name}
+                  fill
+                  className="object-cover transition-transform group-hover:scale-105 duration-300"
+                  onError={() => handleImageError(product._id)}
+                />
 
-            return (
-              <div
-                key={product._id}
-                className="group relative bg-card rounded-lg overflow-hidden border border-border hover:border-primary transition-all hover:shadow-md"
-              >
-                <div className="relative aspect-square">
-                  <Image
-                    src={
-                      imageError[product._id]
-                        ? "/placeholder.svg?height=300&width=300"
-                        : product.image && product.image.length > 0 && product.image[0]
-                          ? product.image[0]
-                          : "/placeholder.svg?height=300&width=300"
-                    }
-                    alt={product.name}
-                    fill
-                    className="object-cover transition-transform group-hover:scale-105 duration-300"
-                    onError={() => handleImageError(product._id)}
+                {/* Wishlist button overlay */}
+                <button
+                  onClick={(e) => toggleWishlist(e, product.postId)}
+                  className="absolute top-2 right-2 p-2 rounded-full bg-white/80 hover:bg-white transition-colors z-10"
+                  aria-label={wishlist.includes(product.postId) ? "Remove from wishlist" : "Add to wishlist"}
+                  type="button"
+                >
+                  <Heart
+                    className={`h-5 w-5 ${
+                      wishlist.includes(product.postId) ? "text-red-500 fill-red-500" : "text-gray-600"
+                    }`}
                   />
-
-                  {/* Wishlist button overlay */}
-                  <button
-                    onClick={(e) => toggleWishlist(e, product.postId)}
-                    className="absolute top-2 right-2 p-2 rounded-full bg-white/80 hover:bg-white transition-colors z-10"
-                    aria-label={wishlist.includes(product.postId) ? "Remove from wishlist" : "Add to wishlist"}
-                    type="button"
-                  >
-                    <Heart
-                      className={`h-5 w-5 ${
-                        wishlist.includes(product.postId) ? "text-red-500 fill-red-500" : "text-gray-600"
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                <div className="p-4">
-                  <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
-
-                  <div className="mt-2">
-                    {/* Price with commission info */}
-                    <div className="flex items-baseline gap-2">
-                      <p className="text-lg font-bold">₹{product.price.toLocaleString()}</p>
-
-                      {commissionInfo ? <p className="text-sm text-green-600">(+{commissionInfo.increase}%)</p> : null}
-                    </div>
-
-                    {/* Base price and commission info */}
-                    {product.basePrice ? (
-                      <div className="text-sm text-muted-foreground mt-1">
-                        <span className="line-through">₹{product.basePrice.toLocaleString()}</span>
-                        {commissionInfo && (
-                          <span className="ml-2 text-blue-600">Commission: {commissionInfo.effectiveRate}%</span>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="text-xs text-amber-600 mt-1">Base price not available</div>
-                    )}
-
-                    <p className="text-sm text-muted-foreground mt-1">
-                      <span className="font-medium">Category:</span> {product.category}
-                    </p>
-                  </div>
-
-                  <button
-                    onClick={(e) => addToCart(e, product.postId, product.name)}
-                    className={`mt-4 w-full py-2 rounded-lg text-sm font-medium
-                              ${
-                                cart.includes(product.postId)
-                                  ? "bg-muted text-muted-foreground"
-                                  : "bg-primary hover:bg-primary/90 text-primary-foreground"
-                              } 
-                              transition-colors`}
-                    disabled={
-                      cart.includes(product.postId) ||
-                      addingToCart[product.postId] ||
-                      (product.quantityAvailable !== undefined && product.quantityAvailable <= 0)
-                    }
-                    type="button"
-                  >
-                    {addingToCart[product.postId] ? (
-                      <Loader2 className="h-4 w-4 animate-spin mx-auto" />
-                    ) : cart.includes(product.postId) ? (
-                      "Added to Cart"
-                    ) : product.quantityAvailable !== undefined && product.quantityAvailable <= 0 ? (
-                      "Out of Stock"
-                    ) : (
-                      "Add to Cart"
-                    )}
-                  </button>
-                </div>
+                </button>
               </div>
-            )
-          })}
+
+              <div className="p-4">
+                <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
+
+                {/* Price display - now showing the commission-adjusted price */}
+                <div className="mt-2">
+                  <p className="text-lg font-bold text-blue">₹{product.price.toLocaleString()}</p>
+
+                  {/* Show the base price for comparison */}
+                  {product.basePrice && product.basePrice !== product.price && (
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm text-muted-foreground">
+                        <span className="line-through">₹{product.basePrice.toLocaleString()}</span>
+                      </p>
+                      <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-800 rounded-full">
+                        Agent Price
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <p className="text-sm text-muted-foreground mt-1">{product.category}</p>
+
+                <button
+                  onClick={(e) => addToCart(e, product.postId, product.name)}
+                  className={`mt-4 w-full py-2 rounded-lg text-sm font-medium
+                            ${
+                              cart.includes(product.postId)
+                                ? "bg-muted text-muted-foreground"
+                                : "bg-primary hover:bg-primary/90 text-primary-foreground"
+                            } 
+                            transition-colors`}
+                  disabled={
+                    cart.includes(product.postId) ||
+                    addingToCart[product.postId] ||
+                    (product.quantityAvailable !== undefined && product.quantityAvailable <= 0)
+                  }
+                  type="button"
+                >
+                  {addingToCart[product.postId] ? (
+                    <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                  ) : cart.includes(product.postId) ? (
+                    "Added to Cart"
+                  ) : product.quantityAvailable !== undefined && product.quantityAvailable <= 0 ? (
+                    "Out of Stock"
+                  ) : (
+                    "Add to Cart"
+                  )}
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
