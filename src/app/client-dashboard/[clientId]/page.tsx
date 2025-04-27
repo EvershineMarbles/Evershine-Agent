@@ -16,6 +16,7 @@ interface Product {
   _id: string
   name: string
   price: number
+  basePrice?: number // Add this field to recognize the original price
   image: string[]
   postId: string
   category: string
@@ -56,6 +57,9 @@ export default function ProductsPage() {
   const [clientData, setClientData] = useState<any>(null)
   // Add commission data state
   const [commissionData, setCommissionData] = useState<CommissionData | null>(null)
+  // Add state for commission rate override
+  const [overrideCommissionRate, setOverrideCommissionRate] = useState<number | null>(null)
+  const [commissionLoading, setCommissionLoading] = useState(false)
 
   // Debug scroll event
   useEffect(() => {
@@ -98,6 +102,7 @@ export default function ProductsPage() {
   // Add fetchCommissionData function
   const fetchCommissionData = useCallback(async () => {
     try {
+      setCommissionLoading(true)
       const token = localStorage.getItem("clientImpersonationToken")
       if (!token) {
         return null
@@ -121,29 +126,37 @@ export default function ProductsPage() {
     } catch (error) {
       console.error("Error fetching commission data:", error)
       return null
+    } finally {
+      setCommissionLoading(false)
     }
   }, [])
 
-  // Add calculateAdjustedPrice function
+  // Add calculateAdjustedPrice function with override support
   const calculateAdjustedPrice = useCallback(
     (product: Product) => {
-      if (!commissionData) return product.price
+      // Always use basePrice (which should be the original price)
+      const basePrice = product.basePrice || product.price
 
-      // Get commission rate (use category-specific if available)
-      let rate = commissionData.commissionRate
+      // Get the default commission rate (from agent or category-specific)
+      let defaultRate = commissionData?.commissionRate || 10
+
+      // Check for category-specific commission
       if (
-        commissionData.categoryCommissions &&
+        commissionData?.categoryCommissions &&
         product.category &&
         commissionData.categoryCommissions[product.category]
       ) {
-        rate = commissionData.categoryCommissions[product.category]
+        defaultRate = commissionData.categoryCommissions[product.category]
       }
 
-      // Calculate adjusted price
-      const adjustedPrice = product.price * (1 + rate / 100)
+      // Add the override rate to the default rate if an override is set
+      const finalRate = overrideCommissionRate !== null ? defaultRate + overrideCommissionRate : defaultRate
+
+      // Calculate adjusted price based on the original basePrice
+      const adjustedPrice = basePrice * (1 + finalRate / 100)
       return Math.round(adjustedPrice * 100) / 100 // Round to 2 decimal places
     },
-    [commissionData],
+    [commissionData, overrideCommissionRate],
   )
 
   // Fetch products function
@@ -200,6 +213,8 @@ export default function ProductsPage() {
             Array.isArray(product.image) && product.image.length > 0
               ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
               : ["/placeholder.svg"],
+          // Ensure basePrice is set if it doesn't exist
+          basePrice: product.basePrice || product.price,
         }))
 
         setProducts(processedProducts)
@@ -514,6 +529,37 @@ export default function ProductsPage() {
           <h1 className="text-3xl font-bold">Products</h1>
 
           <div className="flex items-center gap-4">
+            {/* Commission dots moved before scan button */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setOverrideCommissionRate(5)}
+                className={`w-6 h-6 rounded-full bg-red-500 hover:ring-2 hover:ring-red-300 transition-all ${overrideCommissionRate === 5 ? "ring-2 ring-gray-400 border border-gray-400 scale-110" : ""}`}
+                title="Set 5% additional commission"
+                aria-label="Set 5% additional commission"
+              />
+              <button
+                onClick={() => setOverrideCommissionRate(10)}
+                className={`w-6 h-6 rounded-full bg-yellow-500 hover:ring-2 hover:ring-yellow-300 transition-all ${overrideCommissionRate === 10 ? "ring-2 ring-gray-400 border border-gray-400 scale-110" : ""}`}
+                title="Set 10% additional commission"
+                aria-label="Set 10% additional commission"
+              />
+              <button
+                onClick={() => setOverrideCommissionRate(15)}
+                className={`w-6 h-6 rounded-full bg-purple-500 hover:ring-2 hover:ring-purple-300 transition-all ${overrideCommissionRate === 15 ? "ring-2 ring-gray-400 border border-gray-400 scale-110" : ""}`}
+                title="Set 15% additional commission"
+                aria-label="Set 15% additional commission"
+              />
+              {overrideCommissionRate !== null && (
+                <button
+                  onClick={() => setOverrideCommissionRate(null)}
+                  className="text-xs text-gray-600 hover:text-gray-900"
+                  title="Reset to default commission"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+
             {/* Scan QR Button */}
             <button
               onClick={handleScanQR}
@@ -569,80 +615,92 @@ export default function ProductsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredProducts.map((product) => (
-              <div
-                key={product._id}
-                className="group relative bg-card rounded-lg overflow-hidden border border-border hover:border-primary transition-all hover:shadow-md cursor-pointer"
-                onClick={(e) => handleProductClick(e, product.postId)}
-              >
-                <div className="p-3">
-                  <div className="relative w-full overflow-hidden rounded-xl bg-gray-50 aspect-square">
-                    <Image
-                      src={imageError[product._id] ? "/placeholder.svg" : product.image?.[0] || "/placeholder.svg"}
-                      alt={product.name}
-                      fill
-                      unoptimized={true} // This bypasses Vercel's image optimization
-                      className="object-cover transition-transform group-hover:scale-105 duration-300"
-                      onError={() => handleImageError(product._id)}
-                    />
+            {filteredProducts.map((product) => {
+              // Calculate the adjusted price based on commission
+              const adjustedPrice = calculateAdjustedPrice(product)
 
-                    {/* Wishlist button overlay */}
+              return (
+                <div
+                  key={product._id}
+                  className="group relative bg-card rounded-lg overflow-hidden border border-border hover:border-primary transition-all hover:shadow-md cursor-pointer"
+                  onClick={(e) => handleProductClick(e, product.postId)}
+                >
+                  <div className="p-3">
+                    <div className="relative w-full overflow-hidden rounded-xl bg-gray-50 aspect-square">
+                      <Image
+                        src={imageError[product._id] ? "/placeholder.svg" : product.image?.[0] || "/placeholder.svg"}
+                        alt={product.name}
+                        fill
+                        unoptimized={true} // This bypasses Vercel's image optimization
+                        className="object-cover transition-transform group-hover:scale-105 duration-300"
+                        onError={() => handleImageError(product._id)}
+                      />
+
+                      {/* Wishlist button overlay */}
+                      <button
+                        onClick={(e) => toggleWishlist(e, product.postId)}
+                        className="absolute top-2 right-2 p-2 rounded-full bg-white/80 hover:bg-white transition-colors z-10"
+                        aria-label={wishlist.includes(product.postId) ? "Remove from wishlist" : "Add to wishlist"}
+                        type="button"
+                        disabled={addingToWishlist[product.postId]}
+                      >
+                        {addingToWishlist[product.postId] ? (
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                        ) : (
+                          <Heart
+                            className={`h-5 w-5 ${
+                              wishlist.includes(product.postId) ? "text-red-500 fill-red-500" : "text-gray-600"
+                            }`}
+                          />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="p-4">
+                    <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
+
+                    {/* Simplified price display - just the adjusted price */}
+                    <div className="mt-2">
+                      <p className="text-lg font-bold">₹{adjustedPrice.toLocaleString()}/sqft</p>
+                    </div>
+
+                    <p className="text-sm text-muted-foreground mt-1">
+                      <span className="font-medium">Category:</span> {product.category}
+                    </p>
+
                     <button
                       onClick={(e) => toggleWishlist(e, product.postId)}
-                      className="absolute top-2 right-2 p-2 rounded-full bg-white/80 hover:bg-white transition-colors z-10"
-                      aria-label={wishlist.includes(product.postId) ? "Remove from wishlist" : "Add to wishlist"}
-                      type="button"
+                      className={`mt-4 w-full py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2
+                                ${
+                                  wishlist.includes(product.postId)
+                                    ? "bg-gray-100 text-gray-600 border border-gray-200"
+                                    : addingToWishlist[product.postId]
+                                      ? "bg-gray-200 text-gray-700"
+                                      : "bg-primary hover:bg-primary/90 text-primary-foreground"
+                                } 
+                                transition-colors`}
                       disabled={addingToWishlist[product.postId]}
+                      type="button"
                     >
                       {addingToWishlist[product.postId] ? (
-                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                      ) : wishlist.includes(product.postId) ? (
+                        <>
+                          <Heart className="h-4 w-4 fill-gray-500 mr-1" />
+                          Added to Wishlist
+                        </>
                       ) : (
-                        <Heart
-                          className={`h-5 w-5 ${
-                            wishlist.includes(product.postId) ? "text-red-500 fill-red-500" : "text-gray-600"
-                          }`}
-                        />
+                        <>
+                          <Heart className="h-4 w-4 mr-1" />
+                          Add to Wishlist
+                        </>
                       )}
                     </button>
                   </div>
                 </div>
-
-                <div className="p-4">
-                  <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
-                  <p className="text-lg font-bold mt-2">₹{calculateAdjustedPrice(product).toLocaleString()}/sqft</p>
-                  <p className="text-sm text-muted-foreground mt-1">{product.category}</p>
-
-                  <button
-                    onClick={(e) => toggleWishlist(e, product.postId)}
-                    className={`mt-4 w-full py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2
-                              ${
-                                wishlist.includes(product.postId)
-                                  ? "bg-gray-100 text-gray-600 border border-gray-200"
-                                  : addingToWishlist[product.postId]
-                                    ? "bg-gray-200 text-gray-700"
-                                    : "bg-primary hover:bg-primary/90 text-primary-foreground"
-                              } 
-                              transition-colors`}
-                    disabled={addingToWishlist[product.postId]}
-                    type="button"
-                  >
-                    {addingToWishlist[product.postId] ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                    ) : wishlist.includes(product.postId) ? (
-                      <>
-                        <Heart className="h-4 w-4 fill-gray-500 mr-1" />
-                        Added to Wishlist
-                      </>
-                    ) : (
-                      <>
-                        <Heart className="h-4 w-4 mr-1" />
-                        Add to Wishlist
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
 
