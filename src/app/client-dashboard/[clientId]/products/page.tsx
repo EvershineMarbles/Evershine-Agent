@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
-import { Search, Loader2, Heart, ShoppingCart, AlertCircle, Info } from "lucide-react"
+import { Search, Loader2, Heart, ShoppingCart, AlertCircle, RefreshCw } from "lucide-react"
 import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -49,11 +49,13 @@ export default function ProductsPage() {
   const [addingToCart, setAddingToCart] = useState<Record<string, boolean>>({})
   const [error, setError] = useState<string | null>(null)
 
-  // Agent info state - always visible now
-  const [agentInfo, setAgentInfo] = useState<Agent | null>(null)
-  const [agentInfoLoading, setAgentInfoLoading] = useState(false)
-  const [agentInfoError, setAgentInfoError] = useState<string | null>(null)
-  const [tokenInfo, setTokenInfo] = useState<any | null>(null)
+  // Agent info state - simplified to just commission info
+  const [agentCommission, setAgentCommission] = useState<{
+    commissionRate: number
+    categoryCommissions?: Record<string, number>
+  } | null>(null)
+  const [commissionLoading, setCommissionLoading] = useState(false)
+  const [commissionError, setCommissionError] = useState<string | null>(null)
 
   // Load wishlist and cart from localStorage
   useEffect(() => {
@@ -82,114 +84,58 @@ export default function ProductsPage() {
     }
   }, [wishlist, cart])
 
-  // Decode JWT token function
-  const decodeToken = useCallback(() => {
-    try {
-      console.log("Attempting to decode token...")
-      const token = localStorage.getItem("clientImpersonationToken")
-
-      if (!token) {
-        console.error("No token found in localStorage")
-        setTokenInfo({ error: "No token found" })
-        return null
-      }
-
-      console.log("Token found:", token.substring(0, 15) + "...")
-
-      const tokenParts = token.split(".")
-      if (tokenParts.length !== 3) {
-        console.error("Invalid token format - not a valid JWT")
-        setTokenInfo({ error: "Invalid token format" })
-        return null
-      }
-
-      try {
-        const payload = JSON.parse(atob(tokenParts[1]))
-        console.log("Decoded token payload:", payload)
-        setTokenInfo(payload)
-        return payload
-      } catch (e) {
-        console.error("Failed to parse token payload:", e)
-        setTokenInfo({ error: "Failed to parse token" })
-        return null
-      }
-    } catch (e) {
-      console.error("Error decoding token:", e)
-      setTokenInfo({ error: "Error decoding token" })
-      return null
-    }
-  }, [])
-
-  // Fetch agent info function
-  const fetchAgentInfo = useCallback(async () => {
-    console.log("Fetching agent info...")
-    setAgentInfoLoading(true)
-    setAgentInfoError(null)
+  // Fetch agent commission info function - using the new endpoint
+  const fetchAgentCommission = useCallback(async () => {
+    console.log("Fetching agent commission info...")
+    setCommissionLoading(true)
+    setCommissionError(null)
 
     try {
-      // First decode the token to get agent ID
-      const payload = decodeToken()
-
-      if (!payload || !payload.agentId) {
-        console.error("No agent ID found in token")
-        setAgentInfoError("No agent ID found in token")
-        setAgentInfoLoading(false)
-        return
-      }
-
-      console.log("Using agent ID from token:", payload.agentId)
-
       // Get the token for authorization
       const token = localStorage.getItem("clientImpersonationToken")
       if (!token) {
-        console.error("No token available for API request")
-        setAgentInfoError("No authentication token found")
-        setAgentInfoLoading(false)
-        return
+        throw new Error("No authentication token found")
       }
 
-      // Fetch agent details from API
+      // Fetch agent commission from the new endpoint
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
-      console.log("Fetching agent info from:", `${apiUrl}/api/admin/agents/${payload.agentId}/commission`)
+      console.log("Fetching commission from:", `${apiUrl}/api/client/agent-commission`)
 
-      const response = await fetch(`${apiUrl}/api/admin/agents/${payload.agentId}/commission`, {
+      const response = await fetch(`${apiUrl}/api/client/agent-commission`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       })
 
-      console.log("Agent info API response status:", response.status)
+      console.log("Commission API response status:", response.status)
 
       if (!response.ok) {
         const errorText = await response.text()
         console.error("API error response:", errorText)
-        throw new Error(`Failed to fetch agent info: ${response.status} - ${errorText}`)
+        throw new Error(`Failed to fetch commission info: ${response.status} - ${errorText}`)
       }
 
       const data = await response.json()
-      console.log("Agent info API response data:", data)
+      console.log("Commission API response data:", data)
 
       if (data.success && data.data) {
-        console.log("Setting agent info:", data.data)
-        setAgentInfo(data.data)
+        console.log("Setting commission info:", data.data)
+        setAgentCommission({
+          commissionRate: data.data.commissionRate,
+          categoryCommissions: data.data.categoryCommissions,
+        })
       } else {
-        console.error("Invalid agent data response:", data)
-        throw new Error("Invalid agent data response")
+        console.error("Invalid commission data response:", data)
+        throw new Error("Invalid commission data response")
       }
     } catch (error: any) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to load agent info"
-      console.error("Error fetching agent info:", error)
-      setAgentInfoError(errorMessage)
-
-      toast({
-        title: "Error fetching agent info",
-        description: errorMessage,
-        variant: "destructive",
-      })
+      const errorMessage = error instanceof Error ? error.message : "Failed to load commission info"
+      console.error("Error fetching commission info:", error)
+      setCommissionError(errorMessage)
     } finally {
-      setAgentInfoLoading(false)
+      setCommissionLoading(false)
     }
-  }, [decodeToken, toast])
+  }, [])
 
   // Fetch products function
   const fetchProducts = useCallback(async () => {
@@ -233,11 +179,6 @@ export default function ProductsPage() {
 
       if (data.success && Array.isArray(data.data)) {
         console.log("Products fetched successfully. Count:", data.data.length)
-        console.log("Sample product:", data.data[0])
-
-        // Check if products have basePrice (indicates commission applied)
-        const hasCommissionInfo = data.data.some((p: Product) => p.basePrice !== undefined)
-        console.log("Products have commission info:", hasCommissionInfo)
 
         // Process the image URLs to ensure they're valid
         const processedProducts = data.data.map((product: Product) => ({
@@ -272,12 +213,12 @@ export default function ProductsPage() {
     }
   }, [toast])
 
-  // Fetch products and agent info on component mount
+  // Fetch products and agent commission on component mount
   useEffect(() => {
     console.log("Component mounted - fetching data")
     fetchProducts()
-    fetchAgentInfo()
-  }, [fetchProducts, fetchAgentInfo])
+    fetchAgentCommission()
+  }, [fetchProducts, fetchAgentCommission])
 
   // Toggle wishlist function
   const toggleWishlist = useCallback(
@@ -330,22 +271,11 @@ export default function ProductsPage() {
           console.error("No impersonation token found")
           toast({
             title: "Authentication Error",
-            description: "Please refresh your token using the debug panel above",
+            description: "No authentication token found",
             variant: "destructive",
           })
           throw new Error("No authentication token found")
         }
-
-        console.log("Using token:", token.substring(0, 15) + "...")
-        console.log("Full request details:", {
-          url: "https://evershinebackend-2.onrender.com/api/addToCart",
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ productId }),
-        })
 
         // Make a direct fetch request with the token
         const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
@@ -376,7 +306,7 @@ export default function ProductsPage() {
         // Check for errors
         if (!response.ok) {
           if (response.status === 401) {
-            throw new Error("Authentication failed. Please refresh the token using the debug panel above.")
+            throw new Error("Authentication failed. Please refresh the token.")
           } else {
             throw new Error(`API error: ${response.status} ${response.statusText}. Details: ${responseText}`)
           }
@@ -423,15 +353,15 @@ export default function ProductsPage() {
   // Calculate commission for a product
   const getCommissionInfo = useCallback(
     (product: Product) => {
-      if (!agentInfo || !product.basePrice) {
+      if (!agentCommission || !product.basePrice) {
         return null
       }
 
-      let effectiveRate = agentInfo.commissionRate
+      let effectiveRate = agentCommission.commissionRate
 
       // Check for category-specific commission
-      if (agentInfo.categoryCommissions && agentInfo.categoryCommissions[product.category]) {
-        effectiveRate = agentInfo.categoryCommissions[product.category]
+      if (agentCommission.categoryCommissions && agentCommission.categoryCommissions[product.category]) {
+        effectiveRate = agentCommission.categoryCommissions[product.category]
       }
 
       const increase = ((product.price / product.basePrice - 1) * 100).toFixed(1)
@@ -443,7 +373,7 @@ export default function ProductsPage() {
         increase,
       }
     },
-    [agentInfo],
+    [agentCommission],
   )
 
   // Loading state
@@ -489,85 +419,54 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      {/* Debug Info Panel - Always Visible */}
+      {/* Simplified Commission Info Panel */}
       <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
         <div className="flex items-center justify-between mb-2">
-          <h3 className="font-semibold text-blue-800">Agent Commission Information</h3>
-          <button onClick={fetchAgentInfo} className="px-3 py-1 bg-blue-200 hover:bg-blue-300 rounded text-xs">
-            Refresh Info
+          <h3 className="font-semibold text-blue-800">Agent Commission Rate</h3>
+          <button
+            onClick={fetchAgentCommission}
+            className="flex items-center gap-1 px-3 py-1 bg-blue-200 hover:bg-blue-300 rounded text-xs"
+            disabled={commissionLoading}
+          >
+            {commissionLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+            Refresh
           </button>
         </div>
 
-        {agentInfoLoading ? (
+        {commissionLoading ? (
           <div className="flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin" />
-            <span>Loading agent information...</span>
+            <span>Loading commission information...</span>
           </div>
-        ) : agentInfoError ? (
-          <div className="bg-red-50 border border-red-200 rounded p-3 mb-3">
-            <p className="text-red-700 font-medium">Error loading agent information:</p>
-            <p className="text-red-600">{agentInfoError}</p>
+        ) : commissionError ? (
+          <div className="bg-red-50 border border-red-200 rounded p-3">
+            <p className="text-red-700 font-medium">Error loading commission information:</p>
+            <p className="text-red-600">{commissionError}</p>
           </div>
-        ) : agentInfo ? (
+        ) : agentCommission ? (
           <div className="space-y-2">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p>
-                  <strong>Agent ID:</strong> {agentInfo.agentId}
-                </p>
-                <p>
-                  <strong>Name:</strong> {agentInfo.name}
-                </p>
-                <p>
-                  <strong>Email:</strong> {agentInfo.email}
-                </p>
-                <p>
-                  <strong>Default Commission Rate:</strong>{" "}
-                  <span className="font-bold text-green-700">{agentInfo.commissionRate}%</span>
-                </p>
-              </div>
+            <p className="text-lg font-bold text-green-700">
+              Default Commission Rate: {agentCommission.commissionRate}%
+            </p>
 
+            {agentCommission.categoryCommissions && Object.keys(agentCommission.categoryCommissions).length > 0 && (
               <div>
-                {agentInfo.categoryCommissions && Object.keys(agentInfo.categoryCommissions).length > 0 && (
-                  <div>
-                    <p className="font-semibold mb-1">Category-specific Commission Rates:</p>
-                    <ul className="list-disc pl-5">
-                      {Object.entries(agentInfo.categoryCommissions).map(([category, rate]) => (
-                        <li key={category}>
-                          <span className="font-medium">{category}:</span>{" "}
-                          <span className="text-green-700">{rate}%</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+                <p className="font-semibold mb-1">Category-specific Commission Rates:</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                  {Object.entries(agentCommission.categoryCommissions).map(([category, rate]) => (
+                    <div key={category} className="bg-white rounded p-2 text-sm">
+                      <span className="font-medium">{category}:</span> <span className="text-green-700">{rate}%</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-
-            <div className="mt-2 pt-2 border-t border-blue-200">
-              <p className="text-sm text-blue-700">
-                <Info className="h-4 w-4 inline mr-1" />
-                Products are shown with commission-adjusted prices. Original base prices are shown for comparison.
-              </p>
-            </div>
+            )}
           </div>
         ) : (
           <div className="text-amber-700">
-            No agent information available. Please click "Refresh Info" to load agent details.
+            No commission information available. Please click "Refresh" to load commission details.
           </div>
         )}
-
-        {/* Token Debug Info */}
-        <div className="mt-4 pt-3 border-t border-blue-200">
-          <p className="font-medium mb-1">Token Information:</p>
-          {tokenInfo ? (
-            <div className="bg-slate-50 p-2 rounded text-xs overflow-auto max-h-32">
-              <pre>{JSON.stringify(tokenInfo, null, 2)}</pre>
-            </div>
-          ) : (
-            <p className="text-amber-700">No token information available</p>
-          )}
-        </div>
       </div>
 
       <div className="relative mb-6">
@@ -653,9 +552,7 @@ export default function ProductsPage() {
                           <span className="ml-2 text-blue-600">Commission: {commissionInfo.effectiveRate}%</span>
                         )}
                       </div>
-                    ) : (
-                      <div className="text-xs text-amber-600 mt-1">Base price not available</div>
-                    )}
+                    ) : null}
 
                     <p className="text-sm text-muted-foreground mt-1">
                       <span className="font-medium">Category:</span> {product.category}
