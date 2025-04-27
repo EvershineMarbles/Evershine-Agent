@@ -386,6 +386,46 @@ export default function ProductsPage() {
     setSortOption("default")
   }
 
+  // Add this function to your products-page.tsx file
+
+  const debugToken = () => {
+    try {
+      const token = localStorage.getItem("clientImpersonationToken") || localStorage.getItem("token")
+      if (!token) {
+        console.error("No token found in localStorage")
+        toast({
+          title: "Authentication Error",
+          description: "No token found. Please log in again.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Decode the token (JWT tokens are in format: header.payload.signature)
+      const parts = token.split(".")
+      if (parts.length !== 3) {
+        console.error("Invalid token format")
+        return
+      }
+
+      try {
+        // Base64 decode the payload part
+        const payload = JSON.parse(atob(parts[1]))
+        console.log("Token payload:", payload)
+
+        toast({
+          title: "Token Information",
+          description: `Client ID: ${payload.clientId || "N/A"}, Agent: ${payload.agentEmail || payload.email || "N/A"}`,
+          variant: "default",
+        })
+      } catch (e) {
+        console.error("Error decoding token:", e)
+      }
+    } catch (error) {
+      console.error("Error in debugToken:", error)
+    }
+  }
+
   // Loading state
   if (loading) {
     return (
@@ -416,7 +456,8 @@ export default function ProductsPage() {
         </div>
 
         <div className="flex items-center gap-4">
-          <Link href="/wishlist" className="relative">
+          {/* Use relative paths instead of absolute paths */}
+          <Link href="./wishlist" className="relative">
             <Heart className="h-6 w-6 text-gray-600" />
             {wishlist.length > 0 && (
               <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
@@ -425,7 +466,7 @@ export default function ProductsPage() {
             )}
           </Link>
 
-          <Link href="/cart" className="relative">
+          <Link href="./cart" className="relative">
             <ShoppingCart className="h-6 w-6 text-gray-600" />
             {cart.length > 0 && (
               <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
@@ -433,6 +474,10 @@ export default function ProductsPage() {
               </span>
             )}
           </Link>
+          {/* Add a debug button somewhere in your UI */}
+          <Button variant="outline" size="sm" onClick={debugToken} className="ml-2">
+            Debug Token
+          </Button>
         </div>
       </div>
 
