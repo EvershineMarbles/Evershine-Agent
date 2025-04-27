@@ -4,11 +4,10 @@ import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
-import { Search, Loader2, Heart, ShoppingCart, AlertCircle, Tag } from "lucide-react"
+import { Search, Loader2, Heart, ShoppingCart, AlertCircle } from "lucide-react"
 import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
 
 // Define the Product interface
 interface Product {
@@ -394,31 +393,6 @@ export default function ProductsPage() {
           </Link>
         </div>
       </div>
-
-      {commissionData && (
-        <div className="mb-6 p-4 bg-muted rounded-lg">
-          <div className="flex items-center gap-2 mb-2">
-            <Tag className="h-5 w-5 text-primary" />
-            <h2 className="font-semibold">Agent Commission Information</h2>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Agent: {commissionData.name} ({commissionData.email})
-          </p>
-          <p className="text-sm text-muted-foreground">Base Commission Rate: {commissionData.commissionRate}%</p>
-          {commissionData.categoryCommissions && Object.keys(commissionData.categoryCommissions).length > 0 && (
-            <div className="mt-2">
-              <p className="text-sm font-medium">Category-specific rates:</p>
-              <div className="flex flex-wrap gap-2 mt-1">
-                {Object.entries(commissionData.categoryCommissions).map(([category, rate]) => (
-                  <Badge key={category} variant="outline" className="text-xs">
-                    {category}: {rate}%
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       <div className="relative mb-6">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
