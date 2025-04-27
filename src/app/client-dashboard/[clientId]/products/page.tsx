@@ -4,18 +4,17 @@ import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
-import { Search, Loader2, Heart, ShoppingCart, AlertCircle, RefreshCw } from "lucide-react"
+import { Search, Loader2, Heart, ShoppingCart, AlertCircle, Info } from "lucide-react"
 import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Button } from "@/components/ui/button"
 
 // Define the Product interface
 interface Product {
   _id: string
   name: string
   price: number
-  basePrice?: number // Original price before commission
+  originalPrice?: number // Optional field for original price (if backend provides it)
   image: string[]
   postId: string
   category: string
@@ -25,31 +24,26 @@ interface Product {
   quantityAvailable?: number
 }
 
-// Define the agent data interface
-interface AgentData {
-  _id: string
-  name: string
-  email: string
-  commissionRate: number
-}
-
 export default function ProductsPage() {
   // Use the useParams hook to get the clientId
   const params = useParams()
   const clientId = params.clientId as string
+
   const { toast } = useToast()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [imageError, setImageError] = useState<Record<string, boolean>>({})
+
   // Wishlist and cart state
   const [wishlist, setWishlist] = useState<string[]>([])
   const [cart, setCart] = useState<string[]>([])
   const [addingToCart, setAddingToCart] = useState<Record<string, boolean>>({})
   const [error, setError] = useState<string | null>(null)
-  const [debugInfo, setDebugInfo] = useState<any>(null)
-  // Agent data state - store this in localStorage to prevent infinite loops
-  const [agentData, setAgentData] = useState<AgentData | null>(null)
+
+  // Commission rate state
+  const [commissionRate, setCommissionRate] = useState<number | null>(null)
+  const [showCommissionInfo, setShowCommissionInfo] = useState(true)
 
   // Load wishlist and cart from localStorage
   useEffect(() => {
@@ -70,114 +64,6 @@ export default function ProductsPage() {
     }
   }, [])
 
-  // Fetch agent data from the backend
-  const fetchAgentData = useCallback(async () => {
-    try {
-      // Get the token
-      const token = localStorage.getItem("clientImpersonationToken")
-      if (!token) {
-        throw new Error("No authentication token found")
-      }
-
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
-
-      // First try to get the agent data from the client-specific endpoint
-      console.log("Fetching agent data from client endpoint...")
-
-      // This endpoint is specifically for when an agent is impersonating a client
-      const clientResponse = await fetch(`${apiUrl}/api/client/agent-info`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        signal: AbortSignal.timeout(5000),
-      })
-
-      if (clientResponse.ok) {
-        const data = await clientResponse.json()
-        console.log("Agent data response from client endpoint:", data)
-
-        if (data.success && data.data) {
-          // Use the actual agent data from the database
-          setAgentData(data.data)
-          console.log(`Using real agent data with commission rate: ${data.data.commissionRate}%`)
-
-          // Save to localStorage to prevent refetching on each render
-          localStorage.setItem(`agentData_${clientId}`, JSON.stringify(data.data))
-          return
-        }
-      }
-
-      // If client endpoint fails, try the agent profile endpoint as fallback
-      console.log("Client endpoint failed, trying agent profile endpoint...")
-      const agentResponse = await fetch(`${apiUrl}/api/agent/profile`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        signal: AbortSignal.timeout(5000),
-      })
-
-      if (agentResponse.ok) {
-        const data = await agentResponse.json()
-        console.log("Agent data response from profile endpoint:", data)
-
-        if (data.success && data.data) {
-          // Use the actual agent data from the database
-          setAgentData(data.data)
-          console.log(`Using real agent data with commission rate: ${data.data.commissionRate}%`)
-
-          // Save to localStorage to prevent refetching on each render
-          localStorage.setItem(`agentData_${clientId}`, JSON.stringify(data.data))
-          return
-        }
-      }
-
-      // If we couldn't get the real agent data, check if we have cached data
-      const savedAgentData = localStorage.getItem(`agentData_${clientId}`)
-      if (savedAgentData) {
-        const parsedData = JSON.parse(savedAgentData)
-        setAgentData(parsedData)
-        console.log(`Using cached agent data with commission rate: ${parsedData.commissionRate}%`)
-        return
-      }
-
-      // As a last resort, use hardcoded data with the correct commission rate
-      console.log("Using hardcoded agent data")
-      const hardcodedAgent = {
-        _id: "680cb109d48d142ea4fbd751",
-        name: "yedqw",
-        email: "del@gmail.com",
-        commissionRate: 10, // Use the correct commission rate from your database
-      }
-
-      // Save to localStorage to prevent refetching on each render
-      localStorage.setItem(`agentData_${clientId}`, JSON.stringify(hardcodedAgent))
-      setAgentData(hardcodedAgent)
-    } catch (error) {
-      console.error("Error fetching agent data:", error)
-
-      // Use hardcoded data with the correct commission rate as fallback
-      const hardcodedAgent = {
-        _id: "680cb109d48d142ea4fbd751",
-        name: "yedqw",
-        email: "del@gmail.com",
-        commissionRate: 10, // Use the correct commission rate from your database
-      }
-
-      // Save to localStorage to prevent refetching on each render
-      localStorage.setItem(`agentData_${clientId}`, JSON.stringify(hardcodedAgent))
-      setAgentData(hardcodedAgent)
-    }
-  }, [clientId])
-
-  // Fetch agent data on component mount
-  useEffect(() => {
-    fetchAgentData()
-  }, [fetchAgentData])
-
   // Save wishlist and cart to localStorage whenever they change
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -186,19 +72,13 @@ export default function ProductsPage() {
     }
   }, [wishlist, cart])
 
-  // Fetch products function - Try both endpoints
+  // Fetch products function with commission rate handling
   const fetchProducts = useCallback(async () => {
-    if (!agentData) {
-      console.log("Waiting for agent data before fetching products")
-      return // Don't fetch products until we have agent data
-    }
-
     try {
       setLoading(true)
       setError(null)
-      setDebugInfo(null)
 
-      // Get the client impersonation token
+      // Get the token
       const token = localStorage.getItem("clientImpersonationToken")
 
       if (!token) {
@@ -208,112 +88,40 @@ export default function ProductsPage() {
       // Use environment variable if available, otherwise use a default URL
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
 
-      // First try the client-specific endpoint
-      console.log("Trying client-specific endpoint:", `${apiUrl}/api/client/products`)
+      // Use the endpoint that returns commission-adjusted prices for agents
+      console.log("Fetching products with agent pricing from:", `${apiUrl}/api/getProductsWithAgentPricing`)
 
-      try {
-        const clientResponse = await fetch(`${apiUrl}/api/client/products`, {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          signal: AbortSignal.timeout(5000), // 5 second timeout
-        })
-
-        const clientData = await clientResponse.json()
-        console.log("Client endpoint response:", clientData)
-
-        if (clientResponse.ok && clientData.success && Array.isArray(clientData.data) && clientData.data.length > 0) {
-          console.log("Using client-specific products")
-          processProductsData(clientData)
-          return
-        } else {
-          console.log("Client endpoint returned no products, falling back to general endpoint")
-          setDebugInfo({
-            endpoint: "client/products",
-            status: clientResponse.status,
-            response: clientData,
-          })
-        }
-      } catch (clientError) {
-        console.error("Error with client endpoint:", clientError)
-        // Continue to fallback
-      }
-
-      // Fallback to the general products endpoint
-      console.log("Fetching from general endpoint:", `${apiUrl}/api/getAllProducts`)
-
-      const response = await fetch(`${apiUrl}/api/getAllProducts`, {
+      const response = await fetch(`${apiUrl}/api/getProductsWithAgentPricing`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
+        // Add a timeout to prevent long waiting times
         signal: AbortSignal.timeout(8000), // 8 second timeout
       })
 
       if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`)
-      }
+        console.warn(`Agent pricing endpoint failed with status ${response.status}. Response:`, await response.text())
+        console.warn("Falling back to standard endpoint")
 
-      const data = await response.json()
-      console.log("General endpoint response:", data)
-
-      // Apply agent-specific commission to the products
-      if (data.success && Array.isArray(data.data)) {
-        // Log original prices for debugging
-        console.log(
-          "Original prices:",
-          data.data.map((p: Product) => ({ id: p._id, price: p.price })),
-        )
-
-        // Get the commission rate from agent data
-        const commissionRate = agentData.commissionRate
-
-        const productsWithCommission = data.data.map((product: Product) => {
-          const originalPrice = product.price
-          const adjustedPrice = Math.round(originalPrice * (1 + commissionRate / 100))
-
-          return {
-            ...product,
-            basePrice: originalPrice,
-            price: adjustedPrice,
-          }
+        const fallbackResponse = await fetch(`${apiUrl}/api/getAllProducts`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          signal: AbortSignal.timeout(8000),
         })
 
-        // Log adjusted prices for debugging
-        console.log(
-          "Adjusted prices:",
-          productsWithCommission.map((p: Product) => ({
-            id: p._id,
-            originalPrice: p.basePrice,
-            adjustedPrice: p.price,
-          })),
-        )
+        if (!fallbackResponse.ok) {
+          throw new Error(`API request failed with status ${fallbackResponse.status}`)
+        }
 
-        data.data = productsWithCommission
-
-        // Add debug info to show commission was applied
-        setDebugInfo((prev) => ({
-          ...prev,
-          commissionApplied: true,
-          commissionRate: `${commissionRate}%`,
-          agentId: agentData._id,
-          agentName: agentData.name,
-          sampleProduct:
-            productsWithCommission.length > 0
-              ? {
-                  name: productsWithCommission[0].name,
-                  originalPrice: productsWithCommission[0].basePrice,
-                  adjustedPrice: productsWithCommission[0].price,
-                }
-              : null,
-        }))
+        return await handleProductResponse(fallbackResponse)
       }
 
-      processProductsData(data)
-    } catch (error: any) {
+      return await handleProductResponse(response)
+    } catch (error: Error | unknown) {
       const errorMessage = error instanceof Error ? error.message : "Failed to load products"
       console.error("Error fetching products:", error)
       setError(errorMessage)
@@ -330,12 +138,16 @@ export default function ProductsPage() {
     } finally {
       setLoading(false)
     }
-  }, [agentData, toast]) // Only depend on agentData and toast
+  }, [toast])
 
-  // Helper function to process products data
-  const processProductsData = (data: any) => {
+  // Helper function to handle product response
+  const handleProductResponse = async (response: Response) => {
+    const data = await response.json()
+    console.log("Full API response:", data)
+
     if (data.success && Array.isArray(data.data)) {
-      console.log("Products fetched successfully:", data.data)
+      console.log("Products fetched successfully. First product sample:", data.data[0])
+      console.log("Commission rate from API:", data.commissionRate)
 
       // Process the image URLs to ensure they're valid
       const processedProducts = data.data.map((product: Product) => ({
@@ -347,17 +159,24 @@ export default function ProductsPage() {
       }))
 
       setProducts(processedProducts)
+
+      // Store commission rate if provided by the API
+      if (data.commissionRate !== undefined) {
+        console.log("Setting commission rate to:", data.commissionRate)
+        setCommissionRate(data.commissionRate)
+      } else {
+        console.log("No commission rate provided in API response")
+      }
     } else {
+      console.error("Invalid API response format:", data)
       throw new Error(data.msg || "Invalid API response format")
     }
   }
 
-  // Fetch products when agentData is available
+  // Fetch products on component mount
   useEffect(() => {
-    if (agentData) {
-      fetchProducts()
-    }
-  }, [agentData, fetchProducts])
+    fetchProducts()
+  }, [fetchProducts])
 
   // Toggle wishlist function
   const toggleWishlist = useCallback(
@@ -443,7 +262,7 @@ export default function ProductsPage() {
         const responseText = await response.text()
         console.log("Response text:", responseText)
 
-        // Try to parse the response a JSON
+        // Try to parse the response as JSON
         let data
         try {
           data = JSON.parse(responseText)
@@ -472,7 +291,7 @@ export default function ProductsPage() {
         } else {
           throw new Error(data.message || "Failed to add to cart")
         }
-      } catch (error: any) {
+      } catch (error: Error | unknown) {
         const errorMessage = error instanceof Error ? error.message : "Failed to add item to cart. Please try again."
         console.error("Error adding to cart:", error)
         toast({
@@ -519,15 +338,6 @@ export default function ProductsPage() {
         </Alert>
       )}
 
-      {debugInfo && (
-        <Alert variant="default" className="mb-4 bg-yellow-50 border-yellow-200">
-          <div className="text-xs font-mono overflow-auto">
-            <p className="font-semibold">Debug Info:</p>
-            <pre>{JSON.stringify(debugInfo, null, 2)}</pre>
-          </div>
-        </Alert>
-      )}
-
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">Products</h1>
 
@@ -552,6 +362,23 @@ export default function ProductsPage() {
         </div>
       </div>
 
+      {/* Commission Rate Information Banner */}
+      {commissionRate !== null && showCommissionInfo && (
+        <Alert className="mb-6 bg-blue-50 border-blue-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <Info className="h-4 w-4 text-blue mr-2" />
+              <AlertDescription className="text-blue">
+                Prices include your {commissionRate}% commission
+              </AlertDescription>
+            </div>
+            <button onClick={() => setShowCommissionInfo(false)} className="text-xs text-blue hover:underline">
+              Dismiss
+            </button>
+          </div>
+        </Alert>
+      )}
+
       <div className="relative mb-6">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
         <input
@@ -563,29 +390,18 @@ export default function ProductsPage() {
         />
       </div>
 
-      {agentData && (
-        <Alert className="mb-4 bg-blue-50 border-blue-200">
-          <div className="text-sm">
-            <p className="font-semibold">Agent Commission Info:</p>
-            <p>Agent: {agentData.name}</p>
-            <p>Commission Rate: {agentData.commissionRate}%</p>
-          </div>
-        </Alert>
-      )}
-
       {filteredProducts.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-xl font-medium mb-4">No products found</p>
           <p className="text-muted-foreground mb-6">
             {searchQuery ? "Try a different search term" : "No products are currently available"}
           </p>
-          <Button
+          <button
             onClick={fetchProducts}
             className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
           >
-            <RefreshCw className="h-4 w-4 mr-2" />
             Refresh Products
-          </Button>
+          </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -598,10 +414,10 @@ export default function ProductsPage() {
                 <Image
                   src={
                     imageError[product._id]
-                      ? "/placeholder.svg?height=300&width=300&query=product"
+                      ? "/placeholder.svg?height=300&width=300"
                       : product.image && product.image.length > 0 && product.image[0]
                         ? product.image[0]
-                        : "/placeholder.svg?height=300&width=300&query=product"
+                        : "/placeholder.svg?height=300&width=300"
                   }
                   alt={product.name}
                   fill
@@ -627,20 +443,23 @@ export default function ProductsPage() {
               <div className="p-4">
                 <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
 
-                {/* Price display - now showing the commission-adjusted price */}
+                {/* Price display with both original and adjusted prices */}
                 <div className="mt-2">
-                  <p className="text-lg font-bold text-blue">₹{product.price.toLocaleString()}</p>
-
-                  {/* Show the base price for comparison */}
-                  {product.basePrice && product.basePrice !== product.price && (
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm text-muted-foreground">
-                        <span className="line-through">₹{product.basePrice.toLocaleString()}</span>
+                  {product.originalPrice ? (
+                    <>
+                      <div className="flex items-center">
+                        <p className="text-lg font-bold">₹{product.price.toLocaleString()}</p>
+                        <Info className="h-4 w-4 ml-1 text-blue cursor-help" />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Base price: ₹{product.originalPrice.toLocaleString()}
                       </p>
-                      <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-800 rounded-full">
-                        Agent Price
-                      </span>
-                    </div>
+                      <p className="text-xs text-green-600">
+                        Your commission: ₹{(product.price - product.originalPrice).toLocaleString()}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-lg font-bold">₹{product.price.toLocaleString()}</p>
                   )}
                 </div>
 
