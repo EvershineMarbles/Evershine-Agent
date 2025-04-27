@@ -66,20 +66,48 @@ export default function SimpleProductsPage() {
     }
   }, [])
 
+  // Debug function to check token
+  const checkToken = () => {
+    const token = localStorage.getItem("clientImpersonationToken") || localStorage.getItem("token")
+    console.log("Current token:", token ? "Token exists" : "No token found")
+
+    if (token) {
+      try {
+        // Decode JWT payload (middle part of token)
+        const base64Url = token.split(".")[1]
+        const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/")
+        const jsonPayload = decodeURIComponent(
+          atob(base64)
+            .split("")
+            .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+            .join(""),
+        )
+
+        console.log("Token payload:", JSON.parse(jsonPayload))
+      } catch (e) {
+        console.error("Error decoding token:", e)
+      }
+    }
+
+    return token
+  }
+
   // Fetch products function
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
 
-      // Get the client impersonation token
-      const token = localStorage.getItem("clientImpersonationToken") || localStorage.getItem("token")
+      // Check token and log it
+      const token = checkToken()
 
       if (!token) {
         throw new Error("No authentication token found. Please log in again.")
       }
 
-      // Use the client-specific endpoint
+      // First try the client-specific endpoint
+      console.log("Fetching from client endpoint:", `${apiUrl}/api/client/products`)
+
       const response = await fetch(`${apiUrl}/api/client/products`, {
         method: "GET",
         headers: {
@@ -89,10 +117,35 @@ export default function SimpleProductsPage() {
       })
 
       if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`)
+        console.error("Client endpoint failed with status:", response.status)
+
+        // If client endpoint fails, try the general products endpoint
+        const fallbackResponse = await fetch(`${apiUrl}/api/getAllProducts`, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (!fallbackResponse.ok) {
+          throw new Error(`API request failed with status ${fallbackResponse.status}`)
+        }
+
+        const fallbackData = await fallbackResponse.json()
+        console.log("Fallback endpoint response:", fallbackData)
+
+        if (fallbackData.success && Array.isArray(fallbackData.data)) {
+          setProducts(fallbackData.data)
+        } else {
+          throw new Error(fallbackData.msg || "Invalid API response format")
+        }
+
+        return
       }
 
       const data = await response.json()
+      console.log("Client endpoint response:", data)
 
       if (data.success && Array.isArray(data.data)) {
         // Process the image URLs to ensure they're valid
@@ -101,7 +154,7 @@ export default function SimpleProductsPage() {
           image:
             Array.isArray(product.image) && product.image.length > 0
               ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
-              : ["/assorted-products-display.png"],
+              : ["/elegant-marble-display.png"],
         }))
 
         setProducts(processedProducts)
@@ -341,10 +394,10 @@ export default function SimpleProductsPage() {
                 <Image
                   src={
                     imageError[product._id]
-                      ? "/placeholder.svg?height=300&width=300&query=product"
+                      ? "/placeholder.svg?height=300&width=300&query=marble product"
                       : product.image && product.image.length > 0 && product.image[0]
                         ? product.image[0]
-                        : "/placeholder.svg?height=300&width=300&query=product"
+                        : "/placeholder.svg?height=300&width=300&query=marble product"
                   }
                   alt={product.name}
                   fill
