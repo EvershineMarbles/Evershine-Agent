@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect, useCallback } from "react"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { Search, Loader2, Heart, ShoppingCart, AlertCircle } from "lucide-react"
 import Image from "next/image"
@@ -24,7 +24,7 @@ interface Product {
   originalPrice?: number
 }
 
-// Add commission data interface
+// Add the CommissionData interface after the Product interface
 interface CommissionData {
   agentId: string
   name: string
@@ -34,12 +34,13 @@ interface CommissionData {
 }
 
 export default function ProductsPage() {
+  console.log("ProductsPage rendering")
+
   // Use the useParams hook to get the clientId
   const params = useParams()
+  const router = useRouter()
   const clientId = params.clientId as string
 
-  // Remove the unused router variable
-  // const router = useRouter()
   const { toast } = useToast()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
@@ -49,8 +50,10 @@ export default function ProductsPage() {
   const [wishlist, setWishlist] = useState<string[]>([])
   const [cart, setCart] = useState<string[]>([])
   const [addingToCart, setAddingToCart] = useState<Record<string, boolean>>({})
+  const [addingToWishlist, setAddingToWishlist] = useState<Record<string, boolean>>({})
   const [error, setError] = useState<string | null>(null)
-  // Add commission data state
+  const [clientData, setClientData] = useState<any>(null)
+  // Add commission data state in the component
   const [commissionData, setCommissionData] = useState<CommissionData | null>(null)
 
   // Load wishlist and cart from localStorage
@@ -80,7 +83,7 @@ export default function ProductsPage() {
     }
   }, [wishlist, cart])
 
-  // Add function to fetch agent commission data
+  // Add fetchCommissionData function after the useEffect hooks for wishlist and cart
   const fetchCommissionData = useCallback(async () => {
     try {
       const token = localStorage.getItem("clientImpersonationToken")
@@ -104,11 +107,12 @@ export default function ProductsPage() {
       }
       return null
     } catch (error) {
+      console.error("Error fetching commission data:", error)
       return null
     }
   }, [])
 
-  // Add function to calculate adjusted price
+  // Add calculateAdjustedPrice function after fetchCommissionData
   const calculateAdjustedPrice = useCallback(
     (product: Product) => {
       if (!commissionData) return product.price
@@ -130,7 +134,7 @@ export default function ProductsPage() {
     [commissionData],
   )
 
-  // Fetch products function
+  // Update the fetchProducts function to fetch commission data first
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true)
@@ -168,13 +172,22 @@ export default function ProductsPage() {
       if (data.success && Array.isArray(data.data)) {
         console.log("Products fetched successfully:", data.data)
 
+        // Filter out products with missing or invalid postId
+        const validProducts = data.data.filter(
+          (product: Product) => product.postId && typeof product.postId === "string",
+        )
+
+        if (validProducts.length < data.data.length) {
+          console.warn(`Filtered out ${data.data.length - validProducts.length} products with invalid postId`)
+        }
+
         // Process the image URLs to ensure they're valid
-        const processedProducts = data.data.map((product: Product) => ({
+        const processedProducts = validProducts.map((product: Product) => ({
           ...product,
           image:
             Array.isArray(product.image) && product.image.length > 0
               ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
-              : ["/placeholder.svg?height=300&width=300"],
+              : ["/placeholder.svg"],
         }))
 
         setProducts(processedProducts)
@@ -461,7 +474,7 @@ export default function ProductsPage() {
 
                 <div className="p-4">
                   <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
-                  <p className="text-lg font-bold mt-2">₹{adjustedPrice.toLocaleString()}</p>
+                  <p className="text-lg font-bold mt-2">₹{calculateAdjustedPrice(product).toLocaleString()}/sqft</p>
                   <p className="text-sm text-muted-foreground mt-1">{product.category}</p>
 
                   <button
