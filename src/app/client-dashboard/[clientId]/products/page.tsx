@@ -4,10 +4,11 @@ import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
-import { Search, Loader2, Heart, ShoppingCart, AlertCircle } from "lucide-react"
+import { Search, Loader2, Heart, ShoppingCart, AlertCircle, Tag } from "lucide-react"
 import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Badge } from "@/components/ui/badge"
 
 // Define the Product interface
 interface Product {
@@ -26,15 +27,6 @@ interface Product {
 
 // Add commission data interface
 interface CommissionData {
-  agentId: string
-  name: string
-  email: string
-  commissionRate: number
-  categoryCommissions?: Record<string, number>
-}
-
-// Add these interfaces after the Product interface
-interface Agent {
   agentId: string
   name: string
   email: string
@@ -122,13 +114,17 @@ export default function ProductsPage() {
 
       // Get commission rate (use category-specific if available)
       let rate = commissionData.commissionRate
-      if (commissionData.categoryCommissions && commissionData.categoryCommissions[product.category]) {
+      if (
+        commissionData.categoryCommissions &&
+        product.category &&
+        commissionData.categoryCommissions[product.category]
+      ) {
         rate = commissionData.categoryCommissions[product.category]
       }
 
       // Calculate adjusted price
       const adjustedPrice = product.price * (1 + rate / 100)
-      return adjustedPrice
+      return Math.round(adjustedPrice * 100) / 100 // Round to 2 decimal places
     },
     [commissionData],
   )
@@ -258,7 +254,8 @@ export default function ProductsPage() {
         }
 
         // Make a direct fetch request with the token
-        const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
+        const response = await fetch(`${apiUrl}/api/addToCart`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -372,6 +369,31 @@ export default function ProductsPage() {
         </div>
       </div>
 
+      {commissionData && (
+        <div className="mb-6 p-4 bg-muted rounded-lg">
+          <div className="flex items-center gap-2 mb-2">
+            <Tag className="h-5 w-5 text-primary" />
+            <h2 className="font-semibold">Agent Commission Information</h2>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Agent: {commissionData.name} ({commissionData.email})
+          </p>
+          <p className="text-sm text-muted-foreground">Base Commission Rate: {commissionData.commissionRate}%</p>
+          {commissionData.categoryCommissions && Object.keys(commissionData.categoryCommissions).length > 0 && (
+            <div className="mt-2">
+              <p className="text-sm font-medium">Category-specific rates:</p>
+              <div className="flex flex-wrap gap-2 mt-1">
+                {Object.entries(commissionData.categoryCommissions).map(([category, rate]) => (
+                  <Badge key={category} variant="outline" className="text-xs">
+                    {category}: {rate}%
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="relative mb-6">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
         <input
@@ -402,6 +424,7 @@ export default function ProductsPage() {
             // Calculate adjusted price for each product
             const originalPrice = product.price
             const adjustedPrice = calculateAdjustedPrice(product)
+            const hasCommission = commissionData && adjustedPrice > originalPrice
 
             return (
               <div
@@ -412,10 +435,10 @@ export default function ProductsPage() {
                   <Image
                     src={
                       imageError[product._id]
-                        ? "/placeholder.svg?height=300&width=300"
+                        ? "/placeholder.svg?height=300&width=300&query=marble"
                         : product.image && product.image.length > 0 && product.image[0]
                           ? product.image[0]
-                          : "/placeholder.svg?height=300&width=300"
+                          : "/placeholder.svg?height=300&width=300&query=marble"
                     }
                     alt={product.name}
                     fill
@@ -441,16 +464,27 @@ export default function ProductsPage() {
                 <div className="p-4">
                   <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
 
-                  {product.originalPrice ? (
-                    <div className="mt-2">
-                      <p className="text-sm text-gray-500 line-through">₹{product.originalPrice.toLocaleString()}</p>
-                      <p className="text-lg font-bold text-green-600">₹{product.price.toLocaleString()}</p>
-                    </div>
-                  ) : (
-                    <p className="text-lg font-bold mt-2">₹{product.price.toLocaleString()}</p>
-                  )}
-
                   <p className="text-sm text-muted-foreground mt-1">{product.category}</p>
+
+                  {/* Price display with original and adjusted prices */}
+                  <div className="mt-2">
+                    {hasCommission ? (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm text-muted-foreground line-through">{formatPrice(originalPrice)}</p>
+                          <Badge variant="outline" className="text-xs">
+                            Base Price
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <p className="text-lg font-bold text-green-600">{formatPrice(adjustedPrice)}</p>
+                          <Badge className="text-xs bg-green-100 text-green-800 hover:bg-green-100">Final Price</Badge>
+                        </div>
+                      </>
+                    ) : (
+                      <p className="text-lg font-bold mt-1">{formatPrice(originalPrice)}</p>
+                    )}
+                  </div>
 
                   <button
                     onClick={(e) => addToCart(e, product.postId, product.name)}
