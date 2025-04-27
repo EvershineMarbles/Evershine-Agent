@@ -21,6 +21,7 @@ interface Product {
   status?: "draft" | "pending" | "approved"
   applicationAreas?: string
   quantityAvailable?: number
+  originalPrice?: number
 }
 
 // Add commission data interface
@@ -440,14 +441,13 @@ export default function ProductsPage() {
                 <div className="p-4">
                   <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
 
-                  {/* Show both original and adjusted prices */}
-                  {commissionData ? (
+                  {product.originalPrice ? (
                     <div className="mt-2">
-                      <p className="text-sm text-gray-500 line-through">₹{originalPrice.toLocaleString()}</p>
-                      <p className="text-lg font-bold text-green-600">₹{adjustedPrice.toLocaleString()}</p>
+                      <p className="text-sm text-gray-500 line-through">₹{product.originalPrice.toLocaleString()}</p>
+                      <p className="text-lg font-bold text-green-600">₹{product.price.toLocaleString()}</p>
                     </div>
                   ) : (
-                    <p className="text-lg font-bold mt-2">₹{originalPrice.toLocaleString()}</p>
+                    <p className="text-lg font-bold mt-2">₹{product.price.toLocaleString()}</p>
                   )}
 
                   <p className="text-sm text-muted-foreground mt-1">{product.category}</p>
