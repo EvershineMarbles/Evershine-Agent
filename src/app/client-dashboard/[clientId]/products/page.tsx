@@ -1,49 +1,58 @@
 "use client"
 
 import type React from "react"
+
 import { useState, useEffect, useCallback } from "react"
-import { useParams } from "next/navigation"
 import Link from "next/link"
-import { Search, Loader2, Heart, ShoppingCart, AlertCircle, Info } from "lucide-react"
+import { Search, Loader2, Heart, ShoppingCart, AlertCircle, RefreshCw } from "lucide-react"
 import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 
 // Define the Product interface
 interface Product {
   _id: string
   name: string
   price: number
-  originalPrice?: number // Optional field for original price (if backend provides it)
+  basePrice?: number // Original price before commission
   image: string[]
   postId: string
   category: string
   description: string
   status?: "draft" | "pending" | "approved"
-  applicationAreas?: string
+  applicationAreas?: string[] | string
   quantityAvailable?: number
 }
 
-export default function ProductsPage() {
-  // Use the useParams hook to get the clientId
-  const params = useParams()
-  const clientId = params.clientId as string
+// Define the agent data interface
+interface AgentData {
+  agentId: string
+  name: string
+  email: string
+  commissionRate: number
+}
 
+export default function ProductsPage() {
+  // State variables
   const { toast } = useToast()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [imageError, setImageError] = useState<Record<string, boolean>>({})
-
-  // Wishlist and cart state
   const [wishlist, setWishlist] = useState<string[]>([])
   const [cart, setCart] = useState<string[]>([])
   const [addingToCart, setAddingToCart] = useState<Record<string, boolean>>({})
   const [error, setError] = useState<string | null>(null)
+  const [agentData, setAgentData] = useState<AgentData | null>(null)
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const [categories, setCategories] = useState<string[]>([])
+  const [sortOption, setSortOption] = useState<string>("default")
 
-  // Commission rate state
-  const [commissionRate, setCommissionRate] = useState<number | null>(null)
-  const [showCommissionInfo, setShowCommissionInfo] = useState(true)
+  // API URL from environment variable or default
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
 
   // Load wishlist and cart from localStorage
   useEffect(() => {
@@ -64,64 +73,61 @@ export default function ProductsPage() {
     }
   }, [])
 
-  // Save wishlist and cart to localStorage whenever they change
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("wishlist", JSON.stringify(wishlist))
-      localStorage.setItem("cart", JSON.stringify(cart))
-    }
-  }, [wishlist, cart])
-
-  // Fetch products function with commission rate handling
+  // Fetch products function - Use the client-specific endpoint
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
 
-      // Get the token
-      const token = localStorage.getItem("clientImpersonationToken")
+      // Get the client impersonation token
+      const token = localStorage.getItem("clientImpersonationToken") || localStorage.getItem("token")
 
       if (!token) {
-        throw new Error("No authentication token found. Please refresh the page and try again.")
+        throw new Error("No authentication token found. Please log in again.")
       }
 
-      // Use environment variable if available, otherwise use a default URL
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
+      // Use the client-specific endpoint that returns prices with commission already applied
+      console.log("Fetching from client endpoint:", `${apiUrl}/api/client/products`)
 
-      // Use the endpoint that returns commission-adjusted prices for agents
-      console.log("Fetching products with agent pricing from:", `${apiUrl}/api/getProductsWithAgentPricing`)
-
-      const response = await fetch(`${apiUrl}/api/getProductsWithAgentPricing`, {
+      const response = await fetch(`${apiUrl}/api/client/products`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        // Add a timeout to prevent long waiting times
         signal: AbortSignal.timeout(8000), // 8 second timeout
       })
 
       if (!response.ok) {
-        console.warn(`Agent pricing endpoint failed with status ${response.status}. Response:`, await response.text())
-        console.warn("Falling back to standard endpoint")
-
-        const fallbackResponse = await fetch(`${apiUrl}/api/getAllProducts`, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          signal: AbortSignal.timeout(8000),
-        })
-
-        if (!fallbackResponse.ok) {
-          throw new Error(`API request failed with status ${fallbackResponse.status}`)
-        }
-
-        return await handleProductResponse(fallbackResponse)
+        throw new Error(`API request failed with status ${response.status}`)
       }
 
-      return await handleProductResponse(response)
-    } catch (error: Error | unknown) {
+      const data = await response.json()
+      console.log("Client endpoint response:", data)
+
+      if (data.success && Array.isArray(data.data)) {
+        // Process the image URLs to ensure they're valid
+        const processedProducts = data.data.map((product: Product) => ({
+          ...product,
+          image:
+            Array.isArray(product.image) && product.image.length > 0
+              ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
+              : ["/placeholder.svg?height=300&width=300"],
+        }))
+
+        setProducts(processedProducts)
+
+        // Extract unique categories
+        const uniqueCategories = Array.from(new Set(processedProducts.map((product: Product) => product.category)))
+
+        // If agent info is included in the response, use it
+        if (data.agentInfo) {
+          setAgentData(data.agentInfo)
+        }
+      } else {
+        throw new Error(data.msg || "Invalid API response format")
+      }
+    } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : "Failed to load products"
       console.error("Error fetching products:", error)
       setError(errorMessage)
@@ -138,68 +144,127 @@ export default function ProductsPage() {
     } finally {
       setLoading(false)
     }
-  }, [toast])
+  }, [apiUrl, toast])
 
-  // Helper function to handle product response
-  const handleProductResponse = async (response: Response) => {
-    const data = await response.json()
-    console.log("Full API response:", data)
-
-    if (data.success && Array.isArray(data.data)) {
-      console.log("Products fetched successfully. First product sample:", data.data[0])
-      console.log("Commission rate from API:", data.commissionRate)
-
-      // Process the image URLs to ensure they're valid
-      const processedProducts = data.data.map((product: Product) => ({
-        ...product,
-        image:
-          Array.isArray(product.image) && product.image.length > 0
-            ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
-            : ["/placeholder.svg?height=300&width=300"],
-      }))
-
-      setProducts(processedProducts)
-
-      // Store commission rate if provided by the API
-      if (data.commissionRate !== undefined) {
-        console.log("Setting commission rate to:", data.commissionRate)
-        setCommissionRate(data.commissionRate)
-      } else {
-        console.log("No commission rate provided in API response")
+  // Fetch agent data separately if needed
+  const fetchAgentData = useCallback(async () => {
+    try {
+      // Get the token
+      const token = localStorage.getItem("clientImpersonationToken") || localStorage.getItem("token")
+      if (!token) {
+        throw new Error("No authentication token found")
       }
-    } else {
-      console.error("Invalid API response format:", data)
-      throw new Error(data.msg || "Invalid API response format")
+
+      // Use the client-specific endpoint for agent info
+      const response = await fetch(`${apiUrl}/api/client/agent-info`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        signal: AbortSignal.timeout(5000),
+      })
+
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`)
+      }
+
+      const data = await response.json()
+      console.log("Agent data response:", data)
+
+      if (data.success && data.data) {
+        setAgentData(data.data)
+      }
+    } catch (error) {
+      console.error("Error fetching agent data:", error)
     }
-  }
+  }, [apiUrl])
 
   // Fetch products on component mount
   useEffect(() => {
     fetchProducts()
-  }, [fetchProducts])
+    fetchAgentData()
+  }, [fetchProducts, fetchAgentData])
+
+  // Save wishlist and cart to localStorage whenever they change
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("wishlist", JSON.stringify(wishlist))
+      localStorage.setItem("cart", JSON.stringify(cart))
+    }
+  }, [wishlist, cart])
 
   // Toggle wishlist function
   const toggleWishlist = useCallback(
-    (e: React.MouseEvent, productId: string) => {
+    async (e: React.MouseEvent, productId: string, productName: string) => {
       e.preventDefault() // Prevent navigation
 
-      if (wishlist.includes(productId)) {
-        setWishlist((prev) => prev.filter((id) => id !== productId))
+      try {
+        // Get the token
+        const token = localStorage.getItem("clientImpersonationToken") || localStorage.getItem("token")
+
+        if (!token) {
+          toast({
+            title: "Authentication Error",
+            description: "Please log in to add items to your wishlist",
+            variant: "destructive",
+          })
+          return
+        }
+
+        if (wishlist.includes(productId)) {
+          // Remove from wishlist
+          const response = await fetch(`${apiUrl}/api/deleteUserWishlistItem`, {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ productId }),
+          })
+
+          if (!response.ok) {
+            throw new Error(`API request failed with status ${response.status}`)
+          }
+
+          setWishlist((prev) => prev.filter((id) => id !== productId))
+          toast({
+            title: "Removed from wishlist",
+            description: `${productName} has been removed from your wishlist`,
+            variant: "default",
+          })
+        } else {
+          // Add to wishlist
+          const response = await fetch(`${apiUrl}/api/addToWishlist`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ productId }),
+          })
+
+          if (!response.ok) {
+            throw new Error(`API request failed with status ${response.status}`)
+          }
+
+          setWishlist((prev) => [...prev, productId])
+          toast({
+            title: "Added to wishlist",
+            description: `${productName} has been added to your wishlist`,
+            variant: "default",
+          })
+        }
+      } catch (error: any) {
+        console.error("Error updating wishlist:", error)
         toast({
-          title: "Removed from wishlist",
-          description: "Item has been removed from your wishlist",
-          variant: "default",
-        })
-      } else {
-        setWishlist((prev) => [...prev, productId])
-        toast({
-          title: "Added to wishlist",
-          description: "Item has been added to your wishlist",
-          variant: "default",
+          title: "Error updating wishlist",
+          description: error.message || "Failed to update wishlist",
+          variant: "destructive",
         })
       }
     },
-    [wishlist, toast],
+    [wishlist, toast, apiUrl],
   )
 
   // Add to cart function
@@ -223,31 +288,19 @@ export default function ProductsPage() {
         console.log("Adding to cart:", productId, productName)
 
         // Get the token
-        const token = localStorage.getItem("clientImpersonationToken")
+        const token = localStorage.getItem("clientImpersonationToken") || localStorage.getItem("token")
 
         if (!token) {
-          console.error("No impersonation token found")
           toast({
             title: "Authentication Error",
-            description: "Please refresh your token using the debug panel above",
+            description: "Please log in to add items to your cart",
             variant: "destructive",
           })
           throw new Error("No authentication token found")
         }
 
-        console.log("Using token:", token.substring(0, 15) + "...")
-        console.log("Full request details:", {
-          url: "https://evershinebackend-2.onrender.com/api/addToCart",
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ productId }),
-        })
-
         // Make a direct fetch request with the token
-        const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
+        const response = await fetch(`${apiUrl}/api/addToCart`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -256,30 +309,16 @@ export default function ProductsPage() {
           body: JSON.stringify({ productId }),
         })
 
-        console.log("Response status:", response.status, response.statusText)
-
-        // Get the response text for debugging
-        const responseText = await response.text()
-        console.log("Response text:", responseText)
-
-        // Try to parse the response as JSON
-        let data
-        try {
-          data = JSON.parse(responseText)
-          console.log("Parsed response data:", data)
-        } catch (e) {
-          console.error("Failed to parse response as JSON:", e)
-          throw new Error(`Invalid response format: ${responseText}`)
-        }
-
-        // Check for errors
         if (!response.ok) {
           if (response.status === 401) {
-            throw new Error("Authentication failed. Please refresh the token using the debug panel above.")
+            throw new Error("Authentication failed. Please log in again.")
           } else {
-            throw new Error(`API error: ${response.status} ${response.statusText}. Details: ${responseText}`)
+            const errorText = await response.text()
+            throw new Error(`API error: ${response.status}. Details: ${errorText}`)
           }
         }
+
+        const data = await response.json()
 
         if (data.success) {
           toast({
@@ -291,7 +330,7 @@ export default function ProductsPage() {
         } else {
           throw new Error(data.message || "Failed to add to cart")
         }
-      } catch (error: Error | unknown) {
+      } catch (error: any) {
         const errorMessage = error instanceof Error ? error.message : "Failed to add item to cart. Please try again."
         console.error("Error adding to cart:", error)
         toast({
@@ -304,20 +343,48 @@ export default function ProductsPage() {
         setAddingToCart((prev) => ({ ...prev, [productId]: false }))
       }
     },
-    [cart, toast],
+    [cart, toast, apiUrl],
   )
 
-  // Filter products based on search query
-  const filteredProducts = products.filter(
-    (product) =>
+  // Filter products based on search query and category
+  const filteredProducts = products.filter((product) => {
+    const matchesSearch =
       product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      product.category.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
+      product.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (product.description && product.description.toLowerCase().includes(searchQuery.toLowerCase()))
+
+    const matchesCategory = selectedCategory ? product.category === selectedCategory : true
+
+    return matchesSearch && matchesCategory
+  })
+
+  // Sort products based on selected option
+  const sortedProducts = [...filteredProducts].sort((a, b) => {
+    switch (sortOption) {
+      case "price-low-high":
+        return a.price - b.price
+      case "price-high-low":
+        return b.price - a.price
+      case "name-a-z":
+        return a.name.localeCompare(b.name)
+      case "name-z-a":
+        return b.name.localeCompare(a.name)
+      default:
+        return 0 // Default sorting (by creation date) is handled by the API
+    }
+  })
 
   // Handle image loading errors
   const handleImageError = useCallback((productId: string) => {
     setImageError((prev) => ({ ...prev, [productId]: true }))
   }, [])
+
+  // Reset filters
+  const resetFilters = () => {
+    setSearchQuery("")
+    setSelectedCategory(null)
+    setSortOption("default")
+  }
 
   // Loading state
   if (loading) {
@@ -330,19 +397,26 @@ export default function ProductsPage() {
   }
 
   return (
-    <div className="p-6 md:p-8">
+    <div className="container mx-auto p-4 md:p-6">
       {error && (
-        <Alert variant="destructive" className="mb-4">
+        <Alert variant="destructive" className="mb-6">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">Products</h1>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+        <div>
+          <h1 className="text-3xl font-bold">Products</h1>
+          {agentData && (
+            <p className="text-sm text-muted-foreground mt-1">
+              Prices include {agentData.commissionRate}% agent commission
+            </p>
+          )}
+        </div>
 
         <div className="flex items-center gap-4">
-          <Link href={`/client-dashboard/${clientId}/wishlist`} className="relative">
+          <Link href="/wishlist" className="relative">
             <Heart className="h-6 w-6 text-gray-600" />
             {wishlist.length > 0 && (
               <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
@@ -351,7 +425,7 @@ export default function ProductsPage() {
             )}
           </Link>
 
-          <Link href={`/client-dashboard/${clientId}/cart`} className="relative">
+          <Link href="/cart" className="relative">
             <ShoppingCart className="h-6 w-6 text-gray-600" />
             {cart.length > 0 && (
               <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
@@ -362,140 +436,222 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      {/* Commission Rate Information Banner */}
-      {commissionRate !== null && showCommissionInfo && (
-        <Alert className="mb-6 bg-blue-50 border-blue-200">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <Info className="h-4 w-4 text-blue mr-2" />
-              <AlertDescription className="text-blue">
-                Prices include your {commissionRate}% commission
-              </AlertDescription>
-            </div>
-            <button onClick={() => setShowCommissionInfo(false)} className="text-xs text-blue hover:underline">
-              Dismiss
-            </button>
-          </div>
-        </Alert>
-      )}
-
-      <div className="relative mb-6">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-        <input
-          type="text"
-          placeholder="Search products by name or category..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10 pr-4 py-2 w-full rounded-lg border border-input focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-        />
-      </div>
-
-      {filteredProducts.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-xl font-medium mb-4">No products found</p>
-          <p className="text-muted-foreground mb-6">
-            {searchQuery ? "Try a different search term" : "No products are currently available"}
-          </p>
-          <button
-            onClick={fetchProducts}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
-          >
-            Refresh Products
-          </button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredProducts.map((product) => (
-            <div
-              key={product._id}
-              className="group relative bg-card rounded-lg overflow-hidden border border-border hover:border-primary transition-all hover:shadow-md"
-            >
-              <div className="relative aspect-square">
-                <Image
-                  src={
-                    imageError[product._id]
-                      ? "/placeholder.svg?height=300&width=300"
-                      : product.image && product.image.length > 0 && product.image[0]
-                        ? product.image[0]
-                        : "/placeholder.svg?height=300&width=300"
-                  }
-                  alt={product.name}
-                  fill
-                  className="object-cover transition-transform group-hover:scale-105 duration-300"
-                  onError={() => handleImageError(product._id)}
+      <div className="grid grid-cols-1 md:grid-cols-[250px_1fr] gap-6">
+        {/* Sidebar filters */}
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Filters</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search products..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 pr-4 py-2 w-full rounded-lg border border-input focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
                 />
+              </div>
 
-                {/* Wishlist button overlay */}
-                <button
-                  onClick={(e) => toggleWishlist(e, product.postId)}
-                  className="absolute top-2 right-2 p-2 rounded-full bg-white/80 hover:bg-white transition-colors z-10"
-                  aria-label={wishlist.includes(product.postId) ? "Remove from wishlist" : "Add to wishlist"}
-                  type="button"
-                >
-                  <Heart
-                    className={`h-5 w-5 ${
-                      wishlist.includes(product.postId) ? "text-red-500 fill-red-500" : "text-gray-600"
+              {/* Categories */}
+              <div>
+                <h3 className="font-medium mb-2">Categories</h3>
+                <div className="space-y-1">
+                  <button
+                    onClick={() => setSelectedCategory(null)}
+                    className={`w-full text-left px-2 py-1 rounded-md text-sm ${
+                      selectedCategory === null ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted"
                     }`}
-                  />
-                </button>
-              </div>
-
-              <div className="p-4">
-                <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
-
-                {/* Price display with both original and adjusted prices */}
-                <div className="mt-2">
-                  {product.originalPrice ? (
-                    <>
-                      <div className="flex items-center">
-                        <p className="text-lg font-bold">₹{product.price.toLocaleString()}</p>
-                        <Info className="h-4 w-4 ml-1 text-blue cursor-help" />
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Base price: ₹{product.originalPrice.toLocaleString()}
-                      </p>
-                      <p className="text-xs text-green-600">
-                        Your commission: ₹{(product.price - product.originalPrice).toLocaleString()}
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-lg font-bold">₹{product.price.toLocaleString()}</p>
-                  )}
+                  >
+                    All Categories
+                  </button>
+                  {categories.map((category) => (
+                    <button
+                      key={category}
+                      onClick={() => setSelectedCategory(category)}
+                      className={`w-full text-left px-2 py-1 rounded-md text-sm ${
+                        selectedCategory === category ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted"
+                      }`}
+                    >
+                      {category}
+                    </button>
+                  ))}
                 </div>
-
-                <p className="text-sm text-muted-foreground mt-1">{product.category}</p>
-
-                <button
-                  onClick={(e) => addToCart(e, product.postId, product.name)}
-                  className={`mt-4 w-full py-2 rounded-lg text-sm font-medium
-                            ${
-                              cart.includes(product.postId)
-                                ? "bg-muted text-muted-foreground"
-                                : "bg-primary hover:bg-primary/90 text-primary-foreground"
-                            } 
-                            transition-colors`}
-                  disabled={
-                    cart.includes(product.postId) ||
-                    addingToCart[product.postId] ||
-                    (product.quantityAvailable !== undefined && product.quantityAvailable <= 0)
-                  }
-                  type="button"
-                >
-                  {addingToCart[product.postId] ? (
-                    <Loader2 className="h-4 w-4 animate-spin mx-auto" />
-                  ) : cart.includes(product.postId) ? (
-                    "Added to Cart"
-                  ) : product.quantityAvailable !== undefined && product.quantityAvailable <= 0 ? (
-                    "Out of Stock"
-                  ) : (
-                    "Add to Cart"
-                  )}
-                </button>
               </div>
-            </div>
-          ))}
+
+              {/* Sort options */}
+              <div>
+                <h3 className="font-medium mb-2">Sort By</h3>
+                <select
+                  value={sortOption}
+                  onChange={(e) => setSortOption(e.target.value)}
+                  className="w-full p-2 rounded-md border border-input bg-background text-sm"
+                >
+                  <option value="default">Default</option>
+                  <option value="price-low-high">Price: Low to High</option>
+                  <option value="price-high-low">Price: High to Low</option>
+                  <option value="name-a-z">Name: A to Z</option>
+                  <option value="name-z-a">Name: Z to A</option>
+                </select>
+              </div>
+
+              {/* Reset filters */}
+              <Button variant="outline" size="sm" onClick={resetFilters} className="w-full">
+                Reset Filters
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Agent info card */}
+          {agentData && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Your Agent</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <p className="font-medium">{agentData.name}</p>
+                  <p className="text-sm text-muted-foreground">{agentData.email}</p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <Badge variant="outline" className="bg-primary/10">
+                      {agentData.commissionRate}% Commission
+                    </Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
-      )}
+
+        {/* Products grid */}
+        <div>
+          {/* Results summary */}
+          <div className="flex justify-between items-center mb-4">
+            <p className="text-sm text-muted-foreground">
+              Showing {sortedProducts.length} {sortedProducts.length === 1 ? "product" : "products"}
+              {selectedCategory ? ` in ${selectedCategory}` : ""}
+              {searchQuery ? ` matching "${searchQuery}"` : ""}
+            </p>
+            <Button variant="ghost" size="sm" onClick={fetchProducts}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+          </div>
+
+          {sortedProducts.length === 0 ? (
+            <div className="text-center py-12 bg-muted/30 rounded-lg">
+              <p className="text-xl font-medium mb-4">No products found</p>
+              <p className="text-muted-foreground mb-6">
+                {searchQuery || selectedCategory
+                  ? "Try different search terms or filters"
+                  : "No products are currently available"}
+              </p>
+              <Button onClick={resetFilters}>Clear Filters</Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {sortedProducts.map((product) => (
+                <Card key={product._id} className="group overflow-hidden h-full flex flex-col">
+                  <div className="relative aspect-square">
+                    <Image
+                      src={
+                        imageError[product._id]
+                          ? "/placeholder.svg?height=300&width=300&query=product"
+                          : product.image && product.image.length > 0 && product.image[0]
+                            ? product.image[0]
+                            : "/placeholder.svg?height=300&width=300&query=product"
+                      }
+                      alt={product.name}
+                      fill
+                      className="object-cover transition-transform group-hover:scale-105 duration-300"
+                      onError={() => handleImageError(product._id)}
+                    />
+
+                    {/* Wishlist button overlay */}
+                    <button
+                      onClick={(e) => toggleWishlist(e, product.postId, product.name)}
+                      className="absolute top-2 right-2 p-2 rounded-full bg-white/80 hover:bg-white transition-colors z-10"
+                      aria-label={wishlist.includes(product.postId) ? "Remove from wishlist" : "Add to wishlist"}
+                      type="button"
+                    >
+                      <Heart
+                        className={`h-5 w-5 ${
+                          wishlist.includes(product.postId) ? "text-red-500 fill-red-500" : "text-gray-600"
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  <CardContent className="flex-grow pt-4">
+                    <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
+                    <p className="text-sm text-muted-foreground mt-1">{product.category}</p>
+
+                    {/* Price display - showing the commission-adjusted price */}
+                    <div className="mt-2">
+                      <p className="text-lg font-bold text-primary">₹{product.price.toLocaleString()}</p>
+
+                      {/* Show the base price for comparison */}
+                      {product.basePrice && product.basePrice !== product.price && (
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm text-muted-foreground">
+                            <span className="line-through">₹{product.basePrice.toLocaleString()}</span>
+                          </p>
+                          <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-800 rounded-full">
+                            Agent Price
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Application areas */}
+                    {product.applicationAreas && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {(Array.isArray(product.applicationAreas)
+                          ? product.applicationAreas
+                          : product.applicationAreas.split(",").map((area) => area.trim())
+                        ).map((area, index) => (
+                          <Badge key={index} variant="secondary" className="text-xs">
+                            {area}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+
+                  <CardFooter className="pt-0">
+                    <Button
+                      onClick={(e) => addToCart(e, product.postId, product.name)}
+                      className={`w-full ${cart.includes(product.postId) ? "bg-muted text-muted-foreground" : ""}`}
+                      disabled={
+                        cart.includes(product.postId) ||
+                        addingToCart[product.postId] ||
+                        (product.quantityAvailable !== undefined && product.quantityAvailable <= 0)
+                      }
+                      variant={cart.includes(product.postId) ? "outline" : "default"}
+                    >
+                      {addingToCart[product.postId] ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : cart.includes(product.postId) ? (
+                        "Added to Cart"
+                      ) : product.quantityAvailable !== undefined && product.quantityAvailable <= 0 ? (
+                        "Out of Stock"
+                      ) : (
+                        <>
+                          <ShoppingCart className="h-4 w-4 mr-2" />
+                          Add to Cart
+                        </>
+                      )}
+                    </Button>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
