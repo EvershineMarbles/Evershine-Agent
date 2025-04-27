@@ -22,13 +22,23 @@ interface Product {
   description: string
 }
 
+// Add these interfaces after the Product interface
+interface Agent {
+  agentId: string
+  name: string
+  email: string
+  commissionRate: number
+  categoryCommissions?: Record<string, number>
+}
+
 export default function ProductsPage() {
   const [loading, setLoading] = useState(true)
   const [products, setProducts] = useState<Product[]>([])
+  // Add this state after the other state declarations
   const [commissionData, setCommissionData] = useState<CommissionData | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // Function to fetch agent commission data
+  // Add this function to fetch agent commission data
   const fetchCommissionData = async () => {
     console.log("1. Starting to fetch agent commission data...")
     try {
@@ -102,7 +112,7 @@ export default function ProductsPage() {
     }
   }
 
-  // Calculate adjusted price based on commission
+  // Add this function to calculate adjusted price
   const calculateAdjustedPrice = (product: Product) => {
     if (!commissionData) return product.price
 
