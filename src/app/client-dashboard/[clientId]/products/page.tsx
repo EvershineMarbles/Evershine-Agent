@@ -16,6 +16,7 @@ interface Product {
   _id: string
   name: string
   price: number
+  basePrice?: number // Add this field to recognize the original price
   image: string[]
   postId: string
   category: string
@@ -133,6 +134,11 @@ export default function ProductsPage() {
   // Add calculateAdjustedPrice function with override support
   const calculateAdjustedPrice = useCallback(
     (product: Product) => {
+      // If there's no basePrice, we can't calculate an adjusted price
+      if (!product.basePrice) {
+        return product.price
+      }
+
       // Use override rate if set, otherwise use agent's commission rate
       let rate = overrideCommissionRate !== null ? overrideCommissionRate : commissionData?.commissionRate || 10
 
@@ -146,8 +152,8 @@ export default function ProductsPage() {
         rate = commissionData.categoryCommissions[product.category]
       }
 
-      // Calculate adjusted price
-      const adjustedPrice = product.price * (1 + rate / 100)
+      // Calculate adjusted price based on the original basePrice
+      const adjustedPrice = product.basePrice * (1 + rate / 100)
       return Math.round(adjustedPrice * 100) / 100 // Round to 2 decimal places
     },
     [commissionData, overrideCommissionRate],
@@ -709,23 +715,39 @@ export default function ProductsPage() {
 
                     {/* Price with commission info */}
                     <div className="flex items-baseline gap-2 mt-2">
-                      <p className="text-lg font-bold">₹{adjustedPrice.toLocaleString()}/sqft</p>
-                      <p className="text-sm text-green-600">(+{percentageIncrease}%)</p>
+                      <p className="text-lg font-bold">
+                        ₹
+                        {product.basePrice
+                          ? calculateAdjustedPrice(product).toLocaleString()
+                          : product.price.toLocaleString()}
+                        /sqft
+                      </p>
+                      {product.basePrice && (
+                        <p className="text-sm text-green-600">
+                          (+{((calculateAdjustedPrice(product) / product.basePrice - 1) * 100).toFixed(1)}%)
+                        </p>
+                      )}
                     </div>
 
                     {/* Base price and commission info */}
-                    <div className="text-sm text-muted-foreground mt-1">
-                      <span className="line-through">₹{product.price.toLocaleString()}/sqft</span>
-                      <span
-                        className={`ml-2 ${overrideCommissionRate !== null ? "text-amber-600 font-medium" : "text-blue-600"}`}
-                      >
-                        Commission:{" "}
-                        {overrideCommissionRate !== null
-                          ? overrideCommissionRate
-                          : commissionData?.commissionRate || 10}
-                        %
-                      </span>
-                    </div>
+                    {product.basePrice && (
+                      <div className="text-sm text-muted-foreground mt-1">
+                        <span className="line-through">₹{product.basePrice.toLocaleString()}/sqft</span>
+                        <span
+                          className={`ml-2 ${overrideCommissionRate !== null ? "text-amber-600 font-medium" : "text-blue-600"}`}
+                        >
+                          Commission:{" "}
+                          {overrideCommissionRate !== null
+                            ? overrideCommissionRate
+                            : commissionData?.categoryCommissions &&
+                                product.category &&
+                                commissionData.categoryCommissions[product.category]
+                              ? commissionData.categoryCommissions[product.category]
+                              : commissionData?.commissionRate || 10}
+                          %
+                        </span>
+                      </div>
+                    )}
 
                     <p className="text-sm text-muted-foreground mt-1">
                       <span className="font-medium">Category:</span> {product.category}
