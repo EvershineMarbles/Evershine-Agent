@@ -134,10 +134,8 @@ export default function ProductsPage() {
   // Add calculateAdjustedPrice function with override support
   const calculateAdjustedPrice = useCallback(
     (product: Product) => {
-      // If there's no basePrice, we can't calculate an adjusted price
-      if (!product.basePrice) {
-        return product.price
-      }
+      // Always use basePrice (which should be the original price)
+      const basePrice = product.basePrice || product.price
 
       // Get the default commission rate (from agent or category-specific)
       let defaultRate = commissionData?.commissionRate || 10
@@ -155,7 +153,7 @@ export default function ProductsPage() {
       const finalRate = overrideCommissionRate !== null ? defaultRate + overrideCommissionRate : defaultRate
 
       // Calculate adjusted price based on the original basePrice
-      const adjustedPrice = product.basePrice * (1 + finalRate / 100)
+      const adjustedPrice = basePrice * (1 + finalRate / 100)
       return Math.round(adjustedPrice * 100) / 100 // Round to 2 decimal places
     },
     [commissionData, overrideCommissionRate],
@@ -215,6 +213,8 @@ export default function ProductsPage() {
             Array.isArray(product.image) && product.image.length > 0
               ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
               : ["/placeholder.svg"],
+          // Ensure basePrice is set if it doesn't exist
+          basePrice: product.basePrice || product.price,
         }))
 
         setProducts(processedProducts)
