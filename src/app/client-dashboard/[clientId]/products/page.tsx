@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
-import { Search, Loader2, Heart, ShoppingCart, AlertCircle, Info } from "lucide-react"
+import { Search, Loader2, Heart, ShoppingCart, AlertCircle } from "lucide-react"
 import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -14,7 +14,6 @@ interface Product {
   _id: string
   name: string
   price: number
-  originalPrice?: number // Optional field for original price (if backend provides it)
   image: string[]
   postId: string
   category: string
@@ -29,21 +28,18 @@ export default function ProductsPage() {
   const params = useParams()
   const clientId = params.clientId as string
 
+  // Remove the unused router variable
+  // const router = useRouter()
   const { toast } = useToast()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [imageError, setImageError] = useState<Record<string, boolean>>({})
-
   // Wishlist and cart state
   const [wishlist, setWishlist] = useState<string[]>([])
   const [cart, setCart] = useState<string[]>([])
   const [addingToCart, setAddingToCart] = useState<Record<string, boolean>>({})
   const [error, setError] = useState<string | null>(null)
-
-  // Commission rate state
-  const [commissionRate, setCommissionRate] = useState<number | null>(null)
-  const [showCommissionInfo, setShowCommissionInfo] = useState(true)
 
   // Load wishlist and cart from localStorage
   useEffect(() => {
@@ -72,29 +68,19 @@ export default function ProductsPage() {
     }
   }, [wishlist, cart])
 
-  // Fetch products function with commission rate handling
+  // Fetch products function
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
 
-      // Get the token
-      const token = localStorage.getItem("clientImpersonationToken")
-
-      if (!token) {
-        throw new Error("No authentication token found. Please refresh the page and try again.")
-      }
-
       // Use environment variable if available, otherwise use a default URL
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
+      console.log("Fetching products from:", `${apiUrl}/api/getAllProducts`)
 
-      // Use the endpoint that returns commission-adjusted prices for agents
-      console.log("Fetching products with agent pricing from:", `${apiUrl}/api/getProductsWithAgentPricing`)
-
-      const response = await fetch(`${apiUrl}/api/getProductsWithAgentPricing`, {
+      const response = await fetch(`${apiUrl}/api/getAllProducts`, {
         method: "GET",
         headers: {
-          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
         // Add a timeout to prevent long waiting times
@@ -102,25 +88,27 @@ export default function ProductsPage() {
       })
 
       if (!response.ok) {
-        console.warn(`Agent pricing endpoint failed with status ${response.status}. Response:`, await response.text())
-        console.warn("Falling back to standard endpoint")
-
-        const fallbackResponse = await fetch(`${apiUrl}/api/getAllProducts`, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          signal: AbortSignal.timeout(8000),
-        })
-
-        if (!fallbackResponse.ok) {
-          throw new Error(`API request failed with status ${fallbackResponse.status}`)
-        }
-
-        return await handleProductResponse(fallbackResponse)
+        throw new Error(`API request failed with status ${response.status}`)
       }
 
-      return await handleProductResponse(response)
+      const data = await response.json()
+
+      if (data.success && Array.isArray(data.data)) {
+        console.log("Products fetched successfully:", data.data)
+
+        // Process the image URLs to ensure they're valid
+        const processedProducts = data.data.map((product: Product) => ({
+          ...product,
+          image:
+            Array.isArray(product.image) && product.image.length > 0
+              ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
+              : ["/placeholder.svg?height=300&width=300"],
+        }))
+
+        setProducts(processedProducts)
+      } else {
+        throw new Error(data.msg || "Invalid API response format")
+      }
     } catch (error: Error | unknown) {
       const errorMessage = error instanceof Error ? error.message : "Failed to load products"
       console.error("Error fetching products:", error)
@@ -139,39 +127,6 @@ export default function ProductsPage() {
       setLoading(false)
     }
   }, [toast])
-
-  // Helper function to handle product response
-  const handleProductResponse = async (response: Response) => {
-    const data = await response.json()
-    console.log("Full API response:", data)
-
-    if (data.success && Array.isArray(data.data)) {
-      console.log("Products fetched successfully. First product sample:", data.data[0])
-      console.log("Commission rate from API:", data.commissionRate)
-
-      // Process the image URLs to ensure they're valid
-      const processedProducts = data.data.map((product: Product) => ({
-        ...product,
-        image:
-          Array.isArray(product.image) && product.image.length > 0
-            ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
-            : ["/placeholder.svg?height=300&width=300"],
-      }))
-
-      setProducts(processedProducts)
-
-      // Store commission rate if provided by the API
-      if (data.commissionRate !== undefined) {
-        console.log("Setting commission rate to:", data.commissionRate)
-        setCommissionRate(data.commissionRate)
-      } else {
-        console.log("No commission rate provided in API response")
-      }
-    } else {
-      console.error("Invalid API response format:", data)
-      throw new Error(data.msg || "Invalid API response format")
-    }
-  }
 
   // Fetch products on component mount
   useEffect(() => {
@@ -205,7 +160,7 @@ export default function ProductsPage() {
   // Add to cart function
   const addToCart = useCallback(
     async (e: React.MouseEvent, productId: string, productName: string) => {
-      e.preventDefault() // Prevent navigation
+      e.preventDefault() // Prevent navigati
 
       if (cart.includes(productId)) {
         toast({
@@ -262,7 +217,7 @@ export default function ProductsPage() {
         const responseText = await response.text()
         console.log("Response text:", responseText)
 
-        // Try to parse the response as JSON
+        // Try to parse the response a JSON
         let data
         try {
           data = JSON.parse(responseText)
@@ -314,7 +269,7 @@ export default function ProductsPage() {
       product.category.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
-  // Handle image loading error
+  // Handle image loading errors
   const handleImageError = useCallback((productId: string) => {
     setImageError((prev) => ({ ...prev, [productId]: true }))
   }, [])
@@ -324,7 +279,7 @@ export default function ProductsPage() {
     return (
       <div className="flex flex-col items-center justify-center h-[80vh]">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-muted-foreground">Loading products...</p>
+        <p className="text-muted-foreground">Loading products..</p>
       </div>
     )
   }
@@ -361,23 +316,6 @@ export default function ProductsPage() {
           </Link>
         </div>
       </div>
-
-      {/* Commission Rate Information Banner */}
-      {commissionRate !== null && showCommissionInfo && (
-        <Alert className="mb-6 bg-blue-50 border-blue-200">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <Info className="h-4 w-4 text-blue mr-2" />
-              <AlertDescription className="text-blue">
-                Prices include your {commissionRate}% commission
-              </AlertDescription>
-            </div>
-            <button onClick={() => setShowCommissionInfo(false)} className="text-xs text-blue hover:underline">
-              Dismiss
-            </button>
-          </div>
-        </Alert>
-      )}
 
       <div className="relative mb-6">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -442,27 +380,7 @@ export default function ProductsPage() {
 
               <div className="p-4">
                 <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
-
-                {/* Price display with both original and adjusted prices */}
-                <div className="mt-2">
-                  {product.originalPrice ? (
-                    <>
-                      <div className="flex items-center">
-                        <p className="text-lg font-bold">₹{product.price.toLocaleString()}</p>
-                        <Info className="h-4 w-4 ml-1 text-blue cursor-help" />
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Base price: ₹{product.originalPrice.toLocaleString()}
-                      </p>
-                      <p className="text-xs text-green-600">
-                        Your commission: ₹{(product.price - product.originalPrice).toLocaleString()}
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-lg font-bold">₹{product.price.toLocaleString()}</p>
-                  )}
-                </div>
-
+                <p className="text-lg font-bold mt-2">₹{product.price.toLocaleString()}</p>
                 <p className="text-sm text-muted-foreground mt-1">{product.category}</p>
 
                 <button
