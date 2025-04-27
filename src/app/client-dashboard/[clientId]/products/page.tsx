@@ -590,7 +590,7 @@ export default function ProductsPage() {
                   <div className="mt-2">
                     {/* Price with commission info */}
                     <div className="flex items-baseline gap-2">
-                      <p className="text-lg font-bold">₹{displayPrice.toLocaleString()}</p>
+                      <p className="text-lg font-bold">₹{Math.round(displayPrice).toLocaleString()}</p>
 
                       {commissionInfo ? <p className="text-sm text-green-600">(+{commissionInfo.increase}%)</p> : null}
                     </div>
