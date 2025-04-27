@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode, RefreshCw } from "lucide-react"
+import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode } from "lucide-react"
 import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -529,6 +529,37 @@ export default function ProductsPage() {
           <h1 className="text-3xl font-bold">Products</h1>
 
           <div className="flex items-center gap-4">
+            {/* Commission dots moved before scan button */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setOverrideCommissionRate(5)}
+                className={`w-6 h-6 rounded-full bg-red-500 hover:ring-2 hover:ring-red-300 transition-all ${overrideCommissionRate === 5 ? "ring-2 ring-red-300 scale-110" : ""}`}
+                title="Set 5% additional commission"
+                aria-label="Set 5% additional commission"
+              />
+              <button
+                onClick={() => setOverrideCommissionRate(10)}
+                className={`w-6 h-6 rounded-full bg-yellow-500 hover:ring-2 hover:ring-yellow-300 transition-all ${overrideCommissionRate === 10 ? "ring-2 ring-yellow-300 scale-110" : ""}`}
+                title="Set 10% additional commission"
+                aria-label="Set 10% additional commission"
+              />
+              <button
+                onClick={() => setOverrideCommissionRate(15)}
+                className={`w-6 h-6 rounded-full bg-purple-500 hover:ring-2 hover:ring-purple-300 transition-all ${overrideCommissionRate === 15 ? "ring-2 ring-purple-300 scale-110" : ""}`}
+                title="Set 15% additional commission"
+                aria-label="Set 15% additional commission"
+              />
+              {overrideCommissionRate !== null && (
+                <button
+                  onClick={() => setOverrideCommissionRate(null)}
+                  className="text-xs text-gray-600 hover:text-gray-900"
+                  title="Reset to default commission"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+
             {/* Scan QR Button */}
             <button
               onClick={handleScanQR}
@@ -556,92 +587,6 @@ export default function ProductsPage() {
               )}
             </Link>
           </div>
-        </div>
-
-        {/* Commission Info Panel with Quick Commission Dots */}
-        <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-blue-800">Agent Commission Rate</h3>
-              <div className="flex items-center gap-2 ml-4">
-                <button
-                  onClick={() => setOverrideCommissionRate(5)}
-                  className={`w-6 h-6 rounded-full bg-red-500 hover:ring-2 hover:ring-red-300 transition-all ${overrideCommissionRate === 5 ? "ring-2 ring-red-300 scale-110" : ""}`}
-                  title="Set 5% commission"
-                  aria-label="Set 5% commission"
-                />
-                <button
-                  onClick={() => setOverrideCommissionRate(10)}
-                  className={`w-6 h-6 rounded-full bg-yellow-500 hover:ring-2 hover:ring-yellow-300 transition-all ${overrideCommissionRate === 10 ? "ring-2 ring-yellow-300 scale-110" : ""}`}
-                  title="Set 10% commission"
-                  aria-label="Set 10% commission"
-                />
-                <button
-                  onClick={() => setOverrideCommissionRate(15)}
-                  className={`w-6 h-6 rounded-full bg-purple-500 hover:ring-2 hover:ring-purple-300 transition-all ${overrideCommissionRate === 15 ? "ring-2 ring-purple-300 scale-110" : ""}`}
-                  title="Set 15% commission"
-                  aria-label="Set 15% commission"
-                />
-                {overrideCommissionRate !== null && (
-                  <button
-                    onClick={() => setOverrideCommissionRate(null)}
-                    className="text-xs text-gray-600 hover:text-gray-900 ml-2"
-                    title="Reset to default commission"
-                  >
-                    Reset
-                  </button>
-                )}
-              </div>
-            </div>
-            <button
-              onClick={fetchCommissionData}
-              className="flex items-center gap-1 px-3 py-1 bg-blue-200 hover:bg-blue-300 rounded text-xs"
-              disabled={commissionLoading}
-            >
-              {commissionLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-              Refresh
-            </button>
-          </div>
-
-          {commissionLoading ? (
-            <div className="flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span>Loading commission information...</span>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <p className="text-lg font-bold text-green-700">
-                {overrideCommissionRate !== null ? (
-                  <>
-                    <span className="text-amber-600">
-                      Total Commission Rate: {(commissionData?.commissionRate || 10) + overrideCommissionRate}%
-                    </span>
-                    <span className="text-sm text-gray-500 ml-2">
-                      (Base: {commissionData?.commissionRate || 10}% + Additional: {overrideCommissionRate}%)
-                    </span>
-                  </>
-                ) : (
-                  <>Default Commission Rate: {commissionData?.commissionRate || 10}%</>
-                )}
-              </p>
-
-              {overrideCommissionRate === null &&
-                commissionData?.categoryCommissions &&
-                Object.keys(commissionData.categoryCommissions).length > 0 && (
-                  <div>
-                    <p className="font-semibold mb-1">Category-specific Commission Rates:</p>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                      {Object.entries(commissionData.categoryCommissions).map(([category, rate]) => (
-                        <div key={category} className="bg-white rounded p-2 text-sm">
-                          <span className="font-medium">{category}:</span>{" "}
-                          <span className="text-green-700">{rate}%</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-            </div>
-          )}
         </div>
 
         <div className="relative mb-6">
@@ -673,8 +618,6 @@ export default function ProductsPage() {
             {filteredProducts.map((product) => {
               // Calculate the adjusted price based on commission
               const adjustedPrice = calculateAdjustedPrice(product)
-              // Calculate the percentage increase
-              const percentageIncrease = ((adjustedPrice / product.price - 1) * 100).toFixed(1)
 
               return (
                 <div
@@ -717,46 +660,10 @@ export default function ProductsPage() {
                   <div className="p-4">
                     <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
 
-                    {/* Price with commission info */}
-                    <div className="flex items-baseline gap-2 mt-2">
-                      <p className="text-lg font-bold">
-                        ₹
-                        {product.basePrice
-                          ? calculateAdjustedPrice(product).toLocaleString()
-                          : product.price.toLocaleString()}
-                        /sqft
-                      </p>
-                      {product.basePrice && (
-                        <p className="text-sm text-green-600">
-                          (+{((calculateAdjustedPrice(product) / product.basePrice - 1) * 100).toFixed(1)}%)
-                        </p>
-                      )}
+                    {/* Simplified price display - just the adjusted price */}
+                    <div className="mt-2">
+                      <p className="text-lg font-bold">₹{adjustedPrice.toLocaleString()}/sqft</p>
                     </div>
-
-                    {/* Base price and commission info */}
-                    {product.basePrice && (
-                      <div className="text-sm text-muted-foreground mt-1">
-                        <span className="line-through">₹{product.basePrice.toLocaleString()}/sqft</span>
-                        <span
-                          className={`ml-2 ${overrideCommissionRate !== null ? "text-amber-600 font-medium" : "text-blue-600"}`}
-                        >
-                          Commission:{" "}
-                          {overrideCommissionRate !== null
-                            ? overrideCommissionRate +
-                              (commissionData?.categoryCommissions &&
-                              product.category &&
-                              commissionData.categoryCommissions[product.category]
-                                ? commissionData.categoryCommissions[product.category]
-                                : commissionData?.commissionRate || 10)
-                            : commissionData?.categoryCommissions &&
-                                product.category &&
-                                commissionData.categoryCommissions[product.category]
-                              ? commissionData.categoryCommissions[product.category]
-                              : commissionData?.commissionRate || 10}
-                          %
-                        </span>
-                      </div>
-                    )}
 
                     <p className="text-sm text-muted-foreground mt-1">
                       <span className="font-medium">Category:</span> {product.category}
