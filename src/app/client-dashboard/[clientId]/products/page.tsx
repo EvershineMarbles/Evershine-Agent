@@ -116,10 +116,15 @@ export default function SimpleProductsPage() {
         },
       })
 
+      console.log("Client endpoint response status:", response.status)
+
       if (!response.ok) {
         console.error("Client endpoint failed with status:", response.status)
+        const errorText = await response.text()
+        console.error("Error response:", errorText)
 
         // If client endpoint fails, try the general products endpoint
+        console.log("Trying fallback endpoint:", `${apiUrl}/api/getAllProducts`)
         const fallbackResponse = await fetch(`${apiUrl}/api/getAllProducts`, {
           method: "GET",
           headers: {
@@ -128,12 +133,16 @@ export default function SimpleProductsPage() {
           },
         })
 
+        console.log("Fallback endpoint response status:", fallbackResponse.status)
+
         if (!fallbackResponse.ok) {
+          const fallbackErrorText = await fallbackResponse.text()
+          console.error("Fallback error response:", fallbackErrorText)
           throw new Error(`API request failed with status ${fallbackResponse.status}`)
         }
 
         const fallbackData = await fallbackResponse.json()
-        console.log("Fallback endpoint response:", fallbackData)
+        console.log("Fallback endpoint response data:", fallbackData)
 
         if (fallbackData.success && Array.isArray(fallbackData.data)) {
           setProducts(fallbackData.data)
@@ -145,7 +154,7 @@ export default function SimpleProductsPage() {
       }
 
       const data = await response.json()
-      console.log("Client endpoint response:", data)
+      console.log("Client endpoint response data:", data)
 
       if (data.success && Array.isArray(data.data)) {
         // Process the image URLs to ensure they're valid
@@ -157,6 +166,7 @@ export default function SimpleProductsPage() {
               : ["/elegant-marble-display.png"],
         }))
 
+        console.log(`Processed ${processedProducts.length} products`)
         setProducts(processedProducts)
 
         // If agent info is included in the response, use it
@@ -164,6 +174,7 @@ export default function SimpleProductsPage() {
           setAgentData(data.agentInfo)
         }
       } else {
+        console.error("Invalid API response format:", data)
         throw new Error(data.msg || "Invalid API response format")
       }
     } catch (error: any) {
