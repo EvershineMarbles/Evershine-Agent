@@ -139,21 +139,23 @@ export default function ProductsPage() {
         return product.price
       }
 
-      // Use override rate if set, otherwise use agent's commission rate
-      let rate = overrideCommissionRate !== null ? overrideCommissionRate : commissionData?.commissionRate || 10
+      // Get the default commission rate (from agent or category-specific)
+      let defaultRate = commissionData?.commissionRate || 10
 
-      // Only use category-specific commission if we're not overriding
+      // Check for category-specific commission
       if (
-        overrideCommissionRate === null &&
         commissionData?.categoryCommissions &&
         product.category &&
         commissionData.categoryCommissions[product.category]
       ) {
-        rate = commissionData.categoryCommissions[product.category]
+        defaultRate = commissionData.categoryCommissions[product.category]
       }
 
+      // Add the override rate to the default rate if an override is set
+      const finalRate = overrideCommissionRate !== null ? defaultRate + overrideCommissionRate : defaultRate
+
       // Calculate adjusted price based on the original basePrice
-      const adjustedPrice = product.basePrice * (1 + rate / 100)
+      const adjustedPrice = product.basePrice * (1 + finalRate / 100)
       return Math.round(adjustedPrice * 100) / 100 // Round to 2 decimal places
     },
     [commissionData, overrideCommissionRate],
@@ -611,9 +613,11 @@ export default function ProductsPage() {
               <p className="text-lg font-bold text-green-700">
                 {overrideCommissionRate !== null ? (
                   <>
-                    <span className="text-amber-600">Override Commission Rate: {overrideCommissionRate}%</span>
+                    <span className="text-amber-600">
+                      Total Commission Rate: {(commissionData?.commissionRate || 10) + overrideCommissionRate}%
+                    </span>
                     <span className="text-sm text-gray-500 ml-2">
-                      (Default: {commissionData?.commissionRate || 10}%)
+                      (Base: {commissionData?.commissionRate || 10}% + Additional: {overrideCommissionRate}%)
                     </span>
                   </>
                 ) : (
@@ -738,7 +742,12 @@ export default function ProductsPage() {
                         >
                           Commission:{" "}
                           {overrideCommissionRate !== null
-                            ? overrideCommissionRate
+                            ? overrideCommissionRate +
+                              (commissionData?.categoryCommissions &&
+                              product.category &&
+                              commissionData.categoryCommissions[product.category]
+                                ? commissionData.categoryCommissions[product.category]
+                                : commissionData?.commissionRate || 10)
                             : commissionData?.categoryCommissions &&
                                 product.category &&
                                 commissionData.categoryCommissions[product.category]
