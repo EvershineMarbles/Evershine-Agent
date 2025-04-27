@@ -314,7 +314,7 @@ export default function ProductsPage() {
       product.category.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
-  // Handle image loading errors
+  // Handle image loading error
   const handleImageError = useCallback((productId: string) => {
     setImageError((prev) => ({ ...prev, [productId]: true }))
   }, [])
