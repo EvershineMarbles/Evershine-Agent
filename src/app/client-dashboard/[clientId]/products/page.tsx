@@ -533,19 +533,19 @@ export default function ProductsPage() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setOverrideCommissionRate(5)}
-                className={`w-6 h-6 rounded-full bg-red-500 hover:ring-2 hover:ring-red-300 transition-all ${overrideCommissionRate === 5 ? "ring-2 ring-red-300 scale-110" : ""}`}
+                className={`w-6 h-6 rounded-full bg-red-500 hover:ring-2 hover:ring-red-300 transition-all ${overrideCommissionRate === 5 ? "ring-2 ring-black border-2 border-black scale-110" : ""}`}
                 title="Set 5% additional commission"
                 aria-label="Set 5% additional commission"
               />
               <button
                 onClick={() => setOverrideCommissionRate(10)}
-                className={`w-6 h-6 rounded-full bg-yellow-500 hover:ring-2 hover:ring-yellow-300 transition-all ${overrideCommissionRate === 10 ? "ring-2 ring-yellow-300 scale-110" : ""}`}
+                className={`w-6 h-6 rounded-full bg-yellow-500 hover:ring-2 hover:ring-yellow-300 transition-all ${overrideCommissionRate === 10 ? "ring-2 ring-black border-2 border-black scale-110" : ""}`}
                 title="Set 10% additional commission"
                 aria-label="Set 10% additional commission"
               />
               <button
                 onClick={() => setOverrideCommissionRate(15)}
-                className={`w-6 h-6 rounded-full bg-purple-500 hover:ring-2 hover:ring-purple-300 transition-all ${overrideCommissionRate === 15 ? "ring-2 ring-purple-300 scale-110" : ""}`}
+                className={`w-6 h-6 rounded-full bg-purple-500 hover:ring-2 hover:ring-purple-300 transition-all ${overrideCommissionRate === 15 ? "ring-2 ring-black border-2 border-black scale-110" : ""}`}
                 title="Set 15% additional commission"
                 aria-label="Set 15% additional commission"
               />
