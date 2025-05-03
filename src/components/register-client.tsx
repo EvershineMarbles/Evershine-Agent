@@ -2,20 +2,18 @@
 
 import type React from "react"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Phone, User, Mail, MapPin, Building, Calendar, Loader2, LogOut } from "lucide-react"
-import Link from "next/link"
-import Image from "next/image"
+import { ArrowLeft, Phone, User, Mail, MapPin, Building, Calendar, Loader2 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/components/ui/use-toast"
-import { isAgentAuthenticated, clearAllTokens } from "@/lib/auth-utils"
+import { isAgentAuthenticated } from "@/lib/auth-utils"
 import axios from "axios"
 
 export default function RegisterClient() {
@@ -39,32 +37,10 @@ export default function RegisterClient() {
     agreeToTerms: false,
   })
   const [isLoading, setIsLoading] = useState(false)
-  const [agentEmail, setAgentEmail] = useState<string | null>(null)
-  const [agentName, setAgentName] = useState<string | null>(null)
 
   // OTP state and refs
   const [otp, setOtp] = useState(["", "", "", "", "", ""])
   const otpInputs = useRef<(HTMLInputElement | null)[]>([null, null, null, null, null, null])
-
-  // Get agent info on component mount
-  useEffect(() => {
-    // Fetch agent email from localStorage
-    const email = localStorage.getItem("agentEmail")
-    setAgentEmail(email)
-
-    // Extract name from email (for demo purposes)
-    if (email) {
-      const name = email.split("@")[0]
-      // Capitalize first letter and format name
-      const formattedName = name.charAt(0).toUpperCase() + name.slice(1)
-      setAgentName(formattedName)
-    }
-  }, [])
-
-  const handleLogout = () => {
-    clearAllTokens()
-    router.push("/agent-login")
-  }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -335,408 +311,387 @@ export default function RegisterClient() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Blue strip at the top */}
-      <div className="w-full bg-[#194a95] text-white py-4 px-6">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Image src="/logo2.png" alt="Evershine Logo" width={80} height={30} />
-            <h1 className="text-xl font-semibold">Advisor Dashboard</h1>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm md:text-base">Welcome, {agentName || agentEmail}</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleLogout}
-              className="text-white hover:bg-white/20 hover:text-white"
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Logout</span>
-            </Button>
-          </div>
+    <div className="flex flex-col items-center justify-center">
+      <div className="w-full max-w-xl">
+        <div className="mb-4">
+          <button onClick={() => router.push("/dashboard")} className="p-2 rounded-full hover:bg-gray-100">
+            <ArrowLeft className="h-5 w-5" />
+          </button>
         </div>
-      </div>
 
-      <div className="flex-1 p-4 md:p-6">
-        <div className="max-w-xl mx-auto">
-            <button onClick={() => router.push("/dashboard")} className="p-2 rounded-full hover:bg-gray-100">
-              <ArrowLeft className="h-5 w-5" />
-            </button>
-          {step === "initial" && (
-            <Card className="shadow-sm border">
-              <CardHeader className="space-y-1 border-b pb-4">
-                <CardTitle className="text-2xl text-center text-blue">Register New Client</CardTitle>
-                <CardDescription className="text-center">Enter basic client information</CardDescription>
-              </CardHeader>
+        {step === "initial" && (
+          <Card className="shadow-sm border">
+            <CardHeader className="space-y-1 border-b pb-4">
+              <CardTitle className="text-2xl text-center text-blue">Register New Client</CardTitle>
+              <CardDescription className="text-center">Enter basic client information</CardDescription>
+            </CardHeader>
 
-              <CardContent className="pt-6">
-                <form onSubmit={handleSubmitInitial} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name" className="text-base font-medium">
-                      Client Name
-                    </Label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                      <Input
-                        id="name"
-                        name="name"
-                        placeholder="Enter client name"
-                        value={formData.name}
-                        onChange={handleChange}
-                        className="h-12 pl-10 rounded-md"
-                        required
-                      />
-                    </div>
+            <CardContent className="pt-6">
+              <form onSubmit={handleSubmitInitial} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name" className="text-base font-medium">
+                    Client Name
+                  </Label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <Input
+                      id="name"
+                      name="name"
+                      placeholder="Enter client name"
+                      value={formData.name}
+                      onChange={handleChange}
+                      className="h-12 pl-10 rounded-md"
+                      required
+                    />
                   </div>
+                </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="mobile" className="text-base font-medium">
-                      Mobile Number
-                    </Label>
-                    <div className="relative">
-                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                      <Input
-                        id="mobile"
-                        name="mobile"
-                        placeholder="Enter mobile number"
-                        value={formData.mobile}
-                        onChange={handleChange}
-                        className="h-12 pl-10 rounded-md"
-                        required
-                      />
-                    </div>
+                <div className="space-y-2">
+                  <Label htmlFor="mobile" className="text-base font-medium">
+                    Mobile Number
+                  </Label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <Input
+                      id="mobile"
+                      name="mobile"
+                      placeholder="Enter mobile number"
+                      value={formData.mobile}
+                      onChange={handleChange}
+                      className="h-12 pl-10 rounded-md"
+                      required
+                    />
                   </div>
+                </div>
 
-                  <Button
-                    type="submit"
-                    className="w-full h-12 mt-6 bg-blue hover:bg-blue/90 text-white rounded-md text-base"
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Sending OTP...
-                      </>
-                    ) : (
-                      "Send OTP"
-                    )}
-                  </Button>
-                  {apiError && <div className="mt-4 p-3 bg-red-50 text-red-600 rounded-md text-sm">{apiError}</div>}
-                </form>
-              </CardContent>
-            </Card>
-          )}
+                <Button
+                  type="submit"
+                  className="w-full h-12 mt-6 bg-blue hover:bg-blue/90 text-white rounded-md text-base"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending OTP...
+                    </>
+                  ) : (
+                    "Send OTP"
+                  )}
+                </Button>
+                {apiError && <div className="mt-4 p-3 bg-red-50 text-red-600 rounded-md text-sm">{apiError}</div>}
+              </form>
+            </CardContent>
+          </Card>
+        )}
 
-          {step === "otp" && (
-            <Card className="shadow-sm border">
-              <CardHeader className="space-y-1 border-b pb-4">
-                <CardTitle className="text-2xl text-center text-blue">Verify OTP</CardTitle>
-                <CardDescription className="text-center">Enter the OTP sent to your mobile number</CardDescription>
-              </CardHeader>
+        {step === "otp" && (
+          <Card className="shadow-sm border">
+            <CardHeader className="space-y-1 border-b pb-4">
+              <CardTitle className="text-2xl text-center text-blue">Verify OTP</CardTitle>
+              <CardDescription className="text-center">Enter the OTP sent to your mobile number</CardDescription>
+            </CardHeader>
 
-              <CardContent className="pt-6">
-                <form onSubmit={handleVerifyOTP} className="space-y-4">
-                  <div className="text-center mb-6">
-                    <p className="text-muted-foreground">
-                      We&apos;ve sent a 6-digit OTP to{" "}
-                      <span className="font-medium text-foreground">{formData.mobile}</span>
-                    </p>
-                  </div>
+            <CardContent className="pt-6">
+              <form onSubmit={handleVerifyOTP} className="space-y-4">
+                <div className="text-center mb-6">
+                  <p className="text-muted-foreground">
+                    We&apos;ve sent a 6-digit OTP to{" "}
+                    <span className="font-medium text-foreground">{formData.mobile}</span>
+                  </p>
+                </div>
 
-                  <div className="flex justify-center gap-2">
-                    {otp.map((digit, index) => (
-                      <Input
-                        key={index}
-                        ref={(el) => {
-                          otpInputs.current[index] = el
-                        }}
-                        className="h-14 w-12 text-center text-xl font-bold rounded-md"
-                        value={digit}
-                        onChange={(e) => handleOtpChange(index, e.target.value)}
-                        onKeyDown={(e) => handleOtpKeyDown(index, e)}
-                        maxLength={6} // Allow pasting multiple digits
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        required
-                      />
-                    ))}
-                  </div>
+                <div className="flex justify-center gap-2">
+                  {otp.map((digit, index) => (
+                    <Input
+                      key={index}
+                      ref={(el) => {
+                        otpInputs.current[index] = el
+                      }}
+                      className="h-14 w-12 text-center text-xl font-bold rounded-md"
+                      value={digit}
+                      onChange={(e) => handleOtpChange(index, e.target.value)}
+                      onKeyDown={(e) => handleOtpKeyDown(index, e)}
+                      maxLength={6} // Allow pasting multiple digits
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      required
+                    />
+                  ))}
+                </div>
 
-                  <div className="text-center mt-4">
-                    <p className="text-sm text-muted-foreground">
-                      Didn&apos;t receive OTP?{" "}
-                      <Button
-                        variant="link"
-                        className="p-0 h-auto text-blue"
-                        onClick={async () => {
-                          try {
-                            setIsSubmitting(true)
-                            const response = await axios.post("https://evershinebackend-2.onrender.com/api/otp/send", {
-                              phoneNumber: formattedPhone,
-                            })
+                <div className="text-center mt-4">
+                  <p className="text-sm text-muted-foreground">
+                    Didn&apos;t receive OTP?{" "}
+                    <Button
+                      variant="link"
+                      className="p-0 h-auto text-blue"
+                      onClick={async () => {
+                        try {
+                          setIsSubmitting(true)
+                          const response = await axios.post("https://evershinebackend-2.onrender.com/api/otp/send", {
+                            phoneNumber: formattedPhone,
+                          })
 
-                            if (response.data.success) {
-                              toast({
-                                title: "OTP Resent",
-                                description: "A new verification code has been sent to your mobile number",
-                              })
-                            }
-                          } catch (error: any) {
-                            const errorMessage = error instanceof Error ? error.message : "Failed to resend OTP"
+                          if (response.data.success) {
                             toast({
-                              title: "Error",
-                              description: errorMessage,
-                              variant: "destructive",
+                              title: "OTP Resent",
+                              description: "A new verification code has been sent to your mobile number",
                             })
-                          } finally {
-                            setIsSubmitting(false)
                           }
-                        }}
-                        disabled={isSubmitting}
-                      >
-                        {isSubmitting ? "Sending..." : "Resend"}
-                      </Button>
-                    </p>
-                  </div>
-
-                  <Button
-                    type="submit"
-                    className="w-full h-12 mt-6 bg-blue hover:bg-blue/90 text-white rounded-md text-base"
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Verifying...
-                      </>
-                    ) : (
-                      "Verify OTP"
-                    )}
-                  </Button>
-                  {apiError && <div className="mt-4 p-3 bg-red-50 text-red-600 rounded-md text-sm">{apiError}</div>}
-                </form>
-              </CardContent>
-
-              <CardFooter className="flex justify-center">
-                <Button variant="link" onClick={() => setStep("initial")} className="text-blue">
-                  Back to details
-                </Button>
-              </CardFooter>
-            </Card>
-          )}
-
-          {step === "details" && (
-            <Card className="shadow-sm border">
-              <CardHeader className="space-y-1 border-b pb-4">
-                <CardTitle className="text-2xl text-center text-blue">Client Details</CardTitle>
-                <CardDescription className="text-center">Complete client registration with all details</CardDescription>
-              </CardHeader>
-
-              <CardContent className="pt-6">
-                <form onSubmit={handleSubmitDetails} className="space-y-5">
-                  <div className="space-y-2">
-                    <Label htmlFor="profession" className="text-base font-medium">
-                      Profession
-                    </Label>
-                    <Tabs defaultValue="architect" onValueChange={(value) => handleSelectChange("profession", value)}>
-                      <TabsList className="grid grid-cols-5 w-full">
-                        <TabsTrigger value="architect">Architect</TabsTrigger>
-                        <TabsTrigger value="contractor">Contractor</TabsTrigger>
-                        <TabsTrigger value="builder">Builder</TabsTrigger>
-                        <TabsTrigger value="self_use">Self Use</TabsTrigger>
-                        <TabsTrigger value="other">Other</TabsTrigger>
-                      </TabsList>
-                    </Tabs>
-                  </div>
-
-                  {/* Business Name and GST Number in one row */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="businessName" className="text-base font-medium">
-                        Business Name
-                      </Label>
-                      <div className="relative">
-                        <Building className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                        <Input
-                          id="businessName"
-                          name="businessName"
-                          placeholder="Enter business name"
-                          value={formData.businessName}
-                          onChange={handleChange}
-                          className="h-12 pl-10 rounded-md"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="gstNumber" className="text-base font-medium">
-                        GST Number
-                      </Label>
-                      <Input
-                        id="gstNumber"
-                        name="gstNumber"
-                        placeholder="Enter GST number"
-                        value={formData.gstNumber}
-                        onChange={handleChange}
-                        className="h-12 rounded-md"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Project Type and Email in one row */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="projectType" className="text-base font-medium">
-                        Project Type
-                      </Label>
-                      <Select
-                        value={formData.projectType}
-                        onValueChange={(value) => handleSelectChange("projectType", value)}
-                      >
-                        <SelectTrigger className="h-12 rounded-md">
-                          <SelectValue placeholder="Select project type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="residential">Residential</SelectItem>
-                          <SelectItem value="commercial">Commercial</SelectItem>
-                          <SelectItem value="industrial">Industrial</SelectItem>
-                          <SelectItem value="infrastructure">Infrastructure</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="email" className="text-base font-medium">
-                        Email Address
-                      </Label>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                        <Input
-                          id="email"
-                          name="email"
-                          type="email"
-                          placeholder="Enter email address"
-                          value={formData.email}
-                          onChange={handleChange}
-                          className="h-12 pl-10 rounded-md"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* City and Architect Details in one row */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="city" className="text-base font-medium">
-                        City
-                      </Label>
-                      <div className="relative">
-                        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                        <Input
-                          id="city"
-                          name="city"
-                          placeholder="Enter city"
-                          value={formData.city}
-                          onChange={handleChange}
-                          className="h-12 pl-10 rounded-md"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="architectDetails" className="text-base font-medium">
-                        Architect Details
-                      </Label>
-                      <Input
-                        id="architectDetails"
-                        name="architectDetails"
-                        placeholder="Enter architect details"
-                        value={formData.architectDetails}
-                        onChange={handleChange}
-                        className="h-12 rounded-md"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Date of Birth and Anniversary Date in one row */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="dateOfBirth" className="text-base font-medium">
-                        Date of Birth
-                      </Label>
-                      <div className="relative">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                        <Input
-                          id="dateOfBirth"
-                          name="dateOfBirth"
-                          type="date"
-                          placeholder="Select date of birth"
-                          value={formData.dateOfBirth}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              dateOfBirth: e.target.value,
-                            }))
-                          }
-                          className="h-12 pl-10 rounded-md"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="anniversaryDate" className="text-base font-medium">
-                        Anniversary Date
-                      </Label>
-                      <div className="relative">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                        <Input
-                          id="anniversaryDate"
-                          name="anniversaryDate"
-                          type="date"
-                          placeholder="Select anniversary date"
-                          value={formData.anniversaryDate}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              anniversaryDate: e.target.value,
-                            }))
-                          }
-                          className="h-12 pl-10 rounded-md"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center space-x-2 mt-4">
-                    <Checkbox id="terms" checked={formData.agreeToTerms} onCheckedChange={handleCheckboxChange} />
-                    <label
-                      htmlFor="terms"
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        } catch (error: any) {
+                          const errorMessage = error instanceof Error ? error.message : "Failed to resend OTP"
+                          toast({
+                            title: "Error",
+                            description: errorMessage,
+                            variant: "destructive",
+                          })
+                        } finally {
+                          setIsSubmitting(false)
+                        }
+                      }}
+                      disabled={isSubmitting}
                     >
-                      I agree to the terms and conditions
-                    </label>
+                      {isSubmitting ? "Sending..." : "Resend"}
+                    </Button>
+                  </p>
+                </div>
+
+                <Button
+                  type="submit"
+                  className="w-full h-12 mt-6 bg-blue hover:bg-blue/90 text-white rounded-md text-base"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Verifying...
+                    </>
+                  ) : (
+                    "Verify OTP"
+                  )}
+                </Button>
+                {apiError && <div className="mt-4 p-3 bg-red-50 text-red-600 rounded-md text-sm">{apiError}</div>}
+              </form>
+            </CardContent>
+
+            <CardFooter className="flex justify-center">
+              <Button variant="link" onClick={() => setStep("initial")} className="text-blue">
+                Back to details
+              </Button>
+            </CardFooter>
+          </Card>
+        )}
+
+        {step === "details" && (
+          <Card className="shadow-sm border">
+            <CardHeader className="space-y-1 border-b pb-4">
+              <CardTitle className="text-2xl text-center text-blue">Client Details</CardTitle>
+              <CardDescription className="text-center">Complete client registration with all details</CardDescription>
+            </CardHeader>
+
+            <CardContent className="pt-6">
+              <form onSubmit={handleSubmitDetails} className="space-y-5">
+                <div className="space-y-2">
+                  <Label htmlFor="profession" className="text-base font-medium">
+                    Profession
+                  </Label>
+                  <Tabs defaultValue="architect" onValueChange={(value) => handleSelectChange("profession", value)}>
+                    <TabsList className="grid grid-cols-5 w-full">
+                      <TabsTrigger value="architect">Architect</TabsTrigger>
+                      <TabsTrigger value="contractor">Contractor</TabsTrigger>
+                      <TabsTrigger value="builder">Builder</TabsTrigger>
+                      <TabsTrigger value="self_use">Self Use</TabsTrigger>
+                      <TabsTrigger value="other">Other</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </div>
+
+                {/* Business Name and GST Number in one row */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="businessName" className="text-base font-medium">
+                      Business Name
+                    </Label>
+                    <div className="relative">
+                      <Building className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                      <Input
+                        id="businessName"
+                        name="businessName"
+                        placeholder="Enter business name"
+                        value={formData.businessName}
+                        onChange={handleChange}
+                        className="h-12 pl-10 rounded-md"
+                      />
+                    </div>
                   </div>
 
-                  <Button
-                    type="submit"
-                    className="w-full h-12 mt-6 bg-blue hover:bg-blue/90 text-white rounded-md text-base"
-                    disabled={!formData.agreeToTerms || isLoading}
-                  >
-                    {isLoading ? "Creating Client..." : "Complete Registration"}
-                  </Button>
-                </form>
-              </CardContent>
+                  <div className="space-y-2">
+                    <Label htmlFor="gstNumber" className="text-base font-medium">
+                      GST Number
+                    </Label>
+                    <Input
+                      id="gstNumber"
+                      name="gstNumber"
+                      placeholder="Enter GST number"
+                      value={formData.gstNumber}
+                      onChange={handleChange}
+                      className="h-12 rounded-md"
+                    />
+                  </div>
+                </div>
 
-              <CardFooter className="flex justify-center">
-                <Button variant="link" onClick={() => setStep("otp")} className="text-blue">
-                  Back to OTP verification
+                {/* Project Type and Email in one row */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="projectType" className="text-base font-medium">
+                      Project Type
+                    </Label>
+                    <Select
+                      value={formData.projectType}
+                      onValueChange={(value) => handleSelectChange("projectType", value)}
+                    >
+                      <SelectTrigger className="h-12 rounded-md">
+                        <SelectValue placeholder="Select project type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="residential">Residential</SelectItem>
+                        <SelectItem value="commercial">Commercial</SelectItem>
+                        <SelectItem value="industrial">Industrial</SelectItem>
+                        <SelectItem value="infrastructure">Infrastructure</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="text-base font-medium">
+                      Email Address
+                    </Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                      <Input
+                        id="email"
+                        name="email"
+                        type="email"
+                        placeholder="Enter email address"
+                        value={formData.email}
+                        onChange={handleChange}
+                        className="h-12 pl-10 rounded-md"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* City and Architect Details in one row */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="city" className="text-base font-medium">
+                      City
+                    </Label>
+                    <div className="relative">
+                      <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                      <Input
+                        id="city"
+                        name="city"
+                        placeholder="Enter city"
+                        value={formData.city}
+                        onChange={handleChange}
+                        className="h-12 pl-10 rounded-md"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="architectDetails" className="text-base font-medium">
+                      Architect Details
+                    </Label>
+                    <Input
+                      id="architectDetails"
+                      name="architectDetails"
+                      placeholder="Enter architect details"
+                      value={formData.architectDetails}
+                      onChange={handleChange}
+                      className="h-12 rounded-md"
+                    />
+                  </div>
+                </div>
+
+                {/* Date of Birth and Anniversary Date in one row */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="dateOfBirth" className="text-base font-medium">
+                      Date of Birth
+                    </Label>
+                    <div className="relative">
+                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                      <Input
+                        id="dateOfBirth"
+                        name="dateOfBirth"
+                        type="date"
+                        placeholder="Select date of birth"
+                        value={formData.dateOfBirth}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            dateOfBirth: e.target.value,
+                          }))
+                        }
+                        className="h-12 pl-10 rounded-md"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="anniversaryDate" className="text-base font-medium">
+                      Anniversary Date
+                    </Label>
+                    <div className="relative">
+                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                      <Input
+                        id="anniversaryDate"
+                        name="anniversaryDate"
+                        type="date"
+                        placeholder="Select anniversary date"
+                        value={formData.anniversaryDate}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            anniversaryDate: e.target.value,
+                          }))
+                        }
+                        className="h-12 pl-10 rounded-md"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-2 mt-4">
+                  <Checkbox id="terms" checked={formData.agreeToTerms} onCheckedChange={handleCheckboxChange} />
+                  <label
+                    htmlFor="terms"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    I agree to the terms and conditions
+                  </label>
+                </div>
+
+                <Button
+                  type="submit"
+                  className="w-full h-12 mt-6 bg-blue hover:bg-blue/90 text-white rounded-md text-base"
+                  disabled={!formData.agreeToTerms || isLoading}
+                >
+                  {isLoading ? "Creating Client..." : "Complete Registration"}
                 </Button>
-              </CardFooter>
-            </Card>
-          )}
-        </div>
+              </form>
+            </CardContent>
+
+            <CardFooter className="flex justify-center">
+              <Button variant="link" onClick={() => setStep("otp")} className="text-blue">
+                Back to OTP verification
+              </Button>
+            </CardFooter>
+          </Card>
+        )}
       </div>
     </div>
   )

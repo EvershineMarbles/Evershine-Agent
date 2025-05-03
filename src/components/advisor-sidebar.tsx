@@ -28,7 +28,7 @@ export function AdvisorSidebar() {
     },
     {
       name: "Scan QR",
-      href: "/scan-qr",
+      href: "/dashboard/scan-qr",
       icon: QrCode,
     },
   ]
