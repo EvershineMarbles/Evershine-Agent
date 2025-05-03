@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Home, Users, Package, LogOut, UserCog } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import Image from "next/image"
 
 export function AdvisorSidebar() {
   const pathname = usePathname()
@@ -35,7 +36,7 @@ export function AdvisorSidebar() {
   return (
     <div className="fixed top-0 left-0 h-screen w-16 flex flex-col bg-dark text-white shadow-lg">
       <div className="sidebar-icon mt-4">
-        <span className="text-xl font-bold">A</span>
+      <Image src="/logo2.png" alt="Evershine Logo" width={40} height={20} />
       </div>
 
       <hr className="sidebar-hr my-2" />
