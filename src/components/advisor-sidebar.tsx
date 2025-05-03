@@ -13,22 +13,22 @@ export function AdvisorSidebar() {
   const routes = [
     {
       name: "Dashboard",
-      href: "/admin/dashboard",
+      href: "/dashboard",
       icon: Home,
     },
     {
-      name: "Advisors",
-      href: "/admin/dashboard/agents",
-      icon: UserCog,
-    },
-    {
-      name: "Clients",
-      href: "/admin/dashboard/all-clients",
+      name: " Register A Client",
+      href: "/register-client",
       icon: Users,
     },
     {
-      name: "Products",
-      href: "/admin/dashboard/products",
+      name: "Client List",
+      href: "/client-list",
+      icon: UserCog,
+    },
+    {
+      name: "Scan QR",
+      href: "/scan-qr",
       icon: Package,
     },
   ]
