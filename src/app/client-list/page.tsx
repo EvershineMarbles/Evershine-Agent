@@ -149,7 +149,7 @@ export default function ClientList() {
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Image src="/logo2.png" alt="Evershine Logo" width={80} height={40} />
-            <h1 className="text-xl font-semibold">Agent Dashboard</h1>
+            <h1 className="text-xl font-semibold">Advisor Dashboard</h1>
           </div>
           <div className="flex items-center gap-4">
             <span className="text-sm md:text-base">Welcome, {agentName || agentEmail}</span>
