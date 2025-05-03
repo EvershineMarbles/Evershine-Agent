@@ -9,7 +9,7 @@ import { Users, Package, Bell, LogOut, UserPlus, Loader2, QrCode, List } from "l
 import { agentAPI } from "@/lib/api-utils"
 import { isAgentAuthenticated, clearAllTokens } from "@/lib/auth-utils"
 import { useToast } from "@/components/ui/use-toast"
-import { AdvisorSidebar } from "@/components/ui/advisor-sidebar"
+import { AdvisorSidebar } from "@/components/advisor-sidebar"
 
 // Define client interface
 interface Client {
