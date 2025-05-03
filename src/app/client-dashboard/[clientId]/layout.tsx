@@ -3,7 +3,7 @@
 import React from "react"
 import { IconSidebar } from "@/components/icon-sidebar"
 import Link from "next/link"
-import { Heart, ShoppingCart, User, LogOut, ArrowLeft } from "lucide-react"
+import { ArrowLeft } from "lucide-react"
 
 // Define the type for the unwrapped params
 type ClientParams = {
@@ -24,6 +24,8 @@ export default function ClientDashboardLayout({
   // State for wishlist and cart counts
   const [wishlistCount, setWishlistCount] = React.useState(0)
   const [cartCount, setCartCount] = React.useState(0)
+  // Agent name - in a real app, this would come from an API or context
+  const [agentName, setAgentName] = React.useState("Evershine Agent")
 
   // Load wishlist and cart counts from localStorage
   React.useEffect(() => {
@@ -38,6 +40,13 @@ export default function ClientDashboardLayout({
         if (savedCart) {
           setCartCount(JSON.parse(savedCart).length)
         }
+
+        // In a real app, you would fetch the agent name from an API
+        // For now, we'll use a placeholder or try to get it from localStorage
+        const agent = localStorage.getItem("agentName")
+        if (agent) {
+          setAgentName(agent)
+        }
       } catch (e) {
         console.error("Error loading data from localStorage:", e)
       }
@@ -49,11 +58,13 @@ export default function ClientDashboardLayout({
       {/* Top Navigation Strip */}
       <div className="w-full bg-[#194a95] text-white py-3 px-4 md:px-8 shadow-md z-0">
         <div className="ml-16 flex items-center justify-between">
-        <Link href="/dashboard" className="flex items-center gap-2">
-        <ArrowLeft className="h-5 w-5" />
-        <span className="font-medium hidden sm:inline">Back to Advisor Dashboard</span>
-      </Link>
-     
+          <div className="flex items-center space-x-6">
+            <span className="font-semibold text-lg">{agentName}</span>
+            <Link href="/dashboard" className="flex items-center gap-2">
+              <ArrowLeft className="h-5 w-5" />
+              <span className="font-medium hidden sm:inline">Back to Advisor Dashboard</span>
+            </Link>
+          </div>
         </div>
       </div>
 
