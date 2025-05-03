@@ -3,7 +3,8 @@
 import React from "react"
 import { IconSidebar } from "@/components/icon-sidebar"
 import Link from "next/link"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, LogOut } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 // Define the type for the unwrapped params
 type ClientParams = {
@@ -24,10 +25,11 @@ export default function ClientDashboardLayout({
   // State for wishlist and cart counts
   const [wishlistCount, setWishlistCount] = React.useState(0)
   const [cartCount, setCartCount] = React.useState(0)
-  // Agent name - in a real app, this would come from an API or context
-  const [agentName, setAgentName] = React.useState("Evershine Agent")
+  // State for agent name
+  const [agentName, setAgentName] = React.useState<string | null>(null)
+  const [agentEmail, setAgentEmail] = React.useState<string | null>(null)
 
-  // Load wishlist and cart counts from localStorage
+  // Load wishlist, cart counts, and agent info from localStorage
   React.useEffect(() => {
     if (typeof window !== "undefined") {
       try {
@@ -41,11 +43,16 @@ export default function ClientDashboardLayout({
           setCartCount(JSON.parse(savedCart).length)
         }
 
-        // In a real app, you would fetch the agent name from an API
-        // For now, we'll use a placeholder or try to get it from localStorage
-        const agent = localStorage.getItem("agentName")
-        if (agent) {
-          setAgentName(agent)
+        // Get agent email from localStorage
+        const email = localStorage.getItem("agentEmail")
+        setAgentEmail(email)
+
+        // Extract name from email (similar to code 2)
+        if (email) {
+          const name = email.split("@")[0]
+          // Capitalize first letter and format name
+          const formattedName = name.charAt(0).toUpperCase() + name.slice(1)
+          setAgentName(formattedName)
         }
       } catch (e) {
         console.error("Error loading data from localStorage:", e)
@@ -53,17 +60,37 @@ export default function ClientDashboardLayout({
     }
   }, [])
 
+  const handleLogout = () => {
+    // Clear tokens and redirect to login
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("agentToken")
+      localStorage.removeItem("agentEmail")
+      window.location.href = "/agent-login"
+    }
+  }
+
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       {/* Top Navigation Strip */}
       <div className="w-full bg-[#194a95] text-white py-3 px-4 md:px-8 shadow-md z-0">
         <div className="ml-16 flex items-center justify-between">
-          <div className="flex items-center space-x-6">
-            <span className="font-semibold text-lg">{agentName}</span>
-            <Link href="/dashboard" className="flex items-center gap-2">
-              <ArrowLeft className="h-5 w-5" />
-              <span className="font-medium hidden sm:inline">Back to Advisor Dashboard</span>
-            </Link>
+          <Link href="/dashboard" className="flex items-center gap-2">
+            <ArrowLeft className="h-5 w-5" />
+            <span className="font-medium hidden sm:inline">Back to Advisor Dashboard</span>
+          </Link>
+
+          {/* Agent name on the right side */}
+          <div className="flex items-center gap-4">
+            <span className="text-sm md:text-base">Welcome, {agentName || agentEmail}</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLogout}
+              className="text-white hover:bg-white/20 hover:text-white"
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Logout</span>
+            </Button>
           </div>
         </div>
       </div>
