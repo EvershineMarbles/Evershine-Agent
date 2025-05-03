@@ -23,7 +23,7 @@ export function AdvisorSidebar() {
     },
     {
       name: "Client List",
-      href: "/client-list",
+      href: "/dashboard/client-list",
       icon: UserCog,
     },
     {
