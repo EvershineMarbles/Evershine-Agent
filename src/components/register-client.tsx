@@ -360,9 +360,9 @@ export default function RegisterClient() {
 
       <div className="flex-1 p-4 md:p-6">
         <div className="max-w-xl mx-auto">
-        <Link href="/dashboard" className="flex items-center mr-2">
-              <ArrowLeft className="h-5 w-5 cursor-pointer hover:text-gray-200" />
-            </Link>
+            <button onClick={() => router.push("/dashboard")} className="p-2 rounded-full hover:bg-gray-100">
+              <ArrowLeft className="h-5 w-5" />
+            </button>
           {step === "initial" && (
             <Card className="shadow-sm border">
               <CardHeader className="space-y-1 border-b pb-4">

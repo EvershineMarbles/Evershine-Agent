@@ -2,13 +2,16 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Users, Package, Bell, LogOut, UserPlus, Loader2, QrCode, List } from "lucide-react"
+import { Users, Package, Bell, LogOut, UserPlus, Loader2, QrCode, List, Home } from "lucide-react"
 import { agentAPI } from "@/lib/api-utils"
 import { isAgentAuthenticated, clearAllTokens } from "@/lib/auth-utils"
 import { useToast } from "@/components/ui/use-toast"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { cn } from "@/lib/utils"
 
 // Define client interface
 interface Client {
@@ -28,6 +31,36 @@ export default function Dashboard() {
   const [agentName, setAgentName] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [clients, setClients] = useState<Client[]>([])
+  const pathname = "/dashboard" // Current path
+
+  // Sidebar routes
+  const routes = [
+    {
+      name: "Dashboard",
+      href: "/dashboard",
+      icon: Home,
+    },
+    {
+      name: "Register Client",
+      href: "/register-client",
+      icon: UserPlus,
+    },
+    {
+      name: "Client List",
+      href: "/client-list",
+      icon: Users,
+    },
+    {
+      name: "Scan QR",
+      href: "/scan-qr",
+      icon: QrCode,
+    },
+    {
+      name: "Active Orders",
+      href: "/reminders",
+      icon: Package,
+    },
+  ]
 
   // Wrap fetchClients in useCallback to prevent it from being recreated on every render
   const fetchClients = useCallback(async () => {
@@ -96,93 +129,142 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Blue strip at the top */}
-      <div className="w-full bg-[#194a95] text-white py-4 px-6">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Image src="/logo2.png" alt="Evershine Logo" width={80} height={30} />
-            <h1 className="text-xl font-semibold">Advisor Dashboard</h1>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm md:text-base">Welcome, {agentName || agentEmail}</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleLogout}
-              className="text-white hover:bg-white/20 hover:text-white"
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              <span>Logout</span>
-            </Button>
-          </div>
+    <div className="min-h-screen bg-gray-50 flex">
+      {/* Sidebar */}
+      <div className="fixed top-0 left-0 h-screen w-16 flex flex-col bg-[#194a95] text-white shadow-lg z-10">
+        <div className="sidebar-icon mt-4">
+          <span className="text-xl font-bold">E</span>
+        </div>
+
+        <hr className="sidebar-hr my-2 border-white/20" />
+
+        <TooltipProvider>
+          {routes.map((route) => (
+            <Tooltip key={route.href}>
+              <TooltipTrigger asChild>
+                <Link
+                  href={route.href}
+                  className={cn(
+                    "sidebar-icon group flex h-12 w-12 mx-auto my-2 items-center justify-center rounded-md transition-all hover:bg-white/20",
+                    pathname === route.href || pathname.startsWith(route.href + "/")
+                      ? "bg-white/30 text-white"
+                      : "text-white/80",
+                  )}
+                >
+                  <route.icon size={24} />
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent side="right">{route.name}</TooltipContent>
+            </Tooltip>
+          ))}
+        </TooltipProvider>
+
+        <div className="mt-auto mb-4">
+          <hr className="sidebar-hr my-2 border-white/20" />
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={handleLogout}
+                  className="sidebar-icon group flex h-12 w-12 mx-auto my-2 items-center justify-center rounded-md transition-all hover:bg-white/20 text-white/80"
+                >
+                  <LogOut size={24} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Logout</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </div>
 
-      <main className="container mx-auto py-6 px-4 flex-1">
-        <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-          <Card className="border rounded-lg overflow-hidden">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3">
-                <Users className="h-5 w-5 text-[#194a95]" />
-                <span className="text-gray-600 font-medium">Total Clients</span>
-              </div>
-              <p className="text-3xl font-bold mt-2">{clients.length}</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border rounded-lg overflow-hidden">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3">
-                <Package className="h-5 w-5 text-[#194a95]" />
-                <span className="text-gray-600 font-medium">Active Orders</span>
-              </div>
-              <p className="text-3xl font-bold mt-2">12</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border rounded-lg overflow-hidden">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3">
-                <Bell className="h-5 w-5 text-[#194a95]" />
-                <span className="text-gray-600 font-medium">Pending Reminders</span>
-              </div>
-              <p className="text-3xl font-bold mt-2">8</p>
-            </CardContent>
-          </Card>
+      {/* Main Content */}
+      <div className="flex-1 ml-16 flex flex-col">
+        {/* Blue strip at the top */}
+        <div className="w-full bg-[#194a95] text-white py-4 px-6">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Image src="/logo2.png" alt="Evershine Logo" width={80} height={30} />
+              <h1 className="text-xl font-semibold">Advisor Dashboard</h1>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="text-sm md:text-base">Welcome, {agentName || agentEmail}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleLogout}
+                className="text-white hover:bg-white/20 hover:text-white"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Logout</span>
+              </Button>
+            </div>
+          </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <main className="container mx-auto py-6 px-4 flex-1">
+          <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
 
-          <button
-            className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg"
-            onClick={() => router.push("/register-client")}
-          >
-            <UserPlus className="h-6 w-6" />
-            <span className="text-base font-medium">Register a New Client</span>
-          </button>
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            <Card className="border rounded-lg overflow-hidden">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3">
+                  <Users className="h-5 w-5 text-[#194a95]" />
+                  <span className="text-gray-600 font-medium">Total Clients</span>
+                </div>
+                <p className="text-3xl font-bold mt-2">{clients.length}</p>
+              </CardContent>
+            </Card>
 
-          <button
-            className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg"
-            onClick={() => router.push("/client-list")}
-          >
-            <List className="h-6 w-6" />
-            <span className="text-base font-medium">Client List</span>
-          </button>
+            <Card className="border rounded-lg overflow-hidden">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3">
+                  <Package className="h-5 w-5 text-[#194a95]" />
+                  <span className="text-gray-600 font-medium">Active Orders</span>
+                </div>
+                <p className="text-3xl font-bold mt-2">12</p>
+              </CardContent>
+            </Card>
 
-          <button
-            className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg"
-            onClick={() => router.push("/scan-qr")}
-          >
-            <QrCode className="h-6 w-6" />
-            <span className="text-base font-medium">Scan QR</span>
-          </button>
-        </div>
-      </main>
+            <Card className="border rounded-lg overflow-hidden">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3">
+                  <Bell className="h-5 w-5 text-[#194a95]" />
+                  <span className="text-gray-600 font-medium">Pending Reminders</span>
+                </div>
+                <p className="text-3xl font-bold mt-2">8</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <button
+              className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg"
+              onClick={() => router.push("/register-client")}
+            >
+              <UserPlus className="h-6 w-6" />
+              <span className="text-base font-medium">Register a New Client</span>
+            </button>
+
+            <button
+              className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg"
+              onClick={() => router.push("/client-list")}
+            >
+              <List className="h-6 w-6" />
+              <span className="text-base font-medium">Client List</span>
+            </button>
+
+            <button
+              className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg"
+              onClick={() => router.push("/scan-qr")}
+            >
+              <QrCode className="h-6 w-6" />
+              <span className="text-base font-medium">Scan QR</span>
+            </button>
+          </div>
+        </main>
+      </div>
     </div>
   )
 }
