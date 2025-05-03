@@ -2,15 +2,14 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Users, Package, Bell, Settings, LogOut, UserPlus, Loader2 } from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
+import { Users, Package, Bell, LogOut, UserPlus, Loader2, QrCode, List } from "lucide-react"
 import { agentAPI } from "@/lib/api-utils"
-import { isAgentAuthenticated, storeClientImpersonationToken, clearAllTokens } from "@/lib/auth-utils"
+import { isAgentAuthenticated, clearAllTokens } from "@/lib/auth-utils"
 import { useToast } from "@/components/ui/use-toast"
-import { AdvisorSidebar } from "@/components/advisor-sidebar"
+import { AdvisorSidebar } from "@/components/ui/advisor-sidebar"
 
 // Define client interface
 interface Client {
@@ -27,9 +26,9 @@ export default function Dashboard() {
   const router = useRouter()
   const { toast } = useToast()
   const [agentEmail, setAgentEmail] = useState<string | null>(null)
+  const [agentName, setAgentName] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [clients, setClients] = useState<Client[]>([])
-  const [showDebug, setShowDebug] = useState(false)
 
   // Wrap fetchClients in useCallback to prevent it from being recreated on every render
   const fetchClients = useCallback(async () => {
@@ -71,46 +70,21 @@ export default function Dashboard() {
     const email = localStorage.getItem("agentEmail")
     setAgentEmail(email)
 
+    // Extract name from email (for demo purposes)
+    if (email) {
+      const name = email.split("@")[0]
+      // Capitalize first letter and format name
+      const formattedName = name.charAt(0).toUpperCase() + name.slice(1)
+      setAgentName(formattedName)
+    }
+
     // Fetch clients
     fetchClients()
   }, [router, fetchClients]) // Add fetchClients to the dependency array
 
-  const handleClientSelect = async (clientId: string) => {
-    try {
-      console.log("Attempting to impersonate client:", clientId)
-      const response = await agentAPI.impersonateClient(clientId)
-      console.log("Impersonation response:", response)
-
-      if (response.success && response.data && response.data.impersonationToken) {
-        // Store the impersonation token
-        storeClientImpersonationToken(clientId, response.data.impersonationToken)
-        console.log("Impersonation token stored, redirecting to client dashboard")
-
-        // Add a small delay to ensure token is stored before navigation
-        setTimeout(() => {
-          router.push(`/client-dashboard/${clientId}`)
-        }, 100)
-      } else {
-        console.error("Failed to get impersonation token:", response)
-        toast({
-          title: "Error",
-          description: response.message || "Failed to access client dashboard",
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      console.error("Error impersonating client:", error)
-      toast({
-        title: "Error",
-        description: "Failed to access client dashboard. Please try again.",
-        variant: "destructive",
-      })
-    }
-  }
-
   const handleLogout = () => {
     clearAllTokens()
-    router.push("/")
+    router.push("/agent-login")
   }
 
   if (isLoading && clients.length === 0) {
@@ -123,7 +97,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Add the sidebar */}
       <AdvisorSidebar />
 
@@ -131,145 +105,89 @@ export default function Dashboard() {
       <div className="ml-16">
         {" "}
         {/* This margin matches the sidebar width */}
-        <header className="bg-white border-b p-4">
-          <div className="container mx-auto flex justify-between items-center">
-            <div className="flex items-center">
-              <Link href="https://evershine-agent.vercel.app/agent-login" className="mr-4">
-                <ArrowLeft className="h-5 w-5" />
-              </Link>
-              <Image src="/logo.png" alt="Evershine Logo" width={120} height={60} />
+        {/* Blue strip at the top */}
+        <div className="w-full bg-[#194a95] text-white py-4 px-6">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Image src="/logo2.png" alt="Evershine Logo" width={80} height={40} />
+              <h1 className="text-xl font-semibold">Agent Dashboard</h1>
             </div>
             <div className="flex items-center gap-4">
-              <span className="text-sm text-muted-foreground">Welcome, {agentEmail}</span>
-              <Button variant="outline" size="sm" onClick={() => setShowDebug(!showDebug)}>
-                {showDebug ? "Hide Debug" : "Show Debug"}
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleLogout}>
+              <span className="text-sm md:text-base">Welcome, {agentName || agentEmail}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleLogout}
+                className="text-white hover:bg-white/20 hover:text-white"
+              >
                 <LogOut className="h-4 w-4 mr-2" />
-                Logout
+                <span>Logout</span>
               </Button>
             </div>
           </div>
-        </header>
-        <main className="container mx-auto py-8 px-4">
-          <div className="flex justify-between items-center mb-8">
-            <h1 className="text-3xl font-bold">Agent Dashboard</h1>
-            <Link href="/register-client">
-              <Button className="bg-coral hover:bg-coral/90">
-                <UserPlus className="h-4 w-4 mr-2" />
-                Create Client
-              </Button>
-            </Link>
-          </div>
+        </div>
+        <main className="container mx-auto py-6 px-4 flex-1">
+          <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg flex items-center">
-                  <Users className="h-5 w-5 mr-2 text-blue" />
-                  Total Clients
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold">{clients.length}</p>
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            <Card className="border rounded-lg overflow-hidden">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3">
+                  <Users className="h-5 w-5 text-[#194a95]" />
+                  <span className="text-gray-600 font-medium">Total Clients</span>
+                </div>
+                <p className="text-3xl font-bold mt-2">{clients.length}</p>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg flex items-center">
-                  <Package className="h-5 w-5 mr-2 text-blue" />
-                  Active Orders
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold">12</p>
+            <Card className="border rounded-lg overflow-hidden">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3">
+                  <Package className="h-5 w-5 text-[#194a95]" />
+                  <span className="text-gray-600 font-medium">Active Orders</span>
+                </div>
+                <p className="text-3xl font-bold mt-2">12</p>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg flex items-center">
-                  <Bell className="h-5 w-5 mr-2 text-blue" />
-                  Pending Reminders
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold">8</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg flex items-center">
-                  <Settings className="h-5 w-5 mr-2 text-blue" />
-                  Settings
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Button variant="outline" size="sm" className="w-full">
-                  Manage Account
-                </Button>
+            <Card className="border rounded-lg overflow-hidden">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3">
+                  <Bell className="h-5 w-5 text-[#194a95]" />
+                  <span className="text-gray-600 font-medium">Pending Reminders</span>
+                </div>
+                <p className="text-3xl font-bold mt-2">8</p>
               </CardContent>
             </Card>
           </div>
 
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Users className="h-5 w-5 mr-2" />
-                Client List
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="flex justify-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin" />
-                </div>
-              ) : clients.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-3 px-4">Name</th>
-                        <th className="text-left py-3 px-4">Mobile</th>
-                        <th className="text-left py-3 px-4">Profession</th>
-                        <th className="text-left py-3 px-4">City</th>
-                        <th className="text-center py-3 px-4">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {clients.map((client) => (
-                        <tr key={client._id || client.clientId} className="border-b hover:bg-gray-50">
-                          <td className="py-3 px-4">{client.name}</td>
-                          <td className="py-3 px-4">{client.mobile}</td>
-                          <td className="py-3 px-4">{client.profession || "-"}</td>
-                          <td className="py-3 px-4">{client.city || "-"}</td>
-                          <td className="py-3 px-4 flex justify-center gap-2">
-                            <Button
-                              variant="default"
-                              size="sm"
-                              className="bg-blue hover:bg-blue/90 text-white"
-                              onClick={() => handleClientSelect(client.clientId)}
-                            >
-                              Access Dashboard
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground mb-4">No clients found</p>
-                  <Link href="/register-client">
-                    <Button className="bg-blue hover:bg-blue/90">Create Your First Client</Button>
-                  </Link>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          {/* Action Buttons */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <button
+              className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg"
+              onClick={() => router.push("/register-client")}
+            >
+              <UserPlus className="h-6 w-6" />
+              <span className="text-base font-medium">Register a New Client</span>
+            </button>
+
+            <button
+              className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg"
+              onClick={() => router.push("/client-list")}
+            >
+              <List className="h-6 w-6" />
+              <span className="text-base font-medium">Client List</span>
+            </button>
+
+            <button
+              className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg"
+              onClick={() => router.push("/scan-qr")}
+            >
+              <QrCode className="h-6 w-6" />
+              <span className="text-base font-medium">Scan QR</span>
+            </button>
+          </div>
         </main>
       </div>
     </div>
