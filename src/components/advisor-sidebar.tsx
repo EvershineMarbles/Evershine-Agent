@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Home, Users, Package, LogOut, UserCog } from "lucide-react"
+import { Home, Users, QrCode, LogOut, UserCog } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import Image from "next/image"
 
@@ -29,7 +29,7 @@ export function AdvisorSidebar() {
     {
       name: "Scan QR",
       href: "/scan-qr",
-      icon: Package,
+      icon: QrCode,
     },
   ]
 
