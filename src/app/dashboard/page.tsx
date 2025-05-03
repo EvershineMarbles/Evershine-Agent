@@ -2,16 +2,14 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Users, Package, Bell, LogOut, UserPlus, Loader2, QrCode, List, Home } from "lucide-react"
+import { Users, Package, Bell, LogOut, UserPlus, Loader2, QrCode, List } from "lucide-react"
 import { agentAPI } from "@/lib/api-utils"
 import { isAgentAuthenticated, clearAllTokens } from "@/lib/auth-utils"
 import { useToast } from "@/components/ui/use-toast"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { cn } from "@/lib/utils"
+import { AdvisorSidebar } from "@/components/advisor-sidebar"
 
 // Define client interface
 interface Client {
@@ -31,36 +29,6 @@ export default function Dashboard() {
   const [agentName, setAgentName] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [clients, setClients] = useState<Client[]>([])
-  const pathname = "/dashboard" // Current path
-
-  // Sidebar routes
-  const routes = [
-    {
-      name: "Dashboard",
-      href: "/dashboard",
-      icon: Home,
-    },
-    {
-      name: "Register Client",
-      href: "/register-client",
-      icon: UserPlus,
-    },
-    {
-      name: "Client List",
-      href: "/client-list",
-      icon: Users,
-    },
-    {
-      name: "Scan QR",
-      href: "/scan-qr",
-      icon: QrCode,
-    },
-    {
-      name: "Active Orders",
-      href: "/reminders",
-      icon: Package,
-    },
-  ]
 
   // Wrap fetchClients in useCallback to prevent it from being recreated on every render
   const fetchClients = useCallback(async () => {
@@ -130,55 +98,9 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      {/* Sidebar */}
-      <div className="fixed top-0 left-0 h-screen w-16 flex flex-col bg-[#194a95] text-white shadow-lg z-10">
-        <div className="sidebar-icon mt-4">
-          <span className="text-xl font-bold">E</span>
-        </div>
+      <AdvisorSidebar />
 
-        <hr className="sidebar-hr my-2 border-white/20" />
-
-        <TooltipProvider>
-          {routes.map((route) => (
-            <Tooltip key={route.href}>
-              <TooltipTrigger asChild>
-                <Link
-                  href={route.href}
-                  className={cn(
-                    "sidebar-icon group flex h-12 w-12 mx-auto my-2 items-center justify-center rounded-md transition-all hover:bg-white/20",
-                    pathname === route.href || pathname.startsWith(route.href + "/")
-                      ? "bg-white/30 text-white"
-                      : "text-white/80",
-                  )}
-                >
-                  <route.icon size={24} />
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent side="right">{route.name}</TooltipContent>
-            </Tooltip>
-          ))}
-        </TooltipProvider>
-
-        <div className="mt-auto mb-4">
-          <hr className="sidebar-hr my-2 border-white/20" />
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={handleLogout}
-                  className="sidebar-icon group flex h-12 w-12 mx-auto my-2 items-center justify-center rounded-md transition-all hover:bg-white/20 text-white/80"
-                >
-                  <LogOut size={24} />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="right">Logout</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 ml-16 flex flex-col">
+      <div className="flex-1 flex flex-col">
         {/* Blue strip at the top */}
         <div className="w-full bg-[#194a95] text-white py-4 px-6">
           <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -195,7 +117,7 @@ export default function Dashboard() {
                 className="text-white hover:bg-white/20 hover:text-white"
               >
                 <LogOut className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Logout</span>
+                <span>Logout</span>
               </Button>
             </div>
           </div>
