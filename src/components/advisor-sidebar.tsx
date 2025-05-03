@@ -36,7 +36,6 @@ export function AdvisorSidebar() {
   return (
     <div className="fixed top-0 left-0 h-screen w-16 flex flex-col bg-dark text-white shadow-lg">
       <div className="sidebar-icon mt-4">
-      <Image src="/logo2.png" alt="Evershine Logo" width={40} height={20} />
       </div>
 
       <hr className="sidebar-hr my-2" />
