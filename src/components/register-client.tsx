@@ -1,21 +1,21 @@
 "use client"
 
-import React from "react"
+import type React from "react"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Phone, User, Mail, MapPin, Building, Calendar, Loader2 } from "lucide-react"
+import { ArrowLeft, Phone, User, Mail, MapPin, Building, Calendar, Loader2, LogOut } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/components/ui/use-toast"
-import { isAgentAuthenticated } from "@/lib/auth-utils"
+import { isAgentAuthenticated, clearAllTokens } from "@/lib/auth-utils"
 import axios from "axios"
 
 export default function RegisterClient() {
@@ -39,15 +39,20 @@ export default function RegisterClient() {
     agreeToTerms: false,
   })
   const [isLoading, setIsLoading] = useState(false)
+  const [agentEmail, setAgentEmail] = useState<string | null>(null)
   const [agentName, setAgentName] = useState<string | null>(null)
 
   // OTP state and refs
   const [otp, setOtp] = useState(["", "", "", "", "", ""])
   const otpInputs = useRef<(HTMLInputElement | null)[]>([null, null, null, null, null, null])
 
-  // Get agent name from localStorage
-  React.useEffect(() => {
+  // Get agent info on component mount
+  useEffect(() => {
+    // Fetch agent email from localStorage
     const email = localStorage.getItem("agentEmail")
+    setAgentEmail(email)
+
+    // Extract name from email (for demo purposes)
     if (email) {
       const name = email.split("@")[0]
       // Capitalize first letter and format name
@@ -57,8 +62,7 @@ export default function RegisterClient() {
   }, [])
 
   const handleLogout = () => {
-    localStorage.removeItem("agentToken")
-    localStorage.removeItem("agentEmail")
+    clearAllTokens()
     router.push("/agent-login")
   }
 
@@ -331,37 +335,32 @@ export default function RegisterClient() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50">
-      {/* Top Navigation Strip */}
-      <div className="w-full bg-[#194a95] text-white py-3 px-4 md:px-8 shadow-md">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Blue strip at the top */}
+      <div className="w-full bg-[#194a95] text-white py-4 px-6">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Image src="/logo.png" alt="Evershine Logo" width={80} height={40} />
-            <h1 className="text-xl font-semibold hidden md:block">Register New Client</h1>
+            <Link href="/dashboard">
+              <ArrowLeft className="h-5 w-5 cursor-pointer hover:text-gray-200" />
+            </Link>
+            <Image src="/logo.png" alt="Evershine Logo" width={80} height={30} />
           </div>
           <div className="flex items-center gap-4">
-            <Link href="/dashboard" className="flex items-center gap-2 text-white hover:text-white/90">
-              <ArrowLeft className="h-5 w-5" />
-              <span className="hidden sm:inline">Back to Dashboard</span>
-            </Link>
-            {agentName && (
-              <div className="flex items-center gap-4">
-                <span className="text-sm md:text-base">Welcome, {agentName}</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleLogout}
-                  className="text-white hover:bg-white/20 hover:text-white"
-                >
-                  <span className="hidden sm:inline mr-2">Logout</span>
-                </Button>
-              </div>
-            )}
+            <span className="text-sm md:text-base">Welcome, {agentName || agentEmail}</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLogout}
+              className="text-white hover:bg-white/20 hover:text-white"
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Logout</span>
+            </Button>
           </div>
         </div>
       </div>
 
-      <div className="w-full p-4 md:p-6 flex-1">
+      <div className="flex-1 p-4 md:p-6">
         <div className="max-w-xl mx-auto">
           {step === "initial" && (
             <Card className="shadow-sm border">
