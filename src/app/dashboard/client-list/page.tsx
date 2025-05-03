@@ -144,25 +144,7 @@ export default function ClientList() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Blue strip at the top */}
-      <div className="w-full bg-[#194a95] text-white py-4 px-6">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Image src="/logo2.png" alt="Evershine Logo" width={80} height={40} />
-            <h1 className="text-xl font-semibold">Advisor Dashboard</h1>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm md:text-base">Welcome, {agentName || agentEmail}</span>
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 text-white hover:bg-white/20 hover:text-white px-3 py-1.5 rounded-md text-sm"
-            >
-              <LogOut className="h-4 w-4" />
-              <span>Logout</span>
-            </button>
-          </div>
-        </div>
-      </div>
+   
 
       <main className="container mx-auto py-6 px-4">
         {/* Back button and page title */}
