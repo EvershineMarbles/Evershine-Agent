@@ -144,8 +144,6 @@ export default function ClientList() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-   
-
       <main className="container mx-auto py-6 px-4">
         {/* Back button and page title */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
