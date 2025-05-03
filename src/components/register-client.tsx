@@ -273,6 +273,12 @@ export default function RegisterClient() {
           email: formData.email || undefined,
           city: formData.city || undefined,
           profession: formData.profession || undefined,
+          businessName: formData.businessName || undefined,
+          gstNumber: formData.gstNumber || undefined,
+          projectType: formData.projectType || undefined,
+          dateOfBirth: formData.dateOfBirth || undefined,
+          anniversaryDate: formData.anniversaryDate || undefined,
+          architectDetails: formData.architectDetails || undefined,
         }),
       })
 
@@ -503,7 +509,8 @@ export default function RegisterClient() {
                   </Tabs>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Business Name and GST Number in one row */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="businessName" className="text-base font-medium">
                       Business Name
@@ -534,7 +541,10 @@ export default function RegisterClient() {
                       className="h-12 rounded-md"
                     />
                   </div>
+                </div>
 
+                {/* Project Type and Email in one row */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="projectType" className="text-base font-medium">
                       Project Type
@@ -555,9 +565,7 @@ export default function RegisterClient() {
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="email" className="text-base font-medium">
                       Email Address
@@ -575,7 +583,10 @@ export default function RegisterClient() {
                       />
                     </div>
                   </div>
+                </div>
 
+                {/* City and Architect Details in one row */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="city" className="text-base font-medium">
                       City
@@ -608,6 +619,7 @@ export default function RegisterClient() {
                   </div>
                 </div>
 
+                {/* Date of Birth and Anniversary Date in one row */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="dateOfBirth" className="text-base font-medium">
@@ -653,24 +665,6 @@ export default function RegisterClient() {
                         className="h-12 pl-10 rounded-md"
                       />
                     </div>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-base font-medium">
-                    Email Address
-                  </Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                    <Input
-                      id="email"
-                      name="email"
-                      type="email"
-                      placeholder="Enter email address"
-                      value={formData.email}
-                      onChange={handleChange}
-                      className="h-12 pl-10 rounded-md"
-                    />
                   </div>
                 </div>
 
