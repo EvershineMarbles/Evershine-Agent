@@ -97,96 +97,97 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      <AdvisorSidebar />
 
-      <div className="flex-1 flex flex-col">
-        {/* Blue strip at the top */}
-        <div className="w-full bg-[#194a95] text-white py-4 px-6">
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Image src="/logo2.png" alt="Evershine Logo" width={80} height={30} />
-              <h1 className="text-xl font-semibold">Advisor Dashboard</h1>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="text-sm md:text-base">Welcome, {agentName || agentEmail}</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleLogout}
-                className="text-white hover:bg-white/20 hover:text-white"
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                <span>Logout</span>
-              </Button>
-            </div>
+
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+          <AdvisorSidebar />
+
+      {/* Blue strip at the top */}
+      <div className="w-full bg-[#194a95] text-white py-4 px-6">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Image src="/logo2.png" alt="Evershine Logo" width={80} height={30} />
+            <h1 className="text-xl font-semibold">Advisor Dashboard</h1>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="text-sm md:text-base">Welcome, {agentName || agentEmail}</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLogout}
+              className="text-white hover:bg-white/20 hover:text-white"
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              <span>Logout</span>
+            </Button>
           </div>
         </div>
-
-        <main className="container mx-auto py-6 px-4 flex-1">
-          <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
-
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-            <Card className="border rounded-lg overflow-hidden">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-3">
-                  <Users className="h-5 w-5 text-[#194a95]" />
-                  <span className="text-gray-600 font-medium">Total Clients</span>
-                </div>
-                <p className="text-3xl font-bold mt-2">{clients.length}</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border rounded-lg overflow-hidden">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-3">
-                  <Package className="h-5 w-5 text-[#194a95]" />
-                  <span className="text-gray-600 font-medium">Active Orders</span>
-                </div>
-                <p className="text-3xl font-bold mt-2">12</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border rounded-lg overflow-hidden">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-3">
-                  <Bell className="h-5 w-5 text-[#194a95]" />
-                  <span className="text-gray-600 font-medium">Pending Reminders</span>
-                </div>
-                <p className="text-3xl font-bold mt-2">8</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <button
-              className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg"
-              onClick={() => router.push("/register-client")}
-            >
-              <UserPlus className="h-6 w-6" />
-              <span className="text-base font-medium">Register a New Client</span>
-            </button>
-
-            <button
-              className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg"
-              onClick={() => router.push("/client-list")}
-            >
-              <List className="h-6 w-6" />
-              <span className="text-base font-medium">Client List</span>
-            </button>
-
-            <button
-              className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg"
-              onClick={() => router.push("/scan-qr")}
-            >
-              <QrCode className="h-6 w-6" />
-              <span className="text-base font-medium">Scan QR</span>
-            </button>
-          </div>
-        </main>
       </div>
+
+      <main className="container mx-auto py-6 px-4 flex-1">
+        <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          <Card className="border rounded-lg overflow-hidden">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3">
+                <Users className="h-5 w-5 text-[#194a95]" />
+                <span className="text-gray-600 font-medium">Total Clients</span>
+              </div>
+              <p className="text-3xl font-bold mt-2">{clients.length}</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border rounded-lg overflow-hidden">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3">
+                <Package className="h-5 w-5 text-[#194a95]" />
+                <span className="text-gray-600 font-medium">Active Orders</span>
+              </div>
+              <p className="text-3xl font-bold mt-2">12</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border rounded-lg overflow-hidden">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3">
+                <Bell className="h-5 w-5 text-[#194a95]" />
+                <span className="text-gray-600 font-medium">Pending Reminders</span>
+              </div>
+              <p className="text-3xl font-bold mt-2">8</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+
+          <button
+            className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg"
+            onClick={() => router.push("/register-client")}
+          >
+            <UserPlus className="h-6 w-6" />
+            <span className="text-base font-medium">Register a New Client</span>
+          </button>
+
+          <button
+            className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg"
+            onClick={() => router.push("/client-list")}
+          >
+            <List className="h-6 w-6" />
+            <span className="text-base font-medium">Client List</span>
+          </button>
+
+          <button
+            className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg"
+            onClick={() => router.push("/scan-qr")}
+          >
+            <QrCode className="h-6 w-6" />
+            <span className="text-base font-medium">Scan QR</span>
+          </button>
+        </div>
+      </main>
     </div>
   )
 }
