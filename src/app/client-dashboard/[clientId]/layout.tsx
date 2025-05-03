@@ -81,7 +81,7 @@ export default function ClientDashboardLayout({
 
           {/* Agent name on the right side */}
           <div className="flex items-center gap-4">
-            <span className="text-sm md:text-base">Welcome, {agentName || agentEmail}</span>
+            <span className="text-sm md:text-base">{agentName || agentEmail}</span>
             <Button
               variant="ghost"
               size="sm"

@@ -101,8 +101,8 @@ export default function Dashboard() {
       <div className="w-full bg-[#194a95] text-white py-4 px-6">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Image src="/logo2.png" alt="Evershine Logo" width={80} height={40} />
-            <h1 className="text-xl font-semibold">Agent Dashboard</h1>
+            <Image src="/logo2.png" alt="Evershine Logo" width={80} height={30} />
+            <h1 className="text-xl font-semibold">Advisor Dashboard</h1>
           </div>
           <div className="flex items-center gap-4">
             <span className="text-sm md:text-base">Welcome, {agentName || agentEmail}</span>
