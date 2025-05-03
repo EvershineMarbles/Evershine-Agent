@@ -340,10 +340,8 @@ export default function RegisterClient() {
       <div className="w-full bg-[#194a95] text-white py-4 px-6">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link href="/dashboard">
-              <ArrowLeft className="h-5 w-5 cursor-pointer hover:text-gray-200" />
-            </Link>
-            <Image src="/logo.png" alt="Evershine Logo" width={80} height={30} />
+            <Image src="/logo2.png" alt="Evershine Logo" width={80} height={30} />
+            <h1 className="text-xl font-semibold">Advisor Dashboard</h1>
           </div>
           <div className="flex items-center gap-4">
             <span className="text-sm md:text-base">Welcome, {agentName || agentEmail}</span>
@@ -362,6 +360,9 @@ export default function RegisterClient() {
 
       <div className="flex-1 p-4 md:p-6">
         <div className="max-w-xl mx-auto">
+        <Link href="/dashboard" className="flex items-center mr-2">
+              <ArrowLeft className="h-5 w-5 cursor-pointer hover:text-gray-200" />
+            </Link>
           {step === "initial" && (
             <Card className="shadow-sm border">
               <CardHeader className="space-y-1 border-b pb-4">
