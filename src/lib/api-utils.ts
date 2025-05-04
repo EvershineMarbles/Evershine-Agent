@@ -72,7 +72,7 @@ export const agentAPI = {
       } else {
         return { success: false, message: data.message }
       }
-    } catch (error: Error | unknown) {
+    } catch (error: any) {
       console.error("API Error:", error)
       return {
         success: false,
@@ -211,3 +211,136 @@ export const agentAPI = {
     }
   },
 }
+
+const getWishlist = async () => {
+  try {
+    const token = localStorage.getItem("clientImpersonationToken")
+    if (!token) {
+      console.error("No client token found in localStorage")
+      return { success: false, message: "No authentication token found" }
+    }
+
+    const response = await fetch("https://evershinebackend-2.onrender.com/api/getUserWishlist", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    })
+
+    if (!response.ok) {
+      console.error("API error:", response.status, response.statusText)
+      return {
+        success: false,
+        message: `API error: ${response.status} ${response.statusText}`,
+      }
+    }
+
+    const data = await response.json()
+    return data
+  } catch (error) {
+    console.error("API Error:", error)
+    return { success: false, message: "Failed to fetch wishlist" }
+  }
+}
+
+const removeFromWishlist = async (productId: string) => {
+  try {
+    const token = localStorage.getItem("clientImpersonationToken")
+    if (!token) {
+      console.error("No client token found in localStorage")
+      return { success: false, message: "No authentication token found" }
+    }
+
+    const response = await fetch("https://evershinebackend-2.onrender.com/api/deleteUserWishlistItem", {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ productId }),
+    })
+
+    if (!response.ok) {
+      console.error("API error:", response.status, response.statusText)
+      return {
+        success: false,
+        message: `API error: ${response.status} ${response.statusText}`,
+      }
+    }
+
+    const data = await response.json()
+    return data
+  } catch (error) {
+    console.error("API Error:", error)
+    return { success: false, message: "Failed to remove from wishlist" }
+  }
+}
+
+const addToCart = async (productId: string) => {
+  try {
+    const token = localStorage.getItem("clientImpersonationToken")
+    if (!token) {
+      console.error("No client token found in localStorage")
+      return { success: false, message: "No authentication token found" }
+    }
+
+    const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ productId }),
+    })
+
+    if (!response.ok) {
+      console.error("API error:", response.status, response.statusText)
+      return {
+        success: false,
+        message: `API error: ${response.status} ${response.statusText}`,
+      }
+    }
+
+    const data = await response.json()
+    return data
+  } catch (error) {
+    console.error("API Error:", error)
+    return { success: false, message: "Failed to add to cart" }
+  }
+}
+
+const updateWishlistPrices = async (commissionRate: number) => {
+  try {
+    const token = localStorage.getItem("clientImpersonationToken")
+    if (!token) {
+      console.error("No client token found in localStorage")
+      return { success: false, message: "No authentication token found" }
+    }
+
+    const response = await fetch("https://evershinebackend-2.onrender.com/api/updateWishlistPrices", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ commissionRate }),
+    })
+
+    if (!response.ok) {
+      console.error("API error:", response.status, response.statusText)
+      return {
+        success: false,
+        message: `API error: ${response.status} ${response.statusText}`,
+      }
+    }
+
+    const data = await response.json()
+    return data
+  } catch (error) {
+    console.error("API Error:", error)
+    return { success: false, message: "Failed to update wishlist prices" }
+  }
+}
+
+export { getWishlist, removeFromWishlist, addToCart, updateWishlistPrices }

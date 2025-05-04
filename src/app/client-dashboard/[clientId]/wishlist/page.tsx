@@ -1,719 +1,228 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowLeft, Trash2, Loader2, Heart, ShoppingCart } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { useToast } from "@/components/ui/use-toast"
-import { Input } from "@/components/ui/input"
-
-interface WishlistItem {
-  _id: string
-  name: string
-  price: number
-  image: string[]
-  postId: string
-  category: string
-  quantity: number
-  basePrice?: number
-}
-
-// Add the CommissionData interface
-interface CommissionData {
-  agentId: string
-  name: string
-  email: string
-  commissionRate: number
-  categoryCommissions?: Record<string, number>
-}
+import { toast } from "react-hot-toast"
+import { FaShoppingCart, FaTrash, FaSync } from "react-icons/fa"
+import { getWishlist, removeFromWishlist, addToCart, updateWishlistPrices } from "@/lib/api-utils"
 
 export default function WishlistPage() {
   const params = useParams()
   const router = useRouter()
-  const { toast } = useToast()
   const clientId = params.clientId as string
 
-  const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([])
+  const [wishlistItems, setWishlistItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [actionLoading, setActionLoading] = useState<Record<string, { removing: boolean; addingToCart: boolean }>>({})
-  const [cartCount, setCartCount] = useState(0)
-  const [quantities, setQuantities] = useState<Record<string, number>>({})
   const [error, setError] = useState<string | null>(null)
-  const [commissionData, setCommissionData] = useState<CommissionData | null>(null)
-  const [overrideCommissionRate, setOverrideCommissionRate] = useState<number | null>(null)
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const [clientData, setClientData] = useState<any>(null)
+  const [refreshing, setRefreshing] = useState(false)
+  const [consultantLevel, setConsultantLevel] = useState<string | null>(null)
+  const [commissionRate, setCommissionRate] = useState<number>(0)
 
-  // Load saved commission rate from localStorage on component mount
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const savedRate = localStorage.getItem(`commission-override-${clientId}`)
-      if (savedRate) {
-        setOverrideCommissionRate(Number(savedRate))
-      }
-    }
-  }, [clientId])
-
-  // Fetch commission data
-  const fetchCommissionData = useCallback(async () => {
-    try {
-      const token = localStorage.getItem("clientImpersonationToken")
-      if (!token) {
-        return null
-      }
-
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
-      const response = await fetch(`${apiUrl}/api/client/agent-commission`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-
-      if (!response.ok) {
-        return null
-      }
-
-      const data = await response.json()
-      if (data.success && data.data) {
-        setCommissionData(data.data)
-        return data.data
-      }
-      return null
-    } catch (error) {
-      console.error("Error fetching commission data:", error)
-      return null
-    }
-  }, [])
-
-  // Calculate adjusted price function
-  const calculateAdjustedPrice = useCallback(
-    (basePrice: number, category: string) => {
-      // Get the default commission rate (from agent or category-specific)
-      let defaultRate = commissionData?.commissionRate || 10
-
-      // Check for category-specific commission
-      if (commissionData?.categoryCommissions && category && commissionData.categoryCommissions[category]) {
-        defaultRate = commissionData.categoryCommissions[category]
-      }
-
-      // Add the override rate to the default rate if an override is set
-      const finalRate = overrideCommissionRate !== null ? defaultRate + overrideCommissionRate : defaultRate
-
-      // Calculate adjusted price based on the original basePrice
-      const adjustedPrice = basePrice * (1 + finalRate / 100)
-      return Math.round(adjustedPrice * 100) / 100 // Round to 2 decimal places
-    },
-    [commissionData, overrideCommissionRate],
-  )
-
-  // Fetch client data
-  useEffect(() => {
-    const fetchClientData = async () => {
-      try {
-        const token = localStorage.getItem("clientImpersonationToken")
-        if (!token) return
-
-        const response = await fetch(`https://evershinebackend-2.onrender.com/api/getClientDetails/${clientId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          if (data.data) {
-            setClientData(data.data)
-
-            // Set commission rate based on consultant level color
-            if (data.data.consultantLevel) {
-              const consultantLevel = data.data.consultantLevel
-              console.log("Client consultant level:", consultantLevel)
-
-              // Map color to commission rate
-              let commissionRate = null
-              switch (consultantLevel) {
-                case "red":
-                  commissionRate = 5
-                  break
-                case "yellow":
-                  commissionRate = 10
-                  break
-                case "purple":
-                  commissionRate = 15
-                  break
-                default:
-                  commissionRate = null
-              }
-
-              // Set the override commission rate
-              setOverrideCommissionRate(commissionRate)
-              console.log(`Setting commission rate to ${commissionRate}% based on consultant level ${consultantLevel}`)
-            }
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching client data:", error)
-      }
-    }
-
-    fetchClientData()
-  }, [clientId])
-
-  // Show toast when commission rate is automatically set from client data
-  useEffect(() => {
-    if (clientData?.consultantLevel && overrideCommissionRate !== null) {
-      toast({
-        title: "Commission Rate Applied",
-        description: `${overrideCommissionRate}% commission rate applied based on client's ${clientData.consultantLevel} consultant level`,
-        duration: 3000,
-      })
-    }
-  }, [clientData?.consultantLevel, overrideCommissionRate, toast])
-
-  // Fetch wishlist items
-  const fetchWishlist = useCallback(async () => {
-    if (isRefreshing) return // Prevent multiple simultaneous fetches
-
-    try {
-      setLoading(true)
-      setIsRefreshing(true)
-      setError(null)
-
-      // First fetch commission data
-      const commissionInfo = await fetchCommissionData()
-
-      // Get the token
-      const token = localStorage.getItem("clientImpersonationToken")
-
-      if (!token) {
-        throw new Error("No authentication token found. Please refresh the page and try again.")
-      }
-
-      console.log("Fetching wishlist with token:", token.substring(0, 15) + "...")
-
-      const response = await fetch("https://evershinebackend-2.onrender.com/api/getUserWishlist", {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      // Check for errors
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error("Authentication failed. Please refresh the token and try again.")
-        } else {
-          throw new Error(`API error: ${response.status} ${response.statusText}`)
-        }
-      }
-
-      const data = await response.json()
-
-      if (data.data) {
-        console.log("Wishlist data:", data.data)
-        const items = data.data.items || []
-
-        // IMPORTANT: Use the prices directly from the wishlist items
-        // These prices were saved when the items were added to the wishlist
-        // with the commission rate that was selected at that time
-        setWishlistItems(items)
-
-        // Initialize quantities state
-        const initialQuantities: Record<string, number> = {}
-        items.forEach((item: WishlistItem) => {
-          initialQuantities[item.postId] = item.quantity || 1
-        })
-        setQuantities(initialQuantities)
-      } else {
-        setWishlistItems([])
-      }
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
-      console.error("Error fetching wishlist:", error)
-      setError(errorMessage)
-      toast({
-        title: "Error",
-        description: errorMessage || "Failed to load your wishlist. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-      setIsRefreshing(false)
-    }
-  }, [toast, fetchCommissionData, isRefreshing])
-
-  // Fetch wishlist on component mount - ONLY ONCE
   useEffect(() => {
     fetchWishlist()
-    // Do not include fetchWishlist in the dependency array to prevent constant refreshing
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // Fetch cart count - ONLY ONCE
-  useEffect(() => {
-    const fetchCartCount = async () => {
-      try {
-        const token = localStorage.getItem("clientImpersonationToken")
-        if (!token) return
-
-        const response = await fetch("https://evershinebackend-2.onrender.com/api/getUserCart", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          if (data.success && data.data && Array.isArray(data.data.items)) {
-            setCartCount(data.data.items.length)
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching cart count:", error)
-      }
+    // Fetch consultant level from localStorage
+    const level = localStorage.getItem("consultantLevel")
+    if (level) {
+      setConsultantLevel(level)
+      // Set commission rate based on consultant level
+      if (level === "red") setCommissionRate(5)
+      else if (level === "yellow") setCommissionRate(10)
+      else if (level === "purple") setCommissionRate(15)
     }
+  }, [clientId])
 
-    fetchCartCount()
-  }, [])
-
-  // Initialize action loading state for each item
-  useEffect(() => {
-    const initialState: Record<string, { removing: boolean; addingToCart: boolean }> = {}
-    wishlistItems.forEach((item) => {
-      initialState[item.postId] = { removing: false, addingToCart: false }
-    })
-    setActionLoading(initialState)
-  }, [wishlistItems])
-
-  // Handle quantity change
-  const handleQuantityChange = (postId: string, value: string) => {
-    const numValue = Number.parseInt(value, 10)
-    if (!isNaN(numValue) && numValue > 0) {
-      setQuantities((prev) => ({
-        ...prev,
-        [postId]: numValue,
-      }))
-    }
-  }
-
-  // Remove item from wishlist
-  const removeFromWishlist = async (productId: string) => {
+  const fetchWishlist = async () => {
     try {
-      setActionLoading((prev) => ({
-        ...prev,
-        [productId]: { ...prev[productId], removing: true },
-      }))
+      setLoading(true)
+      setError(null)
+      const response = await getWishlist()
 
-      // Get the token
-      const token = localStorage.getItem("clientImpersonationToken")
-
-      if (!token) {
-        throw new Error("No authentication token found. Please refresh the page and try again.")
-      }
-
-      console.log("Removing item from wishlist with token:", token.substring(0, 15) + "...")
-
-      const response = await fetch("https://evershinebackend-2.onrender.com/api/deleteUserWishlistItem", {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ productId }),
-      })
-
-      // Check for errors
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error("Authentication failed. Please refresh the token and try again.")
-        } else {
-          throw new Error(`API error: ${response.status} ${response.statusText}`)
-        }
-      }
-
-      const data = await response.json()
-
-      if (data.success) {
-        setWishlistItems((prev) => prev.filter((item) => item.postId !== productId))
-
-        toast({
-          title: "Item removed",
-          description: "Item has been removed from your wishlist",
-          variant: "default",
-        })
+      if (response.success) {
+        setWishlistItems(response.data.items || [])
       } else {
-        throw new Error(data.message || "Failed to remove item")
+        setError(response.message || "Failed to fetch wishlist")
+        toast.error("Failed to fetch wishlist")
       }
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
-      console.error("Error removing item from wishlist:", error)
-      toast({
-        title: "Error",
-        description: errorMessage || "Failed to remove item from wishlist. Please try again.",
-        variant: "destructive",
-      })
+    } catch (err: any) {
+      console.error("Error fetching wishlist:", err)
+      setError(err.message || "An error occurred while fetching wishlist")
+      toast.error("Failed to fetch wishlist")
     } finally {
-      setActionLoading((prev) => ({
-        ...prev,
-        [productId]: { ...prev[productId], removing: false },
-      }))
+      setLoading(false)
     }
   }
 
-  // Add item to cart and remove from wishlist
-  const addToCart = async (productId: string) => {
+  const handleRemoveFromWishlist = async (productId: string) => {
     try {
-      setActionLoading((prev) => ({
-        ...prev,
-        [productId]: { ...prev[productId], addingToCart: true },
-      }))
+      const response = await removeFromWishlist(productId)
 
-      // Get the token
-      const token = localStorage.getItem("clientImpersonationToken")
-
-      if (!token) {
-        throw new Error("No authentication token found. Please refresh the page and try again.")
-      }
-
-      // Get the current quantity for this item
-      const quantity = quantities[productId] || 1
-
-      // Get the item from wishlist to use its price
-      const wishlistItem = wishlistItems.find((item) => item.postId === productId)
-
-      if (!wishlistItem) {
-        throw new Error("Item not found in wishlist")
-      }
-
-      console.log("Adding item to cart with token:", token.substring(0, 15) + "...")
-
-      const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          productId,
-          quantity,
-          // Pass the adjusted price that was saved in the wishlist
-          price: wishlistItem.price,
-        }),
-      })
-
-      // Check for errors
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error("Authentication failed. Please refresh the token and try again.")
-        } else {
-          throw new Error(`API error: ${response.status} ${response.statusText}`)
-        }
-      }
-
-      const data = await response.json()
-
-      if (data.success) {
-        // Increment cart count
-        setCartCount((prev) => prev + 1)
-
-        // Now remove from wishlist
-        await removeFromWishlist(productId)
-
-        toast({
-          title: "Added to cart",
-          description: "Item has been added to your cart and removed from wishlist",
-          variant: "default",
-        })
+      if (response.success) {
+        setWishlistItems(wishlistItems.filter((item) => item.postId !== productId))
+        toast.success("Item removed from wishlist")
       } else {
-        throw new Error(data.message || "Failed to add item to cart")
+        toast.error(response.message || "Failed to remove item")
       }
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
-      console.error("Error adding item to cart:", error)
-      toast({
-        title: "Error",
-        description: errorMessage || "Failed to add item to cart. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setActionLoading((prev) => ({
-        ...prev,
-        [productId]: { ...prev[productId], addingToCart: false },
-      }))
+    } catch (err: any) {
+      console.error("Error removing from wishlist:", err)
+      toast.error(err.message || "Failed to remove item")
     }
   }
 
-  // Function to update wishlist prices based on current commission rates
-  const updateWishlistPrices = async () => {
+  const handleAddToCart = async (productId: string) => {
     try {
-      setIsRefreshing(true)
-      const token = localStorage.getItem("clientImpersonationToken")
+      const response = await addToCart(productId)
 
-      if (!token) {
-        throw new Error("No authentication token found. Please refresh the page and try again.")
-      }
-
-      // Send the client data with the consultant level
-      const response = await fetch("https://evershinebackend-2.onrender.com/api/updateWishlistPrices", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          clientData: {
-            consultantLevel: clientData?.consultantLevel || "red",
-          },
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status} ${response.statusText}`)
-      }
-
-      const data = await response.json()
-
-      if (data.success) {
-        toast({
-          title: "Prices Updated",
-          description: "Wishlist prices have been updated based on your current commission rate",
-          variant: "default",
-        })
-
-        // Refresh the wishlist to show updated prices
-        fetchWishlist()
+      if (response.success) {
+        toast.success("Item added to cart")
+        // Optionally remove from wishlist after adding to cart
+        await handleRemoveFromWishlist(productId)
       } else {
-        throw new Error(data.message || "Failed to update prices")
+        toast.error(response.message || "Failed to add item to cart")
       }
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
-      console.error("Error updating wishlist prices:", error)
-      toast({
-        title: "Error",
-        description: errorMessage || "Failed to update wishlist prices. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsRefreshing(false)
+    } catch (err: any) {
+      console.error("Error adding to cart:", err)
+      toast.error(err.message || "Failed to add item to cart")
     }
   }
 
-  // Update the refreshWishlist function to call updateWishlistPrices
-  const refreshWishlist = () => {
-    if (!isRefreshing) {
-      updateWishlistPrices()
+  const handleUpdatePrices = async () => {
+    try {
+      setRefreshing(true)
+      const response = await updateWishlistPrices(commissionRate)
+
+      if (response.success) {
+        toast.success("Wishlist prices updated")
+        fetchWishlist() // Refresh the wishlist
+      } else {
+        toast.error(response.message || "Failed to update prices")
+      }
+    } catch (err: any) {
+      console.error("Error updating prices:", err)
+      toast.error(err.message || "Failed to update prices")
+    } finally {
+      setRefreshing(false)
     }
   }
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center h-[80vh]">
-        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-muted-foreground">Loading your wishlist...</p>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gray-900"></div>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="p-6 md:p-8">
-        <div className="flex items-center mb-8">
-          <Button variant="ghost" size="icon" onClick={() => router.back()} className="mr-4">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-3xl font-bold">Your Wishlist</h1>
-        </div>
-
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800">
-          <p className="font-medium">Error loading wishlist</p>
-          <p className="mt-1">{error}</p>
-          <Button onClick={refreshWishlist} variant="outline" className="mt-4" disabled={isRefreshing}>
-            {isRefreshing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-            Try Again
-          </Button>
-        </div>
+      <div className="min-h-screen flex flex-col items-center justify-center p-4">
+        <div className="text-red-500 text-xl mb-4">Error: {error}</div>
+        <button onClick={fetchWishlist} className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+          Try Again
+        </button>
       </div>
     )
   }
 
   return (
-    <div className="p-6 md:p-8">
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center">
-          <Button variant="ghost" size="icon" onClick={() => router.back()} className="mr-4">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-3xl font-bold">Your Wishlist</h1>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* Display consultant level indicator */}
-          {clientData?.consultantLevel && (
-            <div className="flex items-center mr-2">
+    <div className="container mx-auto p-4">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">My Wishlist</h1>
+        <div className="flex items-center space-x-4">
+          {consultantLevel && (
+            <div className="flex items-center">
+              <span className="mr-2">Consultant Level:</span>
               <div
-                className={`w-4 h-4 rounded-full mr-1 ${
-                  clientData.consultantLevel === "red"
+                className={`w-4 h-4 rounded-full ${
+                  consultantLevel === "red"
                     ? "bg-red-500"
-                    : clientData.consultantLevel === "yellow"
+                    : consultantLevel === "yellow"
                       ? "bg-yellow-500"
-                      : "bg-purple-500"
+                      : consultantLevel === "purple"
+                        ? "bg-purple-500"
+                        : "bg-gray-500"
                 }`}
-              />
-              <span className="text-xs text-gray-600">{clientData.consultantLevel} level</span>
+              ></div>
+              <span className="ml-2">({commissionRate}% commission)</span>
             </div>
           )}
-
-          {/* Refresh Wishlist Button */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={refreshWishlist}
-            className="flex items-center gap-1 bg-blue-50 hover:bg-blue-100 border-blue-200"
-            disabled={isRefreshing}
+          <button
+            onClick={handleUpdatePrices}
+            disabled={refreshing}
+            className="flex items-center px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-green-300"
           >
-            {isRefreshing ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+            {refreshing ? (
+              <>
+                <FaSync className="animate-spin mr-2" />
+                Updating...
+              </>
             ) : (
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-4 w-4"
-              >
-                <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                <path d="M3 3v5h5" />
-                <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
-                <path d="M16 21h5v-5" />
-              </svg>
+              <>
+                <FaSync className="mr-2" />
+                Update Prices & Refresh
+              </>
             )}
-            Update Prices & Refresh
-          </Button>
-
-          {/* Cart icon */}
-          <Link
-            href={`/client-dashboard/${clientId}/cart`}
-            className="relative p-2 rounded-full hover:bg-gray-100 transition-colors"
-          >
-            <ShoppingCart className="h-6 w-6 text-gray-600" />
-            {cartCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-primary text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                {cartCount}
-              </span>
-            )}
-          </Link>
+          </button>
         </div>
       </div>
 
       {wishlistItems.length === 0 ? (
-        <div className="text-center py-12 bg-muted/20 rounded-lg">
-          <Heart className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-          <p className="text-xl font-medium mb-4">Your wishlist is empty</p>
-          <p className="text-muted-foreground mb-6">Add some products to your wishlist to see them here</p>
-          <Button
-            onClick={() => router.push(`/client-dashboard/${clientId}/products`)}
-            className="bg-primary hover:bg-primary/90"
+        <div className="text-center py-10">
+          <p className="text-xl text-gray-500 mb-4">Your wishlist is empty</p>
+          <Link
+            href={`/client-dashboard/${clientId}/products`}
+            className="px-6 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
           >
             Browse Products
-          </Button>
+          </Link>
         </div>
       ) : (
-        <div className="bg-card rounded-lg border border-border overflow-hidden">
-          <div className="p-4 bg-muted/20 border-b border-border flex justify-between items-center">
-            <h2 className="font-semibold">Wishlist Items ({wishlistItems.length})</h2>
-            <div className="flex items-center">
-              {clientData?.consultantLevel && (
-                <span className="text-xs text-muted-foreground mr-2">
-                  {overrideCommissionRate}% commission ({clientData.consultantLevel} level)
-                </span>
-              )}
-              <p className="text-xs text-muted-foreground">Prices include commission</p>
-            </div>
-          </div>
-          <div className="divide-y divide-border">
-            {wishlistItems.map((item) => (
-              <div key={item.postId} className="p-4 flex flex-col md:flex-row md:items-center">
-                <div className="relative h-20 w-20 rounded-md overflow-hidden flex-shrink-0">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {wishlistItems.map((item) => (
+            <div key={item.postId} className="border rounded-lg overflow-hidden shadow-md">
+              <div className="relative h-48 bg-gray-200">
+                {item.image && item.image.length > 0 ? (
                   <Image
-                    src={item.image && item.image.length > 0 ? item.image[0] : "/placeholder.svg?height=80&width=80"}
+                    src={item.image[0] || "/placeholder.svg"}
                     alt={item.name}
                     fill
-                    className="object-cover"
+                    style={{ objectFit: "cover" }}
                   />
-                </div>
-                <div className="md:ml-4 flex-grow mt-3 md:mt-0">
-                  <h3 className="font-medium">{item.name}</h3>
-                  <p className="text-sm text-muted-foreground">{item.category}</p>
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between mt-2 gap-3">
-                    <div>
-                      <p className="font-semibold">₹{item.price?.toLocaleString()}/sqft</p>
-                      <p className="text-xs text-muted-foreground">Price saved with selected commission</p>
-                    </div>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-400">No Image</div>
+                )}
+              </div>
 
-                    <div className="flex flex-col md:flex-row items-start md:items-center gap-3">
-                      <div className="flex items-center">
-                        <label htmlFor={`quantity-${item.postId}`} className="text-sm mr-2">
-                          Quantity:
-                        </label>
-                        <Input
-                          id={`quantity-${item.postId}`}
-                          type="number"
-                          min="1"
-                          value={quantities[item.postId] || 1}
-                          onChange={(e) => handleQuantityChange(item.postId, e.target.value)}
-                          className="w-20 h-8"
-                        />
-                      </div>
+              <div className="p-4">
+                <h2 className="text-lg font-semibold mb-2">{item.name}</h2>
+                <p className="text-gray-600 mb-2">Category: {item.category}</p>
+                <p className="text-gray-600 mb-2">
+                  Application Areas:{" "}
+                  {Array.isArray(item.applicationAreas) ? item.applicationAreas.join(", ") : item.applicationAreas}
+                </p>
+                <p className="text-xl font-bold text-blue-600 mb-4">₹{item.price.toFixed(2)}</p>
 
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => addToCart(item.postId)}
-                          disabled={actionLoading[item.postId]?.addingToCart}
-                          className="flex items-center"
-                        >
-                          {actionLoading[item.postId]?.addingToCart ? (
-                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                          ) : (
-                            <ShoppingCart className="h-4 w-4 mr-2" />
-                          )}
-                          Add to Cart
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeFromWishlist(item.postId)}
-                          disabled={actionLoading[item.postId]?.removing}
-                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                        >
-                          {actionLoading[item.postId]?.removing ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
+                <div className="flex justify-between">
+                  <button
+                    onClick={() => handleAddToCart(item.postId)}
+                    className="flex items-center px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                  >
+                    <FaShoppingCart className="mr-2" />
+                    Add to Cart
+                  </button>
+
+                  <button
+                    onClick={() => handleRemoveFromWishlist(item.postId)}
+                    className="flex items-center px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+                  >
+                    <FaTrash className="mr-2" />
+                    Remove
+                  </button>
                 </div>
               </div>
-            ))}
-          </div>
-          <div className="p-4 bg-muted/10 border-t border-border">
-            <div className="flex justify-end">
-              <Link href={`/client-dashboard/${clientId}/products`} className="text-sm text-primary hover:underline">
-                Continue Shopping
-              </Link>
             </div>
-          </div>
+          ))}
         </div>
       )}
     </div>
