@@ -2,87 +2,98 @@
 
 import { useState, useEffect } from "react"
 import axios from "axios"
-import { toast } from "react-toastify"
 
-const Wishlist = () => {
+const WishlistPage = () => {
   const [wishlistItems, setWishlistItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [agentCommission, setAgentCommission] = useState(null)
 
   // Get token from localStorage
   const token = localStorage.getItem("token")
 
   useEffect(() => {
     fetchWishlist()
-    fetchAgentCommission()
   }, [])
 
   const fetchWishlist = async () => {
     try {
       setLoading(true)
-      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/getUserWishlist`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
+      console.log("Fetching wishlist...")
+
+      const response = await axios.get(
+        `${process.env.REACT_APP_API_URL || "http://localhost:8000"}/api/getUserWishlist`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
-      })
+      )
+
+      console.log("Wishlist API response:", response.data)
 
       if (response.data.success) {
-        setWishlistItems(response.data.data.items || [])
+        const items = response.data.data.items || []
+        setWishlistItems(items)
+
+        // Log each item's details
+        items.forEach((item, index) => {
+          console.log(`Wishlist item ${index + 1}:`, {
+            id: item.postId,
+            name: item.name,
+            basePrice: item.basePrice,
+            adjustedPrice: item.price,
+            commission: item.price - item.basePrice,
+            commissionPercent: item.basePrice ? ((item.price / item.basePrice - 1) * 100).toFixed(2) + "%" : "N/A",
+          })
+        })
       } else {
+        console.error("Failed to fetch wishlist:", response.data.message)
         setError("Failed to fetch wishlist")
-        toast.error("Failed to fetch wishlist")
       }
     } catch (error) {
       console.error("Error fetching wishlist:", error)
       setError("Error fetching wishlist")
-      toast.error("Error fetching wishlist")
     } finally {
       setLoading(false)
     }
   }
 
-  const fetchAgentCommission = async () => {
-    try {
-      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/client/agent-commission`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      if (response.data.success) {
-        setAgentCommission(response.data.data)
-      }
-    } catch (error) {
-      console.error("Error fetching agent commission:", error)
-    }
-  }
-
   const removeFromWishlist = async (productId) => {
     try {
-      const response = await axios.delete(`${process.env.REACT_APP_API_URL}/api/deleteUserWishlistItem`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
+      console.log(`Removing product ${productId} from wishlist...`)
+
+      const response = await axios.delete(
+        `${process.env.REACT_APP_API_URL || "http://localhost:8000"}/api/deleteUserWishlistItem`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          data: { productId },
         },
-        data: { productId },
-      })
+      )
+
+      console.log("Remove from wishlist response:", response.data)
 
       if (response.data.success) {
-        toast.success("Item removed from wishlist")
-        fetchWishlist() // Refresh the wishlist
+        console.log(`Product ${productId} removed successfully`)
+        // Refresh the wishlist
+        fetchWishlist()
       } else {
-        toast.error(response.data.message || "Failed to remove item")
+        console.error("Failed to remove item:", response.data.message)
+        alert("Failed to remove item from wishlist")
       }
     } catch (error) {
       console.error("Error removing item from wishlist:", error)
-      toast.error("Error removing item from wishlist")
+      alert("Error removing item from wishlist")
     }
   }
 
   const addToCart = async (productId) => {
     try {
+      console.log(`Adding product ${productId} to cart...`)
+
       const response = await axios.post(
-        `${process.env.REACT_APP_API_URL}/api/addToCart`,
+        `${process.env.REACT_APP_API_URL || "http://localhost:8000"}/api/addToCart`,
         { productId },
         {
           headers: {
@@ -91,137 +102,129 @@ const Wishlist = () => {
         },
       )
 
+      console.log("Add to cart response:", response.data)
+
       if (response.data.success) {
-        toast.success("Item added to cart")
+        alert("Item added to cart")
       } else {
-        toast.error(response.data.message || "Failed to add item to cart")
+        alert(response.data.message || "Failed to add item to cart")
       }
     } catch (error) {
       console.error("Error adding item to cart:", error)
-      toast.error("Error adding item to cart")
-    }
-  }
-
-  // Function to calculate commission breakdown
-  const getCommissionBreakdown = (basePrice, adjustedPrice) => {
-    if (!basePrice || !adjustedPrice || !agentCommission) return null
-
-    const totalCommissionAmount = adjustedPrice - basePrice
-    const totalCommissionPercent = (adjustedPrice / basePrice - 1) * 100
-
-    return {
-      basePrice: basePrice.toFixed(2),
-      adjustedPrice: adjustedPrice.toFixed(2),
-      commissionAmount: totalCommissionAmount.toFixed(2),
-      commissionPercent: totalCommissionPercent.toFixed(1),
+      alert("Error adding item to cart")
     }
   }
 
   if (loading) {
-    return <div className="text-center py-10">Loading wishlist...</div>
+    return <div className="text-center p-8">Loading wishlist...</div>
   }
 
   if (error) {
-    return <div className="text-center py-10 text-red-500">{error}</div>
+    return <div className="text-center p-8 text-red-500">{error}</div>
   }
 
   if (wishlistItems.length === 0) {
-    return (
-      <div className="text-center py-10">
-        <h2 className="text-xl font-semibold mb-4">Your Wishlist</h2>
-        <p>Your wishlist is empty</p>
-      </div>
-    )
+    return <div className="text-center p-8">Your wishlist is empty</div>
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h2 className="text-2xl font-bold mb-6">Your Wishlist</h2>
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-6">My Wishlist</h1>
 
-      {agentCommission && (
-        <div className="bg-blue-50 p-4 rounded-lg mb-6">
-          <h3 className="font-semibold">Your Commission Information:</h3>
-          <p>Base Commission Rate: {agentCommission.commissionRate}%</p>
-          {agentCommission.categoryCommissions && Object.keys(agentCommission.categoryCommissions).length > 0 && (
-            <div>
-              <p className="font-medium mt-2">Category-Specific Rates:</p>
-              <ul className="ml-4">
-                {Object.entries(agentCommission.categoryCommissions).map(([category, rate]) => (
-                  <li key={category}>
-                    {category}: {rate}%
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      )}
+      <div className="overflow-x-auto">
+        <table className="min-w-full bg-white border">
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="py-2 px-4 border text-left">Image</th>
+              <th className="py-2 px-4 border text-left">Product</th>
+              <th className="py-2 px-4 border text-left">Category</th>
+              <th className="py-2 px-4 border text-left">Base Price</th>
+              <th className="py-2 px-4 border text-left">Your Price</th>
+              <th className="py-2 px-4 border text-left">Commission</th>
+              <th className="py-2 px-4 border text-left">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {wishlistItems.map((item) => {
+              const basePrice = item.basePrice || item.price
+              const commission = item.price - basePrice
+              const commissionPercent = basePrice ? ((item.price / basePrice - 1) * 100).toFixed(2) : 0
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {wishlistItems.map((item) => {
-          const commissionInfo = getCommissionBreakdown(item.basePrice, item.price)
-
-          return (
-            <div key={item.postId} className="border rounded-lg overflow-hidden shadow-md">
-              <div className="relative h-48 overflow-hidden">
-                {item.image && item.image.length > 0 ? (
-                  <img
-                    src={item.image[0] || "/placeholder.svg"}
-                    alt={item.name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-                    <span className="text-gray-500">No image</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="p-4">
-                <h3 className="font-bold text-lg mb-1">{item.name}</h3>
-                <p className="text-gray-600 mb-2">{item.category}</p>
-
-                <div className="mb-3">
-                  {commissionInfo ? (
-                    <div className="space-y-1">
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Base Price:</span>
-                        <span className="line-through">${commissionInfo.basePrice}</span>
+              return (
+                <tr key={item.postId} className="hover:bg-gray-50">
+                  <td className="py-2 px-4 border">
+                    {item.image && item.image.length > 0 ? (
+                      <img
+                        src={item.image[0] || "/placeholder.svg"}
+                        alt={item.name}
+                        className="w-16 h-16 object-cover"
+                        onError={(e) => {
+                          console.log("Image failed to load:", item.image[0])
+                          e.target.src = "https://via.placeholder.com/150"
+                        }}
+                      />
+                    ) : (
+                      <div className="w-16 h-16 bg-gray-200 flex items-center justify-center">
+                        <span className="text-xs text-gray-500">No image</span>
                       </div>
-                      <div className="flex justify-between font-bold">
-                        <span>Your Price:</span>
-                        <span className="text-green-600">${commissionInfo.adjustedPrice}</span>
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        Includes {commissionInfo.commissionPercent}% commission (${commissionInfo.commissionAmount})
-                      </div>
+                    )}
+                  </td>
+                  <td className="py-2 px-4 border">{item.name}</td>
+                  <td className="py-2 px-4 border">{item.category}</td>
+                  <td className="py-2 px-4 border">
+                    {basePrice !== item.price ? (
+                      <span className="line-through">${basePrice.toFixed(2)}</span>
+                    ) : (
+                      <span>${basePrice.toFixed(2)}</span>
+                    )}
+                  </td>
+                  <td className="py-2 px-4 border font-bold">${item.price.toFixed(2)}</td>
+                  <td className="py-2 px-4 border">
+                    {commission > 0 ? (
+                      <span className="text-green-600">
+                        +${commission.toFixed(2)} ({commissionPercent}%)
+                      </span>
+                    ) : (
+                      <span>-</span>
+                    )}
+                  </td>
+                  <td className="py-2 px-4 border">
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => addToCart(item.postId)}
+                        className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm"
+                      >
+                        Add to Cart
+                      </button>
+                      <button
+                        onClick={() => removeFromWishlist(item.postId)}
+                        className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
+                      >
+                        Remove
+                      </button>
                     </div>
-                  ) : (
-                    <div className="font-bold">${item.price.toFixed(2)}</div>
-                  )}
-                </div>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
 
-                <div className="flex space-x-2 mt-4">
-                  <button
-                    onClick={() => addToCart(item.postId)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded flex-1"
-                  >
-                    Add to Cart
-                  </button>
-                  <button
-                    onClick={() => removeFromWishlist(item.postId)}
-                    className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded"
-                  >
-                    Remove
-                  </button>
-                </div>
-              </div>
-            </div>
-          )
-        })}
+      <div className="mt-8 p-4 bg-gray-100 rounded">
+        <h2 className="font-bold mb-2">Debug Information</h2>
+        <button
+          onClick={() => console.log("Current wishlist items:", wishlistItems)}
+          className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm"
+        >
+          Log Wishlist Data to Console
+        </button>
+        <p className="mt-2 text-sm text-gray-600">
+          Open your browser's developer console (F12) to see detailed information about your wishlist items.
+        </p>
       </div>
     </div>
   )
 }
 
-export default Wishlist
+export default WishlistPage
