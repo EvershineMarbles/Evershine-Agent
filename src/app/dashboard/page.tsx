@@ -73,7 +73,7 @@ export default function Dashboard() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <Card className="border rounded-lg overflow-hidden">
+        <Card className="border rounded-lg overflow-hidden" onClick={() => router.push("/dashboard/client-list")}>
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
               <Users className="h-5 w-5 text-[#194a95]" />
@@ -83,7 +83,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="border rounded-lg overflow-hidden">
+        <Card className="border rounded-lg overflow-hidden" onClick={() => router.push("/dashboard/consultant-orders")}>
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
               <Package className="h-5 w-5 text-[#194a95]" />
