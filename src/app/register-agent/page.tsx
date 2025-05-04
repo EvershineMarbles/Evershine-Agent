@@ -192,10 +192,10 @@ export default function RegisterAgent() {
 
               <Button
                 type="submit"
-                className="w-full h-12 mt-6 bg-coral hover:bg-coral/90 text-white rounded-md text-base"
+                className="w-full h-12 mt-6 bg-blue hover:bg-blue/90 text-white rounded-md text-base"
                 disabled={isLoading || success}
               >
-                {isLoading ? "Registering..." : "Register Agent"}
+                {isLoading ? "Registering..." : "Register Consultant"}
               </Button>
             </form>
           </CardContent>
