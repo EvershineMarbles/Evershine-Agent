@@ -163,251 +163,244 @@ export default function WishlistPage() {
       } else {
         setWishlistItems([])
       }
-    }\
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
-    console.error("Error fetching wishlist:", error)
-    setError(errorMessage)
-    toast({
-      title: "Error",
-      description: errorMessage || "Failed to load your wishlist. Please try again.",
-      variant: "destructive",
-    })
-  } finally {
-    setLoading(false)
-    setIsRefreshing(false)
-}
-}, [toast, fetchCommissionData, isRefreshing])
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
+      console.error("Error fetching wishlist:", error)
+      setError(errorMessage)
+      toast({
+        title: "Error",
+        description: errorMessage || "Failed to load your wishlist. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+      setIsRefreshing(false)
+    }
+  }, [toast, fetchCommissionData, isRefreshing])
 
   // Fetch wishlist on component mount - ONLY ONCE
-  useEffect(() =>
-{
-  fetchWishlist()
-  // Do not include fetchWishlist in the dependency array to prevent constant refreshing
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}
-, [])
+  useEffect(() => {
+    fetchWishlist()
+    // Do not include fetchWishlist in the dependency array to prevent constant refreshing
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Fetch cart count - ONLY ONCE
-  useEffect(() =>
-{
-  const fetchCartCount = async () => {
-    try {
-      const token = localStorage.getItem("clientImpersonationToken")
-      if (!token) return
+  useEffect(() => {
+    const fetchCartCount = async () => {
+      try {
+        const token = localStorage.getItem("clientImpersonationToken")
+        if (!token) return
 
-      const response = await fetch("https://evershinebackend-2.onrender.com/api/getUserCart", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
+        const response = await fetch("https://evershinebackend-2.onrender.com/api/getUserCart", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
 
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success && data.data && Array.isArray(data.data.items)) {
-          setCartCount(data.data.items.length)
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success && data.data && Array.isArray(data.data.items)) {
+            setCartCount(data.data.items.length)
+          }
         }
+      } catch (error) {
+        console.error("Error fetching cart count:", error)
       }
-    } catch (error) {
-      console.error("Error fetching cart count:", error)
     }
-  }
 
-  fetchCartCount()
-}
-, [])
+    fetchCartCount()
+  }, [])
 
   // Initialize action loading state for each item
-  useEffect(() =>
-{
-  const initialState: Record<string, { removing: boolean; addingToCart: boolean }> = {}
-  wishlistItems.forEach((item) => {
-    initialState[item.postId] = { removing: false, addingToCart: false }
-  })
-  setActionLoading(initialState)
-}
-, [wishlistItems])
-
-// Handle quantity change
-const handleQuantityChange = (postId: string, value: string) => {
-  const numValue = Number.parseInt(value, 10)
-  if (!isNaN(numValue) && numValue > 0) {
-    setQuantities((prev) => ({
-      ...prev,
-      [postId]: numValue,
-    }))
-  }
-}
-
-// Remove item from wishlist
-const removeFromWishlist = async (productId: string) => {
-  try {
-    setActionLoading((prev) => ({
-      ...prev,
-      [productId]: { ...prev[productId], removing: true },
-    }))
-
-    // Get the token
-    const token = localStorage.getItem("clientImpersonationToken")
-
-    if (!token) {
-      throw new Error("No authentication token found. Please refresh the page and try again.")
-    }
-
-    console.log("Removing item from wishlist with token:", token.substring(0, 15) + "...")
-
-    const response = await fetch("https://evershinebackend-2.onrender.com/api/deleteUserWishlistItem", {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ productId }),
+  useEffect(() => {
+    const initialState: Record<string, { removing: boolean; addingToCart: boolean }> = {}
+    wishlistItems.forEach((item) => {
+      initialState[item.postId] = { removing: false, addingToCart: false }
     })
+    setActionLoading(initialState)
+  }, [wishlistItems])
 
-    // Check for errors
-    if (!response.ok) {
-      if (response.status === 401) {
-        throw new Error("Authentication failed. Please refresh the token and try again.")
-      } else {
-        throw new Error(`API error: ${response.status} ${response.statusText}`)
+  // Handle quantity change
+  const handleQuantityChange = (postId: string, value: string) => {
+    const numValue = Number.parseInt(value, 10)
+    if (!isNaN(numValue) && numValue > 0) {
+      setQuantities((prev) => ({
+        ...prev,
+        [postId]: numValue,
+      }))
+    }
+  }
+
+  // Remove item from wishlist
+  const removeFromWishlist = async (productId: string) => {
+    try {
+      setActionLoading((prev) => ({
+        ...prev,
+        [productId]: { ...prev[productId], removing: true },
+      }))
+
+      // Get the token
+      const token = localStorage.getItem("clientImpersonationToken")
+
+      if (!token) {
+        throw new Error("No authentication token found. Please refresh the page and try again.")
       }
-    }
 
-    const data = await response.json()
+      console.log("Removing item from wishlist with token:", token.substring(0, 15) + "...")
 
-    if (data.success) {
-      setWishlistItems((prev) => prev.filter((item) => item.postId !== productId))
-
-      toast({
-        title: "Item removed",
-        description: "Item has been removed from your wishlist",
-        variant: "default",
+      const response = await fetch("https://evershinebackend-2.onrender.com/api/deleteUserWishlistItem", {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ productId }),
       })
-    } else {
-      throw new Error(data.message || "Failed to remove item")
-    }
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
-    console.error("Error removing item from wishlist:", error)
-    toast({
-      title: "Error",
-      description: errorMessage || "Failed to remove item from wishlist. Please try again.",
-      variant: "destructive",
-    })
-  } finally {
-    setActionLoading((prev) => ({
-      ...prev,
-      [productId]: { ...prev[productId], removing: false },
-    }))
-  }
-}
 
-// Add item to cart and remove from wishlist
-const addToCart = async (productId: string) => {
-  try {
-    setActionLoading((prev) => ({
-      ...prev,
-      [productId]: { ...prev[productId], addingToCart: true },
-    }))
-
-    // Get the token
-    const token = localStorage.getItem("clientImpersonationToken")
-
-    if (!token) {
-      throw new Error("No authentication token found. Please refresh the page and try again.")
-    }
-
-    // Get the current quantity for this item
-    const quantity = quantities[productId] || 1
-
-    // Get the item from wishlist to use its price
-    const wishlistItem = wishlistItems.find((item) => item.postId === productId)
-
-    if (!wishlistItem) {
-      throw new Error("Item not found in wishlist")
-    }
-
-    console.log("Adding item to cart with token:", token.substring(0, 15) + "...")
-
-    const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        productId,
-        quantity,
-        // Pass the adjusted price that was saved in the wishlist
-        price: wishlistItem.price,
-      }),
-    })
-
-    // Check for errors
-    if (!response.ok) {
-      if (response.status === 401) {
-        throw new Error("Authentication failed. Please refresh the token and try again.")
-      } else {
-        throw new Error(`API error: ${response.status} ${response.statusText}`)
+      // Check for errors
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error("Authentication failed. Please refresh the token and try again.")
+        } else {
+          throw new Error(`API error: ${response.status} ${response.statusText}`)
+        }
       }
-    }
 
-    const data = await response.json()
+      const data = await response.json()
 
-    if (data.success) {
-      // Increment cart count
-      setCartCount((prev) => prev + 1)
+      if (data.success) {
+        setWishlistItems((prev) => prev.filter((item) => item.postId !== productId))
 
-      // Now remove from wishlist
-      await removeFromWishlist(productId)
-
+        toast({
+          title: "Item removed",
+          description: "Item has been removed from your wishlist",
+          variant: "default",
+        })
+      } else {
+        throw new Error(data.message || "Failed to remove item")
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
+      console.error("Error removing item from wishlist:", error)
       toast({
-        title: "Added to cart",
-        description: "Item has been added to your cart and removed from wishlist",
-        variant: "default",
+        title: "Error",
+        description: errorMessage || "Failed to remove item from wishlist. Please try again.",
+        variant: "destructive",
       })
-    } else {
-      throw new Error(data.message || "Failed to add item to cart")
+    } finally {
+      setActionLoading((prev) => ({
+        ...prev,
+        [productId]: { ...prev[productId], removing: false },
+      }))
     }
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
-    console.error("Error adding item to cart:", error)
-    toast({
-      title: "Error",
-      description: errorMessage || "Failed to add item to cart. Please try again.",
-      variant: "destructive",
-    })
-  } finally {
-    setActionLoading((prev) => ({
-      ...prev,
-      [productId]: { ...prev[productId], addingToCart: false },
-    }))
   }
-}
 
-// Refresh wishlist - ONLY when manually triggered
-const refreshWishlist = () => {
-  if (!isRefreshing) {
-    fetchWishlist()
-    toast({
-      title: "Refreshing wishlist",
-      description: "Getting the latest wishlist data with updated prices",
-    })
+  // Add item to cart and remove from wishlist
+  const addToCart = async (productId: string) => {
+    try {
+      setActionLoading((prev) => ({
+        ...prev,
+        [productId]: { ...prev[productId], addingToCart: true },
+      }))
+
+      // Get the token
+      const token = localStorage.getItem("clientImpersonationToken")
+
+      if (!token) {
+        throw new Error("No authentication token found. Please refresh the page and try again.")
+      }
+
+      // Get the current quantity for this item
+      const quantity = quantities[productId] || 1
+
+      // Get the item from wishlist to use its price
+      const wishlistItem = wishlistItems.find((item) => item.postId === productId)
+
+      if (!wishlistItem) {
+        throw new Error("Item not found in wishlist")
+      }
+
+      console.log("Adding item to cart with token:", token.substring(0, 15) + "...")
+
+      const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          productId,
+          quantity,
+          // Pass the adjusted price that was saved in the wishlist
+          price: wishlistItem.price,
+        }),
+      })
+
+      // Check for errors
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error("Authentication failed. Please refresh the token and try again.")
+        } else {
+          throw new Error(`API error: ${response.status} ${response.statusText}`)
+        }
+      }
+
+      const data = await response.json()
+
+      if (data.success) {
+        // Increment cart count
+        setCartCount((prev) => prev + 1)
+
+        // Now remove from wishlist
+        await removeFromWishlist(productId)
+
+        toast({
+          title: "Added to cart",
+          description: "Item has been added to your cart and removed from wishlist",
+          variant: "default",
+        })
+      } else {
+        throw new Error(data.message || "Failed to add item to cart")
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
+      console.error("Error adding item to cart:", error)
+      toast({
+        title: "Error",
+        description: errorMessage || "Failed to add item to cart. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setActionLoading((prev) => ({
+        ...prev,
+        [productId]: { ...prev[productId], addingToCart: false },
+      }))
+    }
   }
-}
 
-if (loading) {
-  return (
+  // Refresh wishlist - ONLY when manually triggered
+  const refreshWishlist = () => {
+    if (!isRefreshing) {
+      fetchWishlist()
+      toast({
+        title: "Refreshing wishlist",
+        description: "Getting the latest wishlist data with updated prices",
+      })
+    }
+  }
+
+  if (loading) {
+    return (
       <div className="flex flex-col items-center justify-center h-[80vh]">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
         <p className="text-muted-foreground">Loading your wishlist...</p>
       </div>
     )
-}
+  }
 
-if (error) {
-  return (
+  if (error) {
+    return (
       <div className="p-6 md:p-8">
         <div className="flex items-center mb-8">
           <Button variant="ghost" size="icon" onClick={() => router.back()} className="mr-4">
@@ -426,9 +419,9 @@ if (error) {
         </div>
       </div>
     )
-}
+  }
 
-return (
+  return (
     <div className="p-6 md:p-8">
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center">
