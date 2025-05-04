@@ -21,7 +21,7 @@ const WishlistPage = () => {
       console.log("Fetching wishlist...")
 
       const response = await axios.get(
-        `${process.env.REACT_APP_API_URL || "http://localhost:8000"}/api/getUserWishlist`,
+        `${process.env.REACT_APP_API_URL || "https://evershinebackend-2.onrender.com"}/api/getUserWishlist`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -63,7 +63,7 @@ const WishlistPage = () => {
       console.log(`Removing product ${productId} from wishlist...`)
 
       const response = await axios.delete(
-        `${process.env.REACT_APP_API_URL || "http://localhost:8000"}/api/deleteUserWishlistItem`,
+        `${process.env.REACT_APP_API_URL || "https://evershinebackend-2.onrender.com"}/api/deleteUserWishlistItem`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -93,7 +93,7 @@ const WishlistPage = () => {
       console.log(`Adding product ${productId} to cart...`)
 
       const response = await axios.post(
-        `${process.env.REACT_APP_API_URL || "http://localhost:8000"}/api/addToCart`,
+        `${process.env.REACT_APP_API_URL || "https://evershinebackend-2.onrender.com"}/api/addToCart`,
         { productId },
         {
           headers: {
