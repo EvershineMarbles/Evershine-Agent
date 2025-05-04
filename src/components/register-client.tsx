@@ -714,31 +714,29 @@ export default function RegisterClient() {
                     <button
                       type="button"
                       onClick={() => handleSelectChange("consultantLevel", "standard")}
-                      className={`w-8 h-8 rounded-full bg-red-500 transition-all ${
-                        formData.consultantLevel === "standard" ? "ring-4 ring-red-200 scale-110" : "hover:scale-105"
+                      className={`w-6 h-6 rounded-full bg-red-500 transition-all ${
+                        formData.consultantLevel === "standard" ? "ring-4 ring-red-120 scale-80" : "hover:scale-105"
                       }`}
                       aria-label="Standard consultant level"
                     />
                     <button
                       type="button"
                       onClick={() => handleSelectChange("consultantLevel", "premium")}
-                      className={`w-8 h-8 rounded-full bg-yellow-500 transition-all ${
-                        formData.consultantLevel === "premium" ? "ring-4 ring-yellow-200 scale-110" : "hover:scale-105"
+                      className={`w-6 h-6 rounded-full bg-yellow-500 transition-all ${
+                        formData.consultantLevel === "premium" ? "ring-4 ring-yellow-120 scale-80" : "hover:scale-105"
                       }`}
                       aria-label="Premium consultant level"
                     />
                     <button
                       type="button"
                       onClick={() => handleSelectChange("consultantLevel", "elite")}
-                      className={`w-8 h-8 rounded-full bg-purple-600 transition-all ${
-                        formData.consultantLevel === "elite" ? "ring-4 ring-purple-200 scale-110" : "hover:scale-105"
+                      className={`w-6 h-6 rounded-full bg-purple-600 transition-all ${
+                        formData.consultantLevel === "elite" ? "ring-4 ring-purple-120 scale-80" : "hover:scale-105"
                       }`}
                       aria-label="Elite consultant level"
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Select a consultant level to determine commission rates for product pricing
-                  </p>
+               
                 </div>
 
                 <div className="flex items-center space-x-2 mt-4">
