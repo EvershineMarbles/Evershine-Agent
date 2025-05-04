@@ -106,7 +106,7 @@ export default function AgentDetailsPage() {
     <div className="p-4 md:p-6">
       <div className="flex flex-col">
         <div className="flex flex-col mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold mb-4">Advisor Details</h1>
+          <h1 className="text-2xl md:text-3xl font-bold mb-4">Consultant Details</h1>
         </div>
 
         {error && (

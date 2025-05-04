@@ -33,7 +33,7 @@ export const agentAPI = {
       } else {
         throw new Error(data.message || "Failed to login")
       }
-    } catch (error: Error | unknown) {
+    } catch (error: any) {
       console.error("Login error:", error)
       return {
         success: false,
@@ -41,7 +41,7 @@ export const agentAPI = {
       }
     }
   },
-  register: async (name: string, email: string, password: string) => {
+  egister: async (name: string, email: string, password: string) => {
     try {
       const response = await fetch("https://evershinebackend-2.onrender.com/api/create-agent", {
         method: "POST",
@@ -165,6 +165,49 @@ export const agentAPI = {
     } catch (error) {
       console.error("API Error:", error)
       return { success: false, message: "Failed to impersonate client" }
+    }
+  },
+  // Add the getAgentOrders function here
+  getAgentOrders: async () => {
+    try {
+      const token = localStorage.getItem("agentToken")
+
+      if (!token) {
+        console.error("No agent token found in localStorage")
+        return { success: false, message: "No authentication token found" }
+      }
+
+      // Use the same URL pattern as your other API calls
+      const response = await fetch("https://evershinebackend-2.onrender.com/api/agent/orders", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (!response.ok) {
+        console.error("API error:", response.status, response.statusText)
+        return {
+          success: false,
+          message: `API error: ${response.status} ${response.statusText}`,
+        }
+      }
+
+      const data = await response.json()
+      console.log("Agent orders response:", data)
+
+      return {
+        success: true,
+        data: data.data,
+        message: data.message,
+      }
+    } catch (error) {
+      console.error("Error fetching agent orders:", error)
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : "Failed to fetch orders",
+      }
     }
   },
 }

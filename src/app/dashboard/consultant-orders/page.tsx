@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Package, Search, Filter, Loader2, Calendar } from 'lucide-react'
+import { ArrowLeft, Package, Search, Filter, Loader2, Calendar } from "lucide-react"
 import { agentAPI } from "@/lib/api-utils"
 import { isAgentAuthenticated } from "@/lib/auth-utils"
 import { useToast } from "@/components/ui/use-toast"
@@ -63,6 +63,7 @@ export default function AgentOrders() {
     try {
       // Fetch orders
       const ordersResponse = await agentAPI.getAgentOrders()
+      console.log("Orders response:", ordersResponse)
 
       if (ordersResponse.success && Array.isArray(ordersResponse.data)) {
         // Fetch clients to get names
