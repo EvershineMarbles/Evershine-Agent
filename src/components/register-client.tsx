@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Phone, User, Mail, MapPin, Building, Calendar, Loader2 } from 'lucide-react'
+import { ArrowLeft, Phone, User, Mail, MapPin, Building, Calendar, Loader2 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -705,26 +705,39 @@ export default function RegisterClient() {
                   </div>
                 </div>
 
-                {/* Consultant Level */}
+                {/* Consultant Level with colored dots */}
                 <div className="space-y-2 mt-4">
                   <Label htmlFor="consultantLevel" className="text-base font-medium">
-                    Consultant Level
+                    Consultant
                   </Label>
-                  <Select
-                    value={formData.consultantLevel}
-                    onValueChange={(value) => handleSelectChange("consultantLevel", value)}
-                  >
-                    <SelectTrigger className="h-12 rounded-md">
-                      <SelectValue placeholder="Select consultant level" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="standard">Standard</SelectItem>
-                      <SelectItem value="premium">Premium</SelectItem>
-                      <SelectItem value="elite">Elite</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center gap-6 mt-2">
+                    <button
+                      type="button"
+                      onClick={() => handleSelectChange("consultantLevel", "standard")}
+                      className={`w-8 h-8 rounded-full bg-red-500 transition-all ${
+                        formData.consultantLevel === "standard" ? "ring-4 ring-red-200 scale-110" : "hover:scale-105"
+                      }`}
+                      aria-label="Standard consultant level"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleSelectChange("consultantLevel", "premium")}
+                      className={`w-8 h-8 rounded-full bg-yellow-500 transition-all ${
+                        formData.consultantLevel === "premium" ? "ring-4 ring-yellow-200 scale-110" : "hover:scale-105"
+                      }`}
+                      aria-label="Premium consultant level"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleSelectChange("consultantLevel", "elite")}
+                      className={`w-8 h-8 rounded-full bg-purple-600 transition-all ${
+                        formData.consultantLevel === "elite" ? "ring-4 ring-purple-200 scale-110" : "hover:scale-105"
+                      }`}
+                      aria-label="Elite consultant level"
+                    />
+                  </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    The consultant level determines the commission rates for product pricing
+                    Select a consultant level to determine commission rates for product pricing
                   </p>
                 </div>
 
