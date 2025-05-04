@@ -136,7 +136,7 @@ export default function AdminDashboard() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <Input
               type="text"
-              placeholder="Search by client name, product, sales agent..."
+              placeholder="Search by client name, product, sales consultant..."
               className="pl-10 py-2 border rounded-full"
             />
           </div>
@@ -178,7 +178,7 @@ export default function AdminDashboard() {
  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <Link href="/admin/dashboard/agents" className="w-full">
                 <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-12 text-lg font-normal w-full rounded-md">
-                  Advisors
+                Consultants
                 </Button>
               </Link>
 

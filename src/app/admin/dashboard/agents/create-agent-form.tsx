@@ -102,7 +102,7 @@ export default function CreateAgentForm() {
                 Creating...
               </>
             ) : (
-              "Create Agent"
+              "Create Consultant"
             )}
           </Button>
         </form>
