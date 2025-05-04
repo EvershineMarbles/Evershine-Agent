@@ -44,6 +44,7 @@ export default function WishlistPage() {
   const [commissionData, setCommissionData] = useState<CommissionData | null>(null)
   const [overrideCommissionRate, setOverrideCommissionRate] = useState<number | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [clientData, setClientData] = useState<any>(null)
 
   // Load saved commission rate from localStorage on component mount
   useEffect(() => {
@@ -104,6 +105,71 @@ export default function WishlistPage() {
     },
     [commissionData, overrideCommissionRate],
   )
+
+  // Fetch client data
+  useEffect(() => {
+    const fetchClientData = async () => {
+      try {
+        const token = localStorage.getItem("clientImpersonationToken")
+        if (!token) return
+
+        const response = await fetch(`https://evershinebackend-2.onrender.com/api/getClientDetails/${clientId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.data) {
+            setClientData(data.data)
+
+            // Set commission rate based on consultant level color
+            if (data.data.consultantLevel) {
+              const consultantLevel = data.data.consultantLevel
+              console.log("Client consultant level:", consultantLevel)
+
+              // Map color to commission rate
+              let commissionRate = null
+              switch (consultantLevel) {
+                case "red":
+                  commissionRate = 5
+                  break
+                case "yellow":
+                  commissionRate = 10
+                  break
+                case "purple":
+                  commissionRate = 15
+                  break
+                default:
+                  commissionRate = null
+              }
+
+              // Set the override commission rate
+              setOverrideCommissionRate(commissionRate)
+              console.log(`Setting commission rate to ${commissionRate}% based on consultant level ${consultantLevel}`)
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching client data:", error)
+      }
+    }
+
+    fetchClientData()
+  }, [clientId])
+
+  // Show toast when commission rate is automatically set from client data
+  useEffect(() => {
+    if (clientData?.consultantLevel && overrideCommissionRate !== null) {
+      toast({
+        title: "Commission Rate Applied",
+        description: `${overrideCommissionRate}% commission rate applied based on client's ${clientData.consultantLevel} consultant level`,
+        duration: 3000,
+      })
+    }
+  }, [clientData?.consultantLevel, overrideCommissionRate, toast])
 
   // Fetch wishlist items
   const fetchWishlist = useCallback(async () => {
@@ -432,6 +498,22 @@ export default function WishlistPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Display consultant level indicator */}
+          {clientData?.consultantLevel && (
+            <div className="flex items-center mr-2">
+              <div
+                className={`w-4 h-4 rounded-full mr-1 ${
+                  clientData.consultantLevel === "red"
+                    ? "bg-red-500"
+                    : clientData.consultantLevel === "yellow"
+                      ? "bg-yellow-500"
+                      : "bg-purple-500"
+                }`}
+              />
+              <span className="text-xs text-gray-600">{clientData.consultantLevel} level</span>
+            </div>
+          )}
+
           {/* Refresh Wishlist Button */}
           <Button
             variant="outline"
@@ -495,7 +577,14 @@ export default function WishlistPage() {
         <div className="bg-card rounded-lg border border-border overflow-hidden">
           <div className="p-4 bg-muted/20 border-b border-border flex justify-between items-center">
             <h2 className="font-semibold">Wishlist Items ({wishlistItems.length})</h2>
-            <p className="text-xs text-muted-foreground">Prices include commission</p>
+            <div className="flex items-center">
+              {clientData?.consultantLevel && (
+                <span className="text-xs text-muted-foreground mr-2">
+                  {overrideCommissionRate}% commission ({clientData.consultantLevel} level)
+                </span>
+              )}
+              <p className="text-xs text-muted-foreground">Prices include commission</p>
+            </div>
           </div>
           <div className="divide-y divide-border">
             {wishlistItems.map((item) => (
