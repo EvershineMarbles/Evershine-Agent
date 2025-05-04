@@ -3,30 +3,39 @@
 import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Users, Loader2, Calendar, Phone } from "lucide-react"
+import { ArrowLeft, Package, Loader2, Calendar } from "lucide-react"
 import { agentAPI } from "@/lib/api-utils"
 import { isAgentAuthenticated } from "@/lib/auth-utils"
 import { useToast } from "@/components/ui/use-toast"
-import { Badge } from "@/components/ui/badge"
-
-// Define client interface
+// Define interfaces
 interface Client {
   _id: string
   name: string
   clientId: string
   mobile?: string
-  email?: string
-  city?: string
-  profession?: string
+}
+
+interface Order {
+  _id: string
+  orderId: string
+  clientId: string
+}
+
+// Define combined interface for display
+interface ClientOrder {
+  clientName: string
+  clientMobile: string
+  orderId: string
+  clientId: string
 }
 
 export default function AgentOrders() {
   const router = useRouter()
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(true)
-  const [clients, setClients] = useState<Client[]>([])
+  const [clientOrders, setClientOrders] = useState<ClientOrder[]>([])
 
-  // Fetch clients
+  // Fetch data
   const fetchData = useCallback(async () => {
     setIsLoading(true)
     try {
@@ -35,17 +44,71 @@ export default function AgentOrders() {
       const clientsResponse = await agentAPI.getClients()
       console.log("Clients response:", clientsResponse)
 
-      if (clientsResponse.success && Array.isArray(clientsResponse.data)) {
-        setClients(clientsResponse.data)
-      } else {
+      if (!clientsResponse.success || !Array.isArray(clientsResponse.data)) {
         console.error("Failed to fetch clients:", clientsResponse.message)
         toast({
           title: "Error",
           description: clientsResponse.message || "Failed to fetch clients",
           variant: "destructive",
         })
-        setClients([])
+        setClientOrders([])
+        setIsLoading(false)
+        return
       }
+
+      const clients = clientsResponse.data
+
+      // Create a map of clients by clientId for easy lookup
+      const clientMap = new Map()
+      clients.forEach((client) => {
+        clientMap.set(client.clientId, {
+          name: client.name || "Unknown",
+          mobile: client.mobile || "-",
+        })
+      })
+
+      // For now, just display clients without orders since orders API isn't working
+      const clientOrdersList: ClientOrder[] = []
+
+      // Add each client to the list (even without orders)
+      clients.forEach((client) => {
+        clientOrdersList.push({
+          clientName: client.name || "Unknown",
+          clientMobile: client.mobile || "-",
+          orderId: "No orders yet",
+          clientId: client.clientId,
+        })
+      })
+
+      // Try to fetch orders if available
+      try {
+        console.log("Fetching agent orders...")
+        const ordersResponse = await agentAPI.getAgentOrders()
+        console.log("Orders response:", ordersResponse)
+
+        if (ordersResponse.success && Array.isArray(ordersResponse.data) && ordersResponse.data.length > 0) {
+          // Clear the previous list that had placeholder "No orders yet"
+          clientOrdersList.length = 0
+
+          // Add actual orders
+          ordersResponse.data.forEach((order) => {
+            const client = clientMap.get(order.clientId)
+            if (client) {
+              clientOrdersList.push({
+                clientName: client.name,
+                clientMobile: client.mobile,
+                orderId: order.orderId,
+                clientId: order.clientId,
+              })
+            }
+          })
+        }
+      } catch (orderError) {
+        console.error("Error fetching orders:", orderError)
+        // Continue with just clients if orders fail
+      }
+
+      setClientOrders(clientOrdersList)
     } catch (error) {
       console.error("Error fetching data:", error)
       toast({
@@ -53,6 +116,7 @@ export default function AgentOrders() {
         description: "Failed to fetch data. Please try again.",
         variant: "destructive",
       })
+      setClientOrders([])
     } finally {
       setIsLoading(false)
     }
@@ -78,7 +142,7 @@ export default function AgentOrders() {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin mr-2" />
-        <p>Loading clients...</p>
+        <p>Loading data...</p>
       </div>
     )
   }
@@ -92,7 +156,7 @@ export default function AgentOrders() {
             <button onClick={() => router.push("/dashboard")} className="p-2 rounded-full hover:bg-gray-100">
               <ArrowLeft className="h-5 w-5" />
             </button>
-            <h1 className="text-3xl font-bold">Your Clients</h1>
+            <h1 className="text-3xl font-bold">Agent Orders</h1>
           </div>
 
           <div className="flex items-center gap-4">
@@ -106,56 +170,49 @@ export default function AgentOrders() {
           </div>
         </div>
 
-        {/* Clients List Card */}
+        {/* Client Orders List Card */}
         <Card className="mb-8">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <div className="flex items-center">
-                <Users className="h-5 w-5 mr-2" />
-                Client List
+                <Package className="h-5 w-5 mr-2" />
+                Client Orders
               </div>
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                  {clients.length} Clients
-                </Badge>
+                <span className="text-sm text-gray-500">{clientOrders.length} entries</span>
               </div>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin" />
-              </div>
-            ) : clients.length > 0 ? (
+            {clientOrders.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b">
-                      <th className="text-left py-3 px-4">Name</th>
+                      <th className="text-left py-3 px-4">Client Name</th>
                       <th className="text-left py-3 px-4">Mobile</th>
-                      <th className="text-left py-3 px-4">City</th>
-                      <th className="text-left py-3 px-4">Profession</th>
+                      <th className="text-left py-3 px-4">Order ID</th>
                       <th className="text-center py-3 px-4">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {clients.map((client) => (
-                      <tr key={client.clientId} className="border-b hover:bg-gray-50">
-                        <td className="py-3 px-4 font-medium">{client.name}</td>
+                    {clientOrders.map((item, index) => (
+                      <tr key={`${item.clientId}-${item.orderId}-${index}`} className="border-b hover:bg-gray-50">
+                        <td className="py-3 px-4 font-medium">{item.clientName}</td>
+                        <td className="py-3 px-4">{item.clientMobile}</td>
                         <td className="py-3 px-4">
-                          <div className="flex items-center">
-                            <Phone className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
-                            {client.mobile || "-"}
-                          </div>
+                          {item.orderId === "No orders yet" ? (
+                            <span className="text-gray-500">No orders yet</span>
+                          ) : (
+                            item.orderId
+                          )}
                         </td>
-                        <td className="py-3 px-4">{client.city || "-"}</td>
-                        <td className="py-3 px-4">{client.profession || "-"}</td>
                         <td className="py-3 px-4 flex justify-center gap-2">
                           <button
-                            onClick={() => handleViewClient(client.clientId)}
+                            onClick={() => handleViewClient(item.clientId)}
                             className="bg-[#194a95] hover:bg-[#194a95]/90 text-white hover:text-white px-3 py-1.5 rounded-md text-sm flex items-center gap-2"
                           >
-                            <span>Access Dashboard</span>
+                            <span>View Client</span>
                           </button>
                         </td>
                       </tr>
@@ -165,13 +222,8 @@ export default function AgentOrders() {
               </div>
             ) : (
               <div className="text-center py-8">
-                <p className="text-muted-foreground mb-4">No clients found</p>
-                <button
-                  onClick={() => router.push("/register-client")}
-                  className="bg-[#194a95] hover:bg-[#194a95]/90 text-white hover:text-white px-4 py-2 rounded-md"
-                >
-                  Register New Client
-                </button>
+                <p className="text-muted-foreground mb-4">No data found</p>
+                <p className="text-gray-500">Client orders will appear here when available</p>
               </div>
             )}
           </CardContent>
