@@ -229,7 +229,7 @@ export default function RegisterClient() {
     }
   }
 
-  // Updated handleSubmitDetails function
+  // Updated handleSubmitDetails function with client dashboard redirect
   const handleSubmitDetails = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
@@ -290,13 +290,51 @@ export default function RegisterClient() {
       const data = await response.json()
       console.log("Create client response:", data)
 
+      // Get the client ID from the response
+      const clientId = data.data?.client?.clientId
+
+      if (!clientId) {
+        throw new Error("Client ID not found in response")
+      }
+
       toast({
         title: "Success",
         description: "Client registered successfully!",
       })
 
-      // Redirect to dashboard
-      router.push("/dashboard")
+      // Generate impersonation token for the new client
+      try {
+        const impersonateResponse = await fetch(
+          `https://evershinebackend-2.onrender.com/api/agent/impersonate/${clientId}`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          },
+        )
+
+        if (!impersonateResponse.ok) {
+          throw new Error("Failed to generate impersonation token")
+        }
+
+        const impersonateData = await impersonateResponse.json()
+
+        if (impersonateData.success && impersonateData.data?.impersonationToken) {
+          // Store the impersonation token
+          localStorage.setItem("clientImpersonationToken", impersonateData.data.impersonationToken)
+
+          // Redirect to client dashboard
+          router.push(`/client-dashboard/${clientId}`)
+        } else {
+          throw new Error("Invalid impersonation token response")
+        }
+      } catch (impersonateError) {
+        console.error("Error generating impersonation token:", impersonateError)
+        // If impersonation fails, still redirect to client dashboard
+        router.push(`/client-dashboard/${clientId}`)
+      }
     } catch (error: any) {
       console.error("Error creating client:", error)
       const errorMessage = error instanceof Error ? error.message : "An error occurred while creating the client"
@@ -680,7 +718,14 @@ export default function RegisterClient() {
                   className="w-full h-12 mt-6 bg-blue hover:bg-blue/90 text-white rounded-md text-base"
                   disabled={!formData.agreeToTerms || isLoading}
                 >
-                  {isLoading ? "Creating Client..." : "Complete Registration"}
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating Client...
+                    </>
+                  ) : (
+                    "Complete Registration"
+                  )}
                 </Button>
               </form>
             </CardContent>

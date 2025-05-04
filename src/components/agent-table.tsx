@@ -238,7 +238,7 @@ export default function AgentTable() {
       setAgents((prev) => prev.filter((agent) => agent.agentId !== deletingAgent.agentId))
 
       toast({
-        title: "Advisor deleted",
+        title: "Consultant deleted",
         description: `${deletingAgent.name} has been successfully removed from the system.`,
         variant: "default",
       })
@@ -355,7 +355,7 @@ export default function AgentTable() {
       <Card className="shadow-sm border-0">
         <CardHeader className="flex flex-row items-center justify-between p-6">
           <div className="flex items-center gap-2">
-            <h2 className="text-xl font-bold">Advisors</h2>
+            <h2 className="text-xl font-bold">Consultants</h2>
             <Badge variant="outline" className="ml-2 bg-primary/10 text-primary">
               {agents.length}
             </Badge>
@@ -374,7 +374,7 @@ export default function AgentTable() {
               <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             </Button>
             <Button className="bg-primary hover:bg-primary/90 text-white" onClick={handleCreateClick}>
-              <Plus className="mr-2 h-4 w-4" /> Add Advisor
+              <Plus className="mr-2 h-4 w-4" /> Add Consultant
             </Button>
           </div>
         </CardHeader>
@@ -390,9 +390,9 @@ export default function AgentTable() {
             </div>
           ) : filteredAgents.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-muted-foreground mb-4">No advisors found</p>
+              <p className="text-muted-foreground mb-4">No consultants found</p>
               <Button className="bg-primary hover:bg-primary/90 text-white" onClick={handleCreateClick}>
-                Add Your First Advisor
+                Add Your First Consultant
               </Button>
             </div>
           ) : (
@@ -527,7 +527,7 @@ export default function AgentTable() {
           <DialogHeader>
             <DialogTitle className="text-xl">Confirm Deletion</DialogTitle>
             <DialogDescription className="py-3">
-              Are you sure you want to delete advisor <span className="font-semibold">{deletingAgent?.name}</span>?
+              Are you sure you want to delete consultant <span className="font-semibold">{deletingAgent?.name}</span>?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
@@ -547,7 +547,7 @@ export default function AgentTable() {
                   Deleting...
                 </>
               ) : (
-                "Delete Advisor"
+                "Delete Consultant"
               )}
             </Button>
           </DialogFooter>

@@ -16,7 +16,7 @@ export function AdminSidebar() {
       icon: Home,
     },
     {
-      name: "Advisors",
+      name: "Consultant",
       href: "/admin/dashboard/agents",
       icon: UserCog,
     },
