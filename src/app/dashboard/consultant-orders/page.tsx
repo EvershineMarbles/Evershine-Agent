@@ -3,14 +3,12 @@
 import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Package, Search, Filter, Loader2, Calendar } from "lucide-react"
+import { ArrowLeft, Package, Loader2, Calendar } from "lucide-react"
 import { agentAPI } from "@/lib/api-utils"
 import { isAgentAuthenticated } from "@/lib/auth-utils"
 import { useToast } from "@/components/ui/use-toast"
-import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { format } from "date-fns"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 // Define order interface
 interface OrderItem {
@@ -53,21 +51,22 @@ export default function AgentOrders() {
   const [isLoading, setIsLoading] = useState(true)
   const [orders, setOrders] = useState<Order[]>([])
   const [clients, setClients] = useState<Client[]>([])
-  const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState<string>("all")
-  const [paymentFilter, setPaymentFilter] = useState<string>("all")
 
   // Fetch orders and clients
   const fetchData = useCallback(async () => {
     setIsLoading(true)
     try {
       // Fetch orders
+      console.log("Fetching agent orders...")
       const ordersResponse = await agentAPI.getAgentOrders()
       console.log("Orders response:", ordersResponse)
 
       if (ordersResponse.success && Array.isArray(ordersResponse.data)) {
+        console.log("Successfully fetched orders:", ordersResponse.data)
+
         // Fetch clients to get names
         const clientsResponse = await agentAPI.getClients()
+        console.log("Clients response:", clientsResponse)
 
         if (clientsResponse.success && Array.isArray(clientsResponse.data)) {
           setClients(clientsResponse.data)
@@ -81,11 +80,14 @@ export default function AgentOrders() {
             }
           })
 
+          console.log("Orders with client names:", ordersWithClientNames)
           setOrders(ordersWithClientNames)
         } else {
+          console.log("Setting orders without client names")
           setOrders(ordersResponse.data)
         }
       } else {
+        console.error("Failed to fetch orders:", ordersResponse.message)
         toast({
           title: "Error",
           description: ordersResponse.message || "Failed to fetch orders",
@@ -195,22 +197,17 @@ export default function AgentOrders() {
     router.push(`/order-details/${orderId}`)
   }
 
-  // Filter orders based on search query and filters
-  const filteredOrders = orders.filter((order) => {
-    // Search filter
-    const searchMatch =
-      (order.orderId && order.orderId.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (order.clientName && order.clientName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (order.totalAmount && order.totalAmount.toString().includes(searchQuery))
+  // Filter to only show active orders (not cancelled or delivered)
+  const activeOrders = orders.filter(
+    (order) => order.status.toLowerCase() !== "cancelled" && order.status.toLowerCase() !== "delivered",
+  )
 
-    // Status filter
-    const statusMatch = statusFilter === "all" || order.status.toLowerCase() === statusFilter.toLowerCase()
-
-    // Payment filter
-    const paymentMatch = paymentFilter === "all" || order.paymentStatus.toLowerCase() === paymentFilter.toLowerCase()
-
-    return searchMatch && statusMatch && paymentMatch
-  })
+  // Log active orders to console
+  useEffect(() => {
+    if (activeOrders.length > 0) {
+      console.log("Active orders:", activeOrders)
+    }
+  }, [activeOrders])
 
   if (isLoading && orders.length === 0) {
     return (
@@ -233,17 +230,7 @@ export default function AgentOrders() {
             <h1 className="text-3xl font-bold">Agent Orders</h1>
           </div>
 
-          <div className="flex items-center gap-4 w-full md:w-auto">
-            <div className="relative flex-grow md:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                type="text"
-                placeholder="Search orders..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
+          <div className="flex items-center gap-4">
             <button
               onClick={() => fetchData()}
               className="flex items-center gap-2 bg-[#194a95] text-white hover:bg-[#194a95]/90 hover:text-white px-4 py-2 rounded-md"
@@ -254,54 +241,16 @@ export default function AgentOrders() {
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-wrap gap-4 mb-6">
-          <div className="w-full md:w-auto">
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full md:w-[180px]">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="processing">Processing</SelectItem>
-                <SelectItem value="shipped">Shipped</SelectItem>
-                <SelectItem value="delivered">Delivered</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="w-full md:w-auto">
-            <Select value={paymentFilter} onValueChange={setPaymentFilter}>
-              <SelectTrigger className="w-full md:w-[180px]">
-                <SelectValue placeholder="Filter by payment" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Payments</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="paid">Paid</SelectItem>
-                <SelectItem value="failed">Failed</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
         {/* Orders List Card */}
         <Card className="mb-8">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <div className="flex items-center">
                 <Package className="h-5 w-5 mr-2" />
-                Orders List
+                Active Orders
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">
-                  {filteredOrders.length} of {orders.length} orders
-                </span>
-                <button className="p-1.5 rounded-md hover:bg-gray-100">
-                  <Filter className="h-4 w-4 text-gray-500" />
-                </button>
+                <span className="text-sm text-gray-500">{activeOrders.length} active orders</span>
               </div>
             </CardTitle>
           </CardHeader>
@@ -310,7 +259,7 @@ export default function AgentOrders() {
               <div className="flex justify-center py-8">
                 <Loader2 className="h-8 w-8 animate-spin" />
               </div>
-            ) : filteredOrders.length > 0 ? (
+            ) : activeOrders.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
@@ -325,7 +274,7 @@ export default function AgentOrders() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredOrders.map((order) => (
+                    {activeOrders.map((order) => (
                       <tr key={order._id || order.orderId} className="border-b hover:bg-gray-50">
                         <td className="py-3 px-4">{order.orderId}</td>
                         <td className="py-3 px-4">{order.clientName || "Unknown"}</td>
@@ -348,41 +297,75 @@ export default function AgentOrders() {
               </div>
             ) : (
               <div className="text-center py-8">
-                <p className="text-muted-foreground mb-4">
-                  {searchQuery || statusFilter !== "all" || paymentFilter !== "all"
-                    ? "No orders match your filters"
-                    : "No orders found"}
-                </p>
-                {searchQuery || statusFilter !== "all" || paymentFilter !== "all" ? (
-                  <button
-                    onClick={() => {
-                      setSearchQuery("")
-                      setStatusFilter("all")
-                      setPaymentFilter("all")
-                    }}
-                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-md"
-                  >
-                    Clear Filters
-                  </button>
-                ) : (
-                  <p className="text-gray-500">Orders will appear here when your clients place them</p>
-                )}
+                <p className="text-muted-foreground mb-4">No active orders found</p>
+                <p className="text-gray-500">Active orders will appear here when your clients place them</p>
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Pagination (if needed in the future) */}
-        {filteredOrders.length > 10 && (
-          <div className="flex justify-end gap-4 mt-8">
-            <button className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors">
-              Previous
-            </button>
-            <button className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors">
-              Next
-            </button>
-          </div>
-        )}
+        {/* All Orders Card */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Package className="h-5 w-5 mr-2" />
+                All Orders
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">{orders.length} total orders</span>
+              </div>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin" />
+              </div>
+            ) : orders.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-3 px-4">Order ID</th>
+                      <th className="text-left py-3 px-4">Client</th>
+                      <th className="text-left py-3 px-4">Date</th>
+                      <th className="text-left py-3 px-4">Amount</th>
+                      <th className="text-left py-3 px-4">Status</th>
+                      <th className="text-left py-3 px-4">Payment</th>
+                      <th className="text-center py-3 px-4">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orders.map((order) => (
+                      <tr key={order._id || order.orderId} className="border-b hover:bg-gray-50">
+                        <td className="py-3 px-4">{order.orderId}</td>
+                        <td className="py-3 px-4">{order.clientName || "Unknown"}</td>
+                        <td className="py-3 px-4">{formatDate(order.createdAt)}</td>
+                        <td className="py-3 px-4">₹{order.totalAmount.toFixed(2)}</td>
+                        <td className="py-3 px-4">{getStatusBadge(order.status)}</td>
+                        <td className="py-3 px-4">{getPaymentBadge(order.paymentStatus)}</td>
+                        <td className="py-3 px-4 flex justify-center gap-2">
+                          <button
+                            onClick={() => handleViewOrder(order.orderId)}
+                            className="bg-[#194a95] hover:bg-[#194a95]/90 text-white hover:text-white px-3 py-1.5 rounded-md text-sm flex items-center gap-2"
+                          >
+                            <span>View Details</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground mb-4">No orders found</p>
+                <p className="text-gray-500">Orders will appear here when your clients place them</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </main>
     </div>
   )
