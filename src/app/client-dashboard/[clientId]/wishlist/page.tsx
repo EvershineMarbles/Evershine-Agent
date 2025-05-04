@@ -1,14 +1,13 @@
 "use client"
 
-import { useState, useEffect, ChangeEvent } from "react"
+import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowLeft, Trash2, Loader2, Heart, ShoppingCart } from 'lucide-react'
+import { ArrowLeft, Trash2, Loader2, Heart, ShoppingCart } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/use-toast"
-import { getClientItem, setClientItem } from "@/utils/localStorageHelper"
+import { Input } from "@/components/ui/input"
 
 interface WishlistItem {
   _id: string
@@ -28,13 +27,9 @@ export default function WishlistPage() {
 
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [actionLoading, setActionLoading] = useState<Record<string, { 
-    removing: boolean; 
-    addingToCart: boolean;
-    updatingQuantity: boolean;
-  }>>({})
+  const [actionLoading, setActionLoading] = useState<Record<string, { removing: boolean; addingToCart: boolean }>>({})
   const [cartCount, setCartCount] = useState(0)
-  const [quantities, setQuantities] = useState<Record<string, string>>({})
+  const [quantities, setQuantities] = useState<Record<string, number>>({})
 
   // Fetch wishlist items
   useEffect(() => {
@@ -74,11 +69,11 @@ export default function WishlistPage() {
           console.log("Wishlist data:", data.data)
           const items = data.data.items || []
           setWishlistItems(items)
-          
+
           // Initialize quantities state
-          const initialQuantities: Record<string, string> = {}
+          const initialQuantities: Record<string, number> = {}
           items.forEach((item: WishlistItem) => {
-            initialQuantities[item.postId] = item.quantity?.toString() || "1"
+            initialQuantities[item.postId] = item.quantity || 1
           })
           setQuantities(initialQuantities)
         } else {
@@ -130,123 +125,20 @@ export default function WishlistPage() {
 
   // Initialize action loading state for each item
   useEffect(() => {
-    const initialState: Record<string, { 
-      removing: boolean; 
-      addingToCart: boolean;
-      updatingQuantity: boolean;
-    }> = {}
-    
+    const initialState: Record<string, { removing: boolean; addingToCart: boolean }> = {}
     wishlistItems.forEach((item) => {
-      initialState[item.postId] = { 
-        removing: false, 
-        addingToCart: false,
-        updatingQuantity: false
-      }
+      initialState[item.postId] = { removing: false, addingToCart: false }
     })
-    
     setActionLoading(initialState)
   }, [wishlistItems])
 
   // Handle quantity change
-  const handleQuantityChange = (productId: string, value: string) => {
-    // Only allow numbers
-    if (value === "" || /^\d+$/.test(value)) {
-      setQuantities(prev => ({
+  const handleQuantityChange = (postId: string, value: string) => {
+    const numValue = Number.parseInt(value, 10)
+    if (!isNaN(numValue) && numValue > 0) {
+      setQuantities((prev) => ({
         ...prev,
-        [productId]: value
-      }))
-    }
-  }
-
-  // Update quantity in wishlist
-  const updateQuantity = async (productId: string) => {
-    try {
-      const quantity = parseInt(quantities[productId])
-      
-      // Validate quantity
-      if (isNaN(quantity) || quantity < 1) {
-        toast({
-          title: "Invalid quantity",
-          description: "Please enter a valid quantity (minimum 1)",
-          variant: "destructive",
-        })
-        
-        // Reset to previous valid quantity
-        const item = wishlistItems.find(item => item.postId === productId)
-        if (item) {
-          setQuantities(prev => ({
-            ...prev,
-            [productId]: item.quantity.toString()
-          }))
-        }
-        return
-      }
-      
-      setActionLoading(prev => ({
-        ...prev,
-        [productId]: { ...prev[productId], updatingQuantity: true }
-      }))
-
-      // Get the token
-      const token = localStorage.getItem("clientImpersonationToken")
-
-      if (!token) {
-        throw new Error("No authentication token found. Please refresh the page and try again.")
-      }
-
-      const response = await fetch("https://evershinebackend-2.onrender.com/api/updateWishlistItem", {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          productId,
-          quantity
-        }),
-      })
-
-      // Check for errors
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error("Authentication failed. Please refresh the token and try again.")
-        } else {
-          throw new Error(`API error: ${response.status} ${response.statusText}`)
-        }
-      }
-
-      const data = await response.json()
-
-      if (data.success) {
-        // Update local state
-        setWishlistItems(prev => 
-          prev.map(item => 
-            item.postId === productId 
-              ? { ...item, quantity } 
-              : item
-          )
-        )
-
-        toast({
-          title: "Quantity updated",
-          description: "Item quantity has been updated",
-          variant: "default",
-        })
-      } else {
-        throw new Error(data.message || "Failed to update quantity")
-      }
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
-      console.error("Error updating quantity:", error)
-      toast({
-        title: "Error",
-        description: errorMessage || "Failed to update quantity. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setActionLoading(prev => ({
-        ...prev,
-        [productId]: { ...prev[productId], updatingQuantity: false }
+        [postId]: numValue,
       }))
     }
   }
@@ -291,11 +183,6 @@ export default function WishlistPage() {
       if (data.success) {
         setWishlistItems((prev) => prev.filter((item) => item.postId !== productId))
 
-        // Update localStorage
-        const currentWishlist = getClientItem("wishlist", clientId) || []
-        const updatedWishlist = currentWishlist.filter((id: string) => id !== productId)
-        setClientItem("wishlist", clientId, updatedWishlist)
-
         toast({
           title: "Item removed",
           description: "Item has been removed from your wishlist",
@@ -337,8 +224,8 @@ export default function WishlistPage() {
 
       console.log("Adding item to cart with token:", token.substring(0, 15) + "...")
 
-      // Get the quantity from state
-      const quantity = parseInt(quantities[productId]) || 1
+      // Get the current quantity for this item
+      const quantity = quantities[productId] || 1
 
       const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
         method: "POST",
@@ -348,7 +235,7 @@ export default function WishlistPage() {
         },
         body: JSON.stringify({
           productId,
-          quantity
+          quantity,
         }),
       })
 
@@ -366,13 +253,6 @@ export default function WishlistPage() {
       if (data.success) {
         // Increment cart count
         setCartCount((prev) => prev + 1)
-
-        // Update localStorage for cart
-        const currentCart = getClientItem("cart", clientId) || []
-        if (!currentCart.includes(productId)) {
-          const updatedCart = [...currentCart, productId]
-          setClientItem("cart", clientId, updatedCart)
-        }
 
         // Now remove from wishlist
         await removeFromWishlist(productId)
@@ -398,25 +278,6 @@ export default function WishlistPage() {
         ...prev,
         [productId]: { ...prev[productId], addingToCart: false },
       }))
-    }
-  }
-
-  // Handle quantity blur (update when user clicks away)
-  const handleQuantityBlur = (productId: string) => {
-    const currentQuantity = wishlistItems.find(item => item.postId === productId)?.quantity.toString()
-    const newQuantity = quantities[productId]
-    
-    // Only update if quantity has changed
-    if (currentQuantity !== newQuantity && newQuantity !== "") {
-      updateQuantity(productId)
-    }
-  }
-
-  // Handle quantity key press (update when user presses Enter)
-  const handleQuantityKeyPress = (e: React.KeyboardEvent<HTMLInputElement>, productId: string) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      updateQuantity(productId)
     }
   }
 
@@ -472,7 +333,7 @@ export default function WishlistPage() {
           </div>
           <div className="divide-y divide-border">
             {wishlistItems.map((item) => (
-              <div key={item.postId} className="p-4 flex items-center">
+              <div key={item.postId} className="p-4 flex flex-col md:flex-row md:items-center">
                 <div className="relative h-20 w-20 rounded-md overflow-hidden flex-shrink-0">
                   <Image
                     src={item.image && item.image.length > 0 ? item.image[0] : "/placeholder.svg?height=80&width=80"}
@@ -481,60 +342,59 @@ export default function WishlistPage() {
                     className="object-cover"
                   />
                 </div>
-                <div className="ml-4 flex-grow">
+                <div className="md:ml-4 flex-grow mt-3 md:mt-0">
                   <h3 className="font-medium">{item.name}</h3>
                   <p className="text-sm text-muted-foreground">{item.category}</p>
-                  <div className="flex items-center justify-between mt-2">
-                    <div className="flex items-center">
-                      <p className="font-semibold mr-4">₹{item.price.toLocaleString()}</p>
-                      <div className="flex items-center">
-                        <span className="text-sm text-muted-foreground mr-2">Qty:</span>
-                        <div className="relative w-16">
-                          <Input
-                            type="text"
-                            value={quantities[item.postId] || "1"}
-                            onChange={(e) => handleQuantityChange(item.postId, e.target.value)}
-                            onBlur={() => handleQuantityBlur(item.postId)}
-                            onKeyPress={(e) => handleQuantityKeyPress(e, item.postId)}
-                            className="h-8 px-2 py-1 text-center"
-                            disabled={actionLoading[item.postId]?.updatingQuantity}
-                          />
-                          {actionLoading[item.postId]?.updatingQuantity && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-white/80">
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between mt-2 gap-3">
+                    <div>
+                      <p className="font-semibold">₹{item.price.toLocaleString()}</p>
+                      <p className="text-xs text-muted-foreground">(Adjusted price with commission)</p>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => addToCart(item.postId)}
-                        disabled={actionLoading[item.postId]?.addingToCart}
-                        className="flex items-center"
-                      >
-                        {actionLoading[item.postId]?.addingToCart ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        ) : (
-                          <ShoppingCart className="h-4 w-4 mr-2" />
-                        )}
-                        Add to Cart
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeFromWishlist(item.postId)}
-                        disabled={actionLoading[item.postId]?.removing}
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                      >
-                        {actionLoading[item.postId]?.removing ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
-                      </Button>
+
+                    <div className="flex flex-col md:flex-row items-start md:items-center gap-3">
+                      <div className="flex items-center">
+                        <label htmlFor={`quantity-${item.postId}`} className="text-sm mr-2">
+                          Quantity:
+                        </label>
+                        <Input
+                          id={`quantity-${item.postId}`}
+                          type="number"
+                          min="1"
+                          value={quantities[item.postId] || 1}
+                          onChange={(e) => handleQuantityChange(item.postId, e.target.value)}
+                          className="w-20 h-8"
+                        />
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => addToCart(item.postId)}
+                          disabled={actionLoading[item.postId]?.addingToCart}
+                          className="flex items-center"
+                        >
+                          {actionLoading[item.postId]?.addingToCart ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : (
+                            <ShoppingCart className="h-4 w-4 mr-2" />
+                          )}
+                          Add to Cart
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeFromWishlist(item.postId)}
+                          disabled={actionLoading[item.postId]?.removing}
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                        >
+                          {actionLoading[item.postId]?.removing ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
