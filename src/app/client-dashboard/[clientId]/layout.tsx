@@ -76,7 +76,7 @@ export default function ClientDashboardLayout({
         <div className="ml-16 flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-2">
             <ArrowLeft className="h-5 w-5" />
-            <span className="font-medium hidden sm:inline">Back to Advisor Dashboard</span>
+            <span className="font-medium hidden sm:inline">Back to Consultant Dashboard</span>
           </Link>
 
           {/* Agent name on the right side */}
