@@ -10,6 +10,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
+import { Input } from "@/components/ui/input"
 
 interface WishlistItem {
   _id: string
@@ -32,6 +33,7 @@ export default function WishlistPage() {
   const [removing, setRemoving] = useState<Record<string, boolean>>({})
   const [addingToCart, setAddingToCart] = useState<Record<string, boolean>>({})
   const [error, setError] = useState<string | null>(null)
+  const [quantities, setQuantities] = useState<Record<string, number>>({})
 
   // Fetch wishlist items
   useEffect(() => {
@@ -184,6 +186,14 @@ export default function WishlistPage() {
     }
   }
 
+  const handleQuantityChange = (productId: string, value: string) => {
+    const parsedValue = Number.parseInt(value)
+    setQuantities((prevQuantities) => ({
+      ...prevQuantities,
+      [productId]: isNaN(parsedValue) ? 0 : parsedValue,
+    }))
+  }
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-[80vh]">
@@ -260,7 +270,28 @@ export default function WishlistPage() {
                         </div>
                       </td>
                       <td className="py-4 px-4">
-                        <p className="font-semibold">₹{item.price.toLocaleString()}</p>
+                        <div className="mt-2">
+                          <p className="text-sm text-muted-foreground">₹{item.price.toLocaleString()}/sqft</p>
+                          <p className="text-lg font-bold text-primary">
+                            Total: ₹{(item.price * (quantities[item.postId] || 1000) || 0).toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="mt-4 mb-2">
+                          <label
+                            htmlFor={`quantity-${item.postId}`}
+                            className="block text-sm font-medium text-gray-700 mb-1"
+                          >
+                            Quantity (sqft):
+                          </label>
+                          <Input
+                            id={`quantity-${item.postId}`}
+                            type="number"
+                            min="1"
+                            value={quantities[item.postId] || 1000}
+                            onChange={(e) => handleQuantityChange(item.postId, e.target.value)}
+                            className="h-8 w-full text-center"
+                          />
+                        </div>
                       </td>
                       <td className="py-4 px-4">
                         <div className="flex items-center justify-center gap-2">
