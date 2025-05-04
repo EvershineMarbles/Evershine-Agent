@@ -35,6 +35,19 @@ interface CommissionData {
   categoryCommissions?: Record<string, number>
 }
 
+// Define the WishlistItem interface
+interface WishlistItem {
+  postId: string
+  name: string
+  price: number
+  category: string
+  applicationAreas?: string[]
+  description: string
+  image: string[]
+  quantity: number
+  quantityAvailable?: number
+}
+
 export default function ProductsPage() {
   console.log("ProductsPage rendering")
 
@@ -60,6 +73,7 @@ export default function ProductsPage() {
   // Add state for commission rate override
   const [overrideCommissionRate, setOverrideCommissionRate] = useState<number | null>(null)
   const [commissionLoading, setCommissionLoading] = useState(false)
+  const [wishlistLoading, setWishlistLoading] = useState(false)
 
   // Debug scroll event
   useEffect(() => {
@@ -72,32 +86,84 @@ export default function ProductsPage() {
     return () => window.removeEventListener("scroll", logScroll)
   }, [])
 
-  // Load wishlist and cart from localStorage
-  useEffect(() => {
-    if (typeof window !== "undefined") {
+  // Fetch wishlist from backend
+  const fetchWishlist = useCallback(async () => {
+    try {
+      setWishlistLoading(true)
+      const token = localStorage.getItem("clientImpersonationToken")
+
+      if (!token) {
+        console.warn("No token found for fetching wishlist")
+        return
+      }
+
+      const response = await fetch("https://evershinebackend-2.onrender.com/api/getUserWishlist", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch wishlist: ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      if (data.success && data.data && Array.isArray(data.data.items)) {
+        // Extract just the postIds from the wishlist items
+        const wishlistIds = data.data.items.map((item: WishlistItem) => item.postId)
+        console.log("Fetched wishlist from backend:", wishlistIds)
+        setWishlist(wishlistIds)
+
+        // Update localStorage for optimistic UI updates
+        localStorage.setItem(`wishlist-${clientId}`, JSON.stringify(wishlistIds))
+      } else {
+        console.log("No wishlist items found or invalid response format")
+        setWishlist([])
+        localStorage.setItem(`wishlist-${clientId}`, JSON.stringify([]))
+      }
+    } catch (error) {
+      console.error("Error fetching wishlist:", error)
+      // Fallback to localStorage if API fails
       try {
         const savedWishlist = localStorage.getItem(`wishlist-${clientId}`)
         if (savedWishlist) {
           setWishlist(JSON.parse(savedWishlist))
         }
+      } catch (e) {
+        console.error("Error loading wishlist from localStorage:", e)
+      }
+    } finally {
+      setWishlistLoading(false)
+    }
+  }, [clientId])
 
+  // Load cart from localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
         const savedCart = localStorage.getItem(`cart-${clientId}`)
         if (savedCart) {
           setCart(JSON.parse(savedCart))
         }
       } catch (e) {
-        console.error("Error loading data from localStorage:", e)
+        console.error("Error loading cart from localStorage:", e)
       }
     }
   }, [clientId])
 
-  // Save wishlist and cart to localStorage whenever they change
+  // Fetch wishlist when component mounts or clientId changes
+  useEffect(() => {
+    fetchWishlist()
+  }, [fetchWishlist, clientId])
+
+  // Save cart to localStorage whenever it changes
   useEffect(() => {
     if (typeof window !== "undefined") {
-      localStorage.setItem(`wishlist-${clientId}`, JSON.stringify(wishlist))
       localStorage.setItem(`cart-${clientId}`, JSON.stringify(cart))
     }
-  }, [wishlist, cart, clientId])
+  }, [cart, clientId])
 
   // Add fetchCommissionData function
   const fetchCommissionData = useCallback(async () => {
@@ -303,6 +369,10 @@ export default function ProductsPage() {
           const data = await response.json()
 
           if (data.success) {
+            // Update localStorage after successful API call
+            const updatedWishlist = wishlist.filter((id) => id !== productId)
+            localStorage.setItem(`wishlist-${clientId}`, JSON.stringify(updatedWishlist))
+
             toast({
               title: "Removed from wishlist",
               description: "Item has been removed from your wishlist",
@@ -329,6 +399,10 @@ export default function ProductsPage() {
           const data = await response.json()
 
           if (data.success) {
+            // Update localStorage after successful API call
+            const updatedWishlist = [...wishlist.filter((id) => id !== productId), productId]
+            localStorage.setItem(`wishlist-${clientId}`, JSON.stringify(updatedWishlist))
+
             toast({
               title: "Added to wishlist",
               description: (
