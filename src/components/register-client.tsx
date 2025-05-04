@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Phone, User, Mail, MapPin, Building, Calendar, Loader2 } from "lucide-react"
+import { ArrowLeft, Phone, User, Mail, MapPin, Building, Calendar, Loader2 } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -34,6 +34,7 @@ export default function RegisterClient() {
     dateOfBirth: "",
     anniversaryDate: "", // Add anniversary date
     architectDetails: "", // Add architect details
+    consultantLevel: "standard", // Add consultant level with default value
     agreeToTerms: false,
   })
   const [isLoading, setIsLoading] = useState(false)
@@ -278,6 +279,7 @@ export default function RegisterClient() {
           dateOfBirth: formData.dateOfBirth || undefined,
           anniversaryDate: formData.anniversaryDate || undefined,
           architectDetails: formData.architectDetails || undefined,
+          consultantLevel: formData.consultantLevel || undefined, // Add consultant level
         }),
       })
 
@@ -701,6 +703,29 @@ export default function RegisterClient() {
                       />
                     </div>
                   </div>
+                </div>
+
+                {/* Consultant Level */}
+                <div className="space-y-2 mt-4">
+                  <Label htmlFor="consultantLevel" className="text-base font-medium">
+                    Consultant Level
+                  </Label>
+                  <Select
+                    value={formData.consultantLevel}
+                    onValueChange={(value) => handleSelectChange("consultantLevel", value)}
+                  >
+                    <SelectTrigger className="h-12 rounded-md">
+                      <SelectValue placeholder="Select consultant level" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="standard">Standard</SelectItem>
+                      <SelectItem value="premium">Premium</SelectItem>
+                      <SelectItem value="elite">Elite</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    The consultant level determines the commission rates for product pricing
+                  </p>
                 </div>
 
                 <div className="flex items-center space-x-2 mt-4">
