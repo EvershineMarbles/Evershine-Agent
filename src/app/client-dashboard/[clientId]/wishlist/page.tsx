@@ -382,7 +382,6 @@ export default function WishlistPage() {
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between mt-2 gap-3">
                     <div>
                       <p className="font-semibold">₹{item.price?.toLocaleString()}/sqft</p>
-                      <p className="text-xs text-muted-foreground">(Adjusted price with commission)</p>
                     </div>
 
                     <div className="flex flex-col md:flex-row items-start md:items-center gap-3">
