@@ -7,9 +7,24 @@ const WishlistPage = () => {
   const [wishlistItems, setWishlistItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [authStatus, setAuthStatus] = useState(null)
 
-  // Get token from localStorage
-  const token = localStorage.getItem("token")
+  // Get token from localStorage with better error handling
+  const getToken = () => {
+    try {
+      const token = localStorage.getItem("token")
+      if (!token) {
+        console.error("No authentication token found in localStorage")
+        setAuthStatus("No token found")
+        return null
+      }
+      return token
+    } catch (e) {
+      console.error("Error accessing localStorage:", e)
+      setAuthStatus("Error accessing localStorage")
+      return null
+    }
+  }
 
   useEffect(() => {
     fetchWishlist()
@@ -20,14 +35,26 @@ const WishlistPage = () => {
       setLoading(true)
       console.log("Fetching wishlist...")
 
-      const response = await axios.get(
-        `${process.env.REACT_APP_API_URL || "https://evershinebackend-2.onrender.com"}/api/getUserWishlist`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+      const token = getToken()
+      if (!token) {
+        setError("Authentication required. Please log in again.")
+        setLoading(false)
+        return
+      }
+
+      // Log the token format (first few characters for security)
+      console.log(`Token format check: ${token.substring(0, 10)}...`)
+      setAuthStatus(`Using token starting with: ${token.substring(0, 10)}...`)
+
+      // Make sure we're using the correct API URL
+      const apiUrl = process.env.REACT_APP_API_URL || "https://evershinebackend-2.onrender.com"
+      console.log(`Using API URL: ${apiUrl}`)
+
+      const response = await axios.get(`${apiUrl}/api/getUserWishlist`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
         },
-      )
+      })
 
       console.log("Wishlist API response:", response.data)
 
@@ -48,11 +75,33 @@ const WishlistPage = () => {
         })
       } else {
         console.error("Failed to fetch wishlist:", response.data.message)
-        setError("Failed to fetch wishlist")
+        setError("Failed to fetch wishlist: " + (response.data.message || "Unknown error"))
       }
     } catch (error) {
       console.error("Error fetching wishlist:", error)
-      setError("Error fetching wishlist")
+
+      // Provide more detailed error information
+      if (error.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        console.error("Response error data:", error.response.data)
+        console.error("Response error status:", error.response.status)
+
+        if (error.response.status === 401) {
+          setError("Authentication failed. Please log in again.")
+          setAuthStatus("Token rejected by server (401)")
+        } else {
+          setError(`Server error: ${error.response.status} - ${error.response.data.message || "Unknown error"}`)
+        }
+      } else if (error.request) {
+        // The request was made but no response was received
+        console.error("No response received:", error.request)
+        setError("No response from server. Please check your internet connection.")
+      } else {
+        // Something happened in setting up the request that triggered an Error
+        console.error("Request setup error:", error.message)
+        setError("Error setting up request: " + error.message)
+      }
     } finally {
       setLoading(false)
     }
@@ -62,15 +111,21 @@ const WishlistPage = () => {
     try {
       console.log(`Removing product ${productId} from wishlist...`)
 
-      const response = await axios.delete(
-        `${process.env.REACT_APP_API_URL || "https://evershinebackend-2.onrender.com"}/api/deleteUserWishlistItem`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          data: { productId },
+      const token = getToken()
+      if (!token) {
+        alert("Authentication required. Please log in again.")
+        return
+      }
+
+      // Make sure we're using the correct API URL
+      const apiUrl = process.env.REACT_APP_API_URL || "https://evershinebackend-2.onrender.com"
+
+      const response = await axios.delete(`${apiUrl}/api/deleteUserWishlistItem`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
         },
-      )
+        data: { productId },
+      })
 
       console.log("Remove from wishlist response:", response.data)
 
@@ -80,11 +135,16 @@ const WishlistPage = () => {
         fetchWishlist()
       } else {
         console.error("Failed to remove item:", response.data.message)
-        alert("Failed to remove item from wishlist")
+        alert("Failed to remove item from wishlist: " + (response.data.message || "Unknown error"))
       }
     } catch (error) {
       console.error("Error removing item from wishlist:", error)
-      alert("Error removing item from wishlist")
+
+      if (error.response && error.response.status === 401) {
+        alert("Authentication failed. Please log in again.")
+      } else {
+        alert("Error removing item from wishlist: " + (error.message || "Unknown error"))
+      }
     }
   }
 
@@ -92,8 +152,17 @@ const WishlistPage = () => {
     try {
       console.log(`Adding product ${productId} to cart...`)
 
+      const token = getToken()
+      if (!token) {
+        alert("Authentication required. Please log in again.")
+        return
+      }
+
+      // Make sure we're using the correct API URL
+      const apiUrl = process.env.REACT_APP_API_URL || "https://evershinebackend-2.onrender.com"
+
       const response = await axios.post(
-        `${process.env.REACT_APP_API_URL || "https://evershinebackend-2.onrender.com"}/api/addToCart`,
+        `${apiUrl}/api/addToCart`,
         { productId },
         {
           headers: {
@@ -111,8 +180,18 @@ const WishlistPage = () => {
       }
     } catch (error) {
       console.error("Error adding item to cart:", error)
-      alert("Error adding item to cart")
+
+      if (error.response && error.response.status === 401) {
+        alert("Authentication failed. Please log in again.")
+      } else {
+        alert("Error adding item to cart: " + (error.message || "Unknown error"))
+      }
     }
+  }
+
+  const handleLogin = () => {
+    // Redirect to login page
+    window.location.href = "/login"
   }
 
   if (loading) {
@@ -120,7 +199,18 @@ const WishlistPage = () => {
   }
 
   if (error) {
-    return <div className="text-center p-8 text-red-500">{error}</div>
+    return (
+      <div className="text-center p-8">
+        <div className="text-red-500 mb-4">{error}</div>
+        {authStatus && <div className="text-sm text-gray-500 mb-4">Auth status: {authStatus}</div>}
+        <button onClick={handleLogin} className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
+          Go to Login
+        </button>
+        <button onClick={fetchWishlist} className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded ml-2">
+          Try Again
+        </button>
+      </div>
+    )
   }
 
   if (wishlistItems.length === 0) {
@@ -218,6 +308,12 @@ const WishlistPage = () => {
           className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm"
         >
           Log Wishlist Data to Console
+        </button>
+        <button
+          onClick={() => console.log("Auth status:", authStatus)}
+          className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm ml-2"
+        >
+          Log Auth Status
         </button>
         <p className="mt-2 text-sm text-gray-600">
           Open your browser's developer console (F12) to see detailed information about your wishlist items.
