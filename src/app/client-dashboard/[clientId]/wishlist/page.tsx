@@ -26,6 +26,7 @@ export default function WishlistPage() {
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<Record<string, { removing: boolean; addingToCart: boolean }>>({})
+  const [cartCount, setCartCount] = useState(0)
 
   // Fetch wishlist items
   useEffect(() => {
@@ -83,6 +84,33 @@ export default function WishlistPage() {
 
     fetchWishlist()
   }, [toast])
+
+  // Fetch cart count
+  useEffect(() => {
+    const fetchCartCount = async () => {
+      try {
+        const token = localStorage.getItem("clientImpersonationToken")
+        if (!token) return
+
+        const response = await fetch("https://evershinebackend-2.onrender.com/api/getUserCart", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success && data.data && Array.isArray(data.data.items)) {
+            setCartCount(data.data.items.length)
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching cart count:", error)
+      }
+    }
+
+    fetchCartCount()
+  }, [])
 
   // Initialize action loading state for each item
   useEffect(() => {
@@ -157,7 +185,7 @@ export default function WishlistPage() {
     }
   }
 
-  // Add item to cart
+  // Add item to cart and remove from wishlist
   const addToCart = async (productId: string) => {
     try {
       setActionLoading((prev) => ({
@@ -198,9 +226,15 @@ export default function WishlistPage() {
       const data = await response.json()
 
       if (data.success) {
+        // Increment cart count
+        setCartCount((prev) => prev + 1)
+
+        // Now remove from wishlist
+        await removeFromWishlist(productId)
+
         toast({
           title: "Added to cart",
-          description: "Item has been added to your cart",
+          description: "Item has been added to your cart and removed from wishlist",
           variant: "default",
         })
       } else {
@@ -233,11 +267,26 @@ export default function WishlistPage() {
 
   return (
     <div className="p-6 md:p-8">
-      <div className="flex items-center mb-8">
-        <Button variant="ghost" size="icon" onClick={() => router.back()} className="mr-4">
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <h1 className="text-3xl font-bold">Your Wishlist</h1>
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center">
+          <Button variant="ghost" size="icon" onClick={() => router.back()} className="mr-4">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <h1 className="text-3xl font-bold">Your Wishlist</h1>
+        </div>
+
+        {/* Cart icon in the top */}
+        <Link
+          href={`/client-dashboard/${clientId}/cart`}
+          className="relative p-2 rounded-full hover:bg-gray-100 transition-colors"
+        >
+          <ShoppingCart className="h-6 w-6 text-gray-600" />
+          {cartCount > 0 && (
+            <span className="absolute -top-1 -right-1 bg-primary text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+              {cartCount}
+            </span>
+          )}
+        </Link>
       </div>
 
       {wishlistItems.length === 0 ? (
