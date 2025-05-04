@@ -3,10 +3,11 @@
 import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Package, Loader2, Calendar } from "lucide-react"
+import { ArrowLeft, Package, Loader2, Calendar, ShoppingBag } from "lucide-react"
 import { agentAPI } from "@/lib/api-utils"
 import { isAgentAuthenticated } from "@/lib/auth-utils"
 import { useToast } from "@/components/ui/use-toast"
+
 // Define interfaces
 interface Client {
   _id: string
@@ -133,9 +134,10 @@ export default function AgentOrders() {
     fetchData()
   }, [router, fetchData])
 
-  // Handle view client details
-  const handleViewClient = (clientId: string) => {
-    router.push(`/client-dashboard/${clientId}`)
+  // Handle view client orders
+  const handleViewOrders = (clientId: string) => {
+    // Navigate to the client orders page instead of the client dashboard
+    router.push(`/client-dashboard/${clientId}/orders`)
   }
 
   if (isLoading) {
@@ -209,10 +211,11 @@ export default function AgentOrders() {
                         </td>
                         <td className="py-3 px-4 flex justify-center gap-2">
                           <button
-                            onClick={() => handleViewClient(item.clientId)}
+                            onClick={() => handleViewOrders(item.clientId)}
                             className="bg-[#194a95] hover:bg-[#194a95]/90 text-white hover:text-white px-3 py-1.5 rounded-md text-sm flex items-center gap-2"
                           >
-                            <span>View Client</span>
+                            <ShoppingBag className="h-4 w-4 mr-1" />
+                            <span>View Orders</span>
                           </button>
                         </td>
                       </tr>
