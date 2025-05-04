@@ -34,7 +34,7 @@ export default function RegisterClient() {
     dateOfBirth: "",
     anniversaryDate: "", // Add anniversary date
     architectDetails: "", // Add architect details
-    consultantLevel: "standard", // Add consultant level with default value
+    consultantLevel: "red", // Update default to "red" instead of "standard"
     agreeToTerms: false,
   })
   const [isLoading, setIsLoading] = useState(false)
@@ -279,7 +279,7 @@ export default function RegisterClient() {
           dateOfBirth: formData.dateOfBirth || undefined,
           anniversaryDate: formData.anniversaryDate || undefined,
           architectDetails: formData.architectDetails || undefined,
-          consultantLevel: formData.consultantLevel || undefined, // Add consultant level
+          consultantLevel: formData.consultantLevel || undefined, // This will now be "red", "yellow", or "purple"
         }),
       })
 
@@ -651,7 +651,7 @@ export default function RegisterClient() {
                       placeholder="Enter architect details"
                       value={formData.architectDetails}
                       onChange={handleChange}
-                      className="h-12 rounded-md"
+                      className="h-12 pl-10 rounded-md"
                     />
                   </div>
                 </div>
@@ -713,30 +713,32 @@ export default function RegisterClient() {
                   <div className="flex items-center gap-6 mt-2">
                     <button
                       type="button"
-                      onClick={() => handleSelectChange("consultantLevel", "standard")}
-                      className={`w-6 h-6 rounded-full bg-red-500 transition-all ${
-                        formData.consultantLevel === "standard" ? "ring-4 ring-red-120 scale-80" : "hover:scale-105"
+                      onClick={() => handleSelectChange("consultantLevel", "red")}
+                      className={`w-8 h-8 rounded-full bg-red-500 transition-all ${
+                        formData.consultantLevel === "red" ? "ring-4 ring-red-200 scale-110" : "hover:scale-105"
                       }`}
-                      aria-label="Standard consultant level"
+                      aria-label="Red consultant level (+5%)"
                     />
                     <button
                       type="button"
-                      onClick={() => handleSelectChange("consultantLevel", "premium")}
-                      className={`w-6 h-6 rounded-full bg-yellow-500 transition-all ${
-                        formData.consultantLevel === "premium" ? "ring-4 ring-yellow-120 scale-80" : "hover:scale-105"
+                      onClick={() => handleSelectChange("consultantLevel", "yellow")}
+                      className={`w-8 h-8 rounded-full bg-yellow-500 transition-all ${
+                        formData.consultantLevel === "yellow" ? "ring-4 ring-yellow-200 scale-110" : "hover:scale-105"
                       }`}
-                      aria-label="Premium consultant level"
+                      aria-label="Yellow consultant level (+10%)"
                     />
                     <button
                       type="button"
-                      onClick={() => handleSelectChange("consultantLevel", "elite")}
-                      className={`w-6 h-6 rounded-full bg-purple-600 transition-all ${
-                        formData.consultantLevel === "elite" ? "ring-4 ring-purple-120 scale-80" : "hover:scale-105"
+                      onClick={() => handleSelectChange("consultantLevel", "purple")}
+                      className={`w-8 h-8 rounded-full bg-purple-600 transition-all ${
+                        formData.consultantLevel === "purple" ? "ring-4 ring-purple-200 scale-110" : "hover:scale-105"
                       }`}
-                      aria-label="Elite consultant level"
+                      aria-label="Purple consultant level (+15%)"
                     />
                   </div>
-               
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Select a consultant level to determine commission rates for product pricing
+                  </p>
                 </div>
 
                 <div className="flex items-center space-x-2 mt-4">
