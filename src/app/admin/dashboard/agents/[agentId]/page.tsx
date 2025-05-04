@@ -126,7 +126,7 @@ export default function AgentDetailsPage() {
               <div className="space-y-4">
                 <div>
                   <div className="flex flex-col sm:flex-row sm:items-baseline">
-                    <span className="text-lg md:text-xl font-medium">Advisor Name - </span>
+                    <span className="text-lg md:text-xl font-medium">Consultant Name - </span>
                     <span className="text-lg md:text-xl font-bold sm:ml-2">{agentDetails.name}</span>
                   </div>
                   <Separator className="mt-2" />
@@ -185,7 +185,7 @@ export default function AgentDetailsPage() {
                   onClick={() => setIsDeleteDialogOpen(true)}
                 >
                   <Trash2 className="h-5 w-5" />
-                  Delete Advisor
+                  Delete Consultant
                 </Button>
               </div>
 
@@ -208,7 +208,7 @@ export default function AgentDetailsPage() {
             <DialogTitle>Confirm Deletion</DialogTitle>
           </DialogHeader>
           <div className="py-3">
-            Are you sure you want to delete advisor <span className="font-semibold">{agentDetails?.name}</span>?
+            Are you sure you want to delete consultant <span className="font-semibold">{agentDetails?.name}</span>?
             <span className="block mt-2 text-red-500">This action cannot be undone.</span>
           </div>
           <DialogFooter>

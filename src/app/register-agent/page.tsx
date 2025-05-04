@@ -128,9 +128,9 @@ export default function RegisterAgent() {
 
         <Card className="w-full shadow-lg border-0">
           <CardHeader className="space-y-1 bg-blue/5 border-b pb-4">
-            <CardTitle className="text-2xl text-center text-blue">Register New Agent</CardTitle>
+            <CardTitle className="text-2xl text-center text-blue">Register New Consultant</CardTitle>
             <CardDescription className="text-center">
-              Create a new agent account to access the dashboard
+              Create a new consultant account to access the dashboard
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-6">

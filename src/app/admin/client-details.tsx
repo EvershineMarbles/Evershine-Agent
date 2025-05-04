@@ -237,7 +237,7 @@ export default function ClientDetails({ clientId }: ClientDetailsProps) {
                   <Separator />
 
                   <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Affiliated Agent</h3>
+                    <h3 className="text-sm font-medium text-muted-foreground">Affiliated Consultant</h3>
                     <p className="text-lg font-medium">{client.agentAffiliated || "-"}</p>
                   </div>
                   <Separator />
