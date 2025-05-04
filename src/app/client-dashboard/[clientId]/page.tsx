@@ -76,12 +76,12 @@ export default function ProductsPage() {
   useEffect(() => {
     if (typeof window !== "undefined") {
       try {
-        const savedWishlist = localStorage.getItem("wishlist")
+        const savedWishlist = localStorage.getItem(`wishlist-${clientId}`)
         if (savedWishlist) {
           setWishlist(JSON.parse(savedWishlist))
         }
 
-        const savedCart = localStorage.getItem("cart")
+        const savedCart = localStorage.getItem(`cart-${clientId}`)
         if (savedCart) {
           setCart(JSON.parse(savedCart))
         }
@@ -89,15 +89,15 @@ export default function ProductsPage() {
         console.error("Error loading data from localStorage:", e)
       }
     }
-  }, [])
+  }, [clientId])
 
   // Save wishlist and cart to localStorage whenever they change
   useEffect(() => {
     if (typeof window !== "undefined") {
-      localStorage.setItem("wishlist", JSON.stringify(wishlist))
-      localStorage.setItem("cart", JSON.stringify(cart))
+      localStorage.setItem(`wishlist-${clientId}`, JSON.stringify(wishlist))
+      localStorage.setItem(`cart-${clientId}`, JSON.stringify(cart))
     }
-  }, [wishlist, cart])
+  }, [wishlist, cart, clientId])
 
   // Add fetchCommissionData function
   const fetchCommissionData = useCallback(async () => {
@@ -390,9 +390,9 @@ export default function ProductsPage() {
       setCart((prev) => [...prev, productId])
 
       // Update localStorage cart
-      const savedCart = localStorage.getItem("cart")
+      const savedCart = localStorage.getItem(`cart-${clientId}`)
       const cartItems = savedCart ? JSON.parse(savedCart) : []
-      localStorage.setItem("cart", JSON.stringify([...cartItems, productId]))
+      localStorage.setItem(`cart-${clientId}`, JSON.stringify([...cartItems, productId]))
 
       // Get the token
       const token = localStorage.getItem("clientImpersonationToken")
