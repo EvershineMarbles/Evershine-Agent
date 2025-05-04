@@ -1,12 +1,14 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, ChangeEvent } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowLeft, Trash2, Loader2, Heart, ShoppingCart } from "lucide-react"
+import { ArrowLeft, Trash2, Loader2, Heart, ShoppingCart } from 'lucide-react'
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/use-toast"
+import { getClientItem, setClientItem } from "@/utils/localStorageHelper"
 
 interface WishlistItem {
   _id: string
@@ -15,6 +17,7 @@ interface WishlistItem {
   image: string[]
   postId: string
   category: string
+  quantity: number
 }
 
 export default function WishlistPage() {
@@ -25,8 +28,13 @@ export default function WishlistPage() {
 
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [actionLoading, setActionLoading] = useState<Record<string, { removing: boolean; addingToCart: boolean }>>({})
+  const [actionLoading, setActionLoading] = useState<Record<string, { 
+    removing: boolean; 
+    addingToCart: boolean;
+    updatingQuantity: boolean;
+  }>>({})
   const [cartCount, setCartCount] = useState(0)
+  const [quantities, setQuantities] = useState<Record<string, string>>({})
 
   // Fetch wishlist items
   useEffect(() => {
@@ -64,7 +72,15 @@ export default function WishlistPage() {
 
         if (data.data) {
           console.log("Wishlist data:", data.data)
-          setWishlistItems(data.data.items || [])
+          const items = data.data.items || []
+          setWishlistItems(items)
+          
+          // Initialize quantities state
+          const initialQuantities: Record<string, string> = {}
+          items.forEach((item: WishlistItem) => {
+            initialQuantities[item.postId] = item.quantity?.toString() || "1"
+          })
+          setQuantities(initialQuantities)
         } else {
           setWishlistItems([])
         }
@@ -114,12 +130,126 @@ export default function WishlistPage() {
 
   // Initialize action loading state for each item
   useEffect(() => {
-    const initialState: Record<string, { removing: boolean; addingToCart: boolean }> = {}
+    const initialState: Record<string, { 
+      removing: boolean; 
+      addingToCart: boolean;
+      updatingQuantity: boolean;
+    }> = {}
+    
     wishlistItems.forEach((item) => {
-      initialState[item.postId] = { removing: false, addingToCart: false }
+      initialState[item.postId] = { 
+        removing: false, 
+        addingToCart: false,
+        updatingQuantity: false
+      }
     })
+    
     setActionLoading(initialState)
   }, [wishlistItems])
+
+  // Handle quantity change
+  const handleQuantityChange = (productId: string, value: string) => {
+    // Only allow numbers
+    if (value === "" || /^\d+$/.test(value)) {
+      setQuantities(prev => ({
+        ...prev,
+        [productId]: value
+      }))
+    }
+  }
+
+  // Update quantity in wishlist
+  const updateQuantity = async (productId: string) => {
+    try {
+      const quantity = parseInt(quantities[productId])
+      
+      // Validate quantity
+      if (isNaN(quantity) || quantity < 1) {
+        toast({
+          title: "Invalid quantity",
+          description: "Please enter a valid quantity (minimum 1)",
+          variant: "destructive",
+        })
+        
+        // Reset to previous valid quantity
+        const item = wishlistItems.find(item => item.postId === productId)
+        if (item) {
+          setQuantities(prev => ({
+            ...prev,
+            [productId]: item.quantity.toString()
+          }))
+        }
+        return
+      }
+      
+      setActionLoading(prev => ({
+        ...prev,
+        [productId]: { ...prev[productId], updatingQuantity: true }
+      }))
+
+      // Get the token
+      const token = localStorage.getItem("clientImpersonationToken")
+
+      if (!token) {
+        throw new Error("No authentication token found. Please refresh the page and try again.")
+      }
+
+      const response = await fetch("https://evershinebackend-2.onrender.com/api/updateWishlistItem", {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          productId,
+          quantity
+        }),
+      })
+
+      // Check for errors
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error("Authentication failed. Please refresh the token and try again.")
+        } else {
+          throw new Error(`API error: ${response.status} ${response.statusText}`)
+        }
+      }
+
+      const data = await response.json()
+
+      if (data.success) {
+        // Update local state
+        setWishlistItems(prev => 
+          prev.map(item => 
+            item.postId === productId 
+              ? { ...item, quantity } 
+              : item
+          )
+        )
+
+        toast({
+          title: "Quantity updated",
+          description: "Item quantity has been updated",
+          variant: "default",
+        })
+      } else {
+        throw new Error(data.message || "Failed to update quantity")
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
+      console.error("Error updating quantity:", error)
+      toast({
+        title: "Error",
+        description: errorMessage || "Failed to update quantity. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setActionLoading(prev => ({
+        ...prev,
+        [productId]: { ...prev[productId], updatingQuantity: false }
+      }))
+    }
+  }
 
   // Remove item from wishlist
   const removeFromWishlist = async (productId: string) => {
@@ -160,6 +290,11 @@ export default function WishlistPage() {
 
       if (data.success) {
         setWishlistItems((prev) => prev.filter((item) => item.postId !== productId))
+
+        // Update localStorage
+        const currentWishlist = getClientItem("wishlist", clientId) || []
+        const updatedWishlist = currentWishlist.filter((id: string) => id !== productId)
+        setClientItem("wishlist", clientId, updatedWishlist)
 
         toast({
           title: "Item removed",
@@ -202,6 +337,9 @@ export default function WishlistPage() {
 
       console.log("Adding item to cart with token:", token.substring(0, 15) + "...")
 
+      // Get the quantity from state
+      const quantity = parseInt(quantities[productId]) || 1
+
       const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
         method: "POST",
         headers: {
@@ -210,7 +348,7 @@ export default function WishlistPage() {
         },
         body: JSON.stringify({
           productId,
-          quantity: 1,
+          quantity
         }),
       })
 
@@ -228,6 +366,13 @@ export default function WishlistPage() {
       if (data.success) {
         // Increment cart count
         setCartCount((prev) => prev + 1)
+
+        // Update localStorage for cart
+        const currentCart = getClientItem("cart", clientId) || []
+        if (!currentCart.includes(productId)) {
+          const updatedCart = [...currentCart, productId]
+          setClientItem("cart", clientId, updatedCart)
+        }
 
         // Now remove from wishlist
         await removeFromWishlist(productId)
@@ -253,6 +398,25 @@ export default function WishlistPage() {
         ...prev,
         [productId]: { ...prev[productId], addingToCart: false },
       }))
+    }
+  }
+
+  // Handle quantity blur (update when user clicks away)
+  const handleQuantityBlur = (productId: string) => {
+    const currentQuantity = wishlistItems.find(item => item.postId === productId)?.quantity.toString()
+    const newQuantity = quantities[productId]
+    
+    // Only update if quantity has changed
+    if (currentQuantity !== newQuantity && newQuantity !== "") {
+      updateQuantity(productId)
+    }
+  }
+
+  // Handle quantity key press (update when user presses Enter)
+  const handleQuantityKeyPress = (e: React.KeyboardEvent<HTMLInputElement>, productId: string) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      updateQuantity(productId)
     }
   }
 
@@ -321,7 +485,28 @@ export default function WishlistPage() {
                   <h3 className="font-medium">{item.name}</h3>
                   <p className="text-sm text-muted-foreground">{item.category}</p>
                   <div className="flex items-center justify-between mt-2">
-                    <p className="font-semibold">₹{item.price.toLocaleString()}</p>
+                    <div className="flex items-center">
+                      <p className="font-semibold mr-4">₹{item.price.toLocaleString()}</p>
+                      <div className="flex items-center">
+                        <span className="text-sm text-muted-foreground mr-2">Qty:</span>
+                        <div className="relative w-16">
+                          <Input
+                            type="text"
+                            value={quantities[item.postId] || "1"}
+                            onChange={(e) => handleQuantityChange(item.postId, e.target.value)}
+                            onBlur={() => handleQuantityBlur(item.postId)}
+                            onKeyPress={(e) => handleQuantityKeyPress(e, item.postId)}
+                            className="h-8 px-2 py-1 text-center"
+                            disabled={actionLoading[item.postId]?.updatingQuantity}
+                          />
+                          {actionLoading[item.postId]?.updatingQuantity && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-white/80">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                     <div className="flex items-center space-x-2">
                       <Button
                         variant="outline"

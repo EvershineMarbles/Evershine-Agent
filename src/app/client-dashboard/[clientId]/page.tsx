@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode } from "lucide-react"
+import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode } from 'lucide-react'
 import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -74,6 +74,32 @@ export default function ProductsPage() {
   const [overrideCommissionRate, setOverrideCommissionRate] = useState<number | null>(null)
   const [commissionLoading, setCommissionLoading] = useState(false)
   const [wishlistLoading, setWishlistLoading] = useState(false)
+
+  // Load saved commission rate from localStorage on component mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedRate = localStorage.getItem(`commission-override-${clientId}`)
+      if (savedRate) {
+        setOverrideCommissionRate(Number(savedRate))
+      }
+    }
+  }, [clientId])
+
+  // Save commission rate to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      if (overrideCommissionRate !== null) {
+        localStorage.setItem(`commission-override-${clientId}`, overrideCommissionRate.toString())
+      } else {
+        localStorage.removeItem(`commission-override-${clientId}`)
+      }
+    }
+  }, [overrideCommissionRate, clientId])
+
+  // Handle commission rate change
+  const handleCommissionRateChange = (rate: number | null) => {
+    setOverrideCommissionRate(rate)
+  }
 
   // Debug scroll event
   useEffect(() => {
@@ -392,7 +418,13 @@ export default function ProductsPage() {
               Authorization: `Bearer ${token}`,
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ productId }),
+            body: JSON.stringify({ 
+              productId,
+              // Include the current price with commission applied
+              price: products.find(p => p.postId === productId) ? 
+                calculateAdjustedPrice(products.find(p => p.postId === productId)!) : 
+                undefined
+            }),
           })
 
           if (!response.ok) {
@@ -446,7 +478,7 @@ export default function ProductsPage() {
         setAddingToWishlist((prev) => ({ ...prev, [productId]: false }))
       }
     },
-    [wishlist, toast, clientId, router, fetchWishlist],
+    [wishlist, toast, clientId, router, fetchWishlist, products, calculateAdjustedPrice],
   )
 
   // Add to cart function
@@ -488,7 +520,13 @@ export default function ProductsPage() {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ productId }),
+        body: JSON.stringify({ 
+          productId,
+          // Include the current price with commission applied
+          price: products.find(p => p.postId === productId) ? 
+            calculateAdjustedPrice(products.find(p => p.postId === productId)!) : 
+            undefined
+        }),
       })
 
       if (!response.ok) {
@@ -621,26 +659,26 @@ export default function ProductsPage() {
             {/* Commission dots moved before scan button */}
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setOverrideCommissionRate(5)}
+                onClick={() => handleCommissionRateChange(5)}
                 className={`w-6 h-6 rounded-full bg-red-500 hover:ring-2 hover:ring-red-300 transition-all ${overrideCommissionRate === 5 ? "ring-2 ring-gray-400 border border-gray-400 scale-110" : ""}`}
                 title="Set 5% additional commission"
                 aria-label="Set 5% additional commission"
               />
               <button
-                onClick={() => setOverrideCommissionRate(10)}
+                onClick={() => handleCommissionRateChange(10)}
                 className={`w-6 h-6 rounded-full bg-yellow-500 hover:ring-2 hover:ring-yellow-300 transition-all ${overrideCommissionRate === 10 ? "ring-2 ring-gray-400 border border-gray-400 scale-110" : ""}`}
                 title="Set 10% additional commission"
                 aria-label="Set 10% additional commission"
               />
               <button
-                onClick={() => setOverrideCommissionRate(15)}
+                onClick={() => handleCommissionRateChange(15)}
                 className={`w-6 h-6 rounded-full bg-purple-500 hover:ring-2 hover:ring-purple-300 transition-all ${overrideCommissionRate === 15 ? "ring-2 ring-gray-400 border border-gray-400 scale-110" : ""}`}
                 title="Set 15% additional commission"
                 aria-label="Set 15% additional commission"
               />
               {overrideCommissionRate !== null && (
                 <button
-                  onClick={() => setOverrideCommissionRate(null)}
+                  onClick={() => handleCommissionRateChange(null)}
                   className="text-xs text-gray-600 hover:text-gray-900"
                   title="Reset to default commission"
                 >
