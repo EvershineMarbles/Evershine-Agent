@@ -1,555 +1,227 @@
 "use client"
 
-import { useState, useEffect, ChangeEvent } from "react"
-import { useParams, useRouter } from "next/navigation"
-import Image from "next/image"
-import Link from "next/link"
-import { ArrowLeft, Trash2, Loader2, Heart, ShoppingCart } from 'lucide-react'
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { useToast } from "@/components/ui/use-toast"
-import { getClientItem, setClientItem } from "@/utils/localStorageHelper"
+import { useState, useEffect } from "react"
+import axios from "axios"
+import { toast } from "react-toastify"
 
-interface WishlistItem {
-  _id: string
-  name: string
-  price: number
-  image: string[]
-  postId: string
-  category: string
-  quantity: number
-}
-
-export default function WishlistPage() {
-  const params = useParams()
-  const router = useRouter()
-  const { toast } = useToast()
-  const clientId = params.clientId as string
-
-  const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([])
+const Wishlist = () => {
+  const [wishlistItems, setWishlistItems] = useState([])
   const [loading, setLoading] = useState(true)
-  const [actionLoading, setActionLoading] = useState<Record<string, { 
-    removing: boolean; 
-    addingToCart: boolean;
-    updatingQuantity: boolean;
-  }>>({})
-  const [cartCount, setCartCount] = useState(0)
-  const [quantities, setQuantities] = useState<Record<string, string>>({})
+  const [error, setError] = useState(null)
+  const [agentCommission, setAgentCommission] = useState(null)
 
-  // Fetch wishlist items
+  // Get token from localStorage
+  const token = localStorage.getItem("token")
+
   useEffect(() => {
-    const fetchWishlist = async () => {
-      try {
-        setLoading(true)
-
-        // Get the token
-        const token = localStorage.getItem("clientImpersonationToken")
-
-        if (!token) {
-          throw new Error("No authentication token found. Please refresh the page and try again.")
-        }
-
-        console.log("Fetching wishlist with token:", token.substring(0, 15) + "...")
-
-        const response = await fetch("https://evershinebackend-2.onrender.com/api/getUserWishlist", {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        })
-
-        // Check for errors
-        if (!response.ok) {
-          if (response.status === 401) {
-            throw new Error("Authentication failed. Please refresh the token and try again.")
-          } else {
-            throw new Error(`API error: ${response.status} ${response.statusText}`)
-          }
-        }
-
-        const data = await response.json()
-
-        if (data.data) {
-          console.log("Wishlist data:", data.data)
-          const items = data.data.items || []
-          setWishlistItems(items)
-          
-          // Initialize quantities state
-          const initialQuantities: Record<string, string> = {}
-          items.forEach((item: WishlistItem) => {
-            initialQuantities[item.postId] = item.quantity?.toString() || "1"
-          })
-          setQuantities(initialQuantities)
-        } else {
-          setWishlistItems([])
-        }
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
-        console.error("Error fetching wishlist:", error)
-        toast({
-          title: "Error",
-          description: errorMessage || "Failed to load your wishlist. Please try again.",
-          variant: "destructive",
-        })
-        setWishlistItems([])
-      } finally {
-        setLoading(false)
-      }
-    }
-
     fetchWishlist()
-  }, [toast])
-
-  // Fetch cart count
-  useEffect(() => {
-    const fetchCartCount = async () => {
-      try {
-        const token = localStorage.getItem("clientImpersonationToken")
-        if (!token) return
-
-        const response = await fetch("https://evershinebackend-2.onrender.com/api/getUserCart", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          if (data.success && data.data && Array.isArray(data.data.items)) {
-            setCartCount(data.data.items.length)
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching cart count:", error)
-      }
-    }
-
-    fetchCartCount()
+    fetchAgentCommission()
   }, [])
 
-  // Initialize action loading state for each item
-  useEffect(() => {
-    const initialState: Record<string, { 
-      removing: boolean; 
-      addingToCart: boolean;
-      updatingQuantity: boolean;
-    }> = {}
-    
-    wishlistItems.forEach((item) => {
-      initialState[item.postId] = { 
-        removing: false, 
-        addingToCart: false,
-        updatingQuantity: false
-      }
-    })
-    
-    setActionLoading(initialState)
-  }, [wishlistItems])
-
-  // Handle quantity change
-  const handleQuantityChange = (productId: string, value: string) => {
-    // Only allow numbers
-    if (value === "" || /^\d+$/.test(value)) {
-      setQuantities(prev => ({
-        ...prev,
-        [productId]: value
-      }))
-    }
-  }
-
-  // Update quantity in wishlist
-  const updateQuantity = async (productId: string) => {
+  const fetchWishlist = async () => {
     try {
-      const quantity = parseInt(quantities[productId])
-      
-      // Validate quantity
-      if (isNaN(quantity) || quantity < 1) {
-        toast({
-          title: "Invalid quantity",
-          description: "Please enter a valid quantity (minimum 1)",
-          variant: "destructive",
-        })
-        
-        // Reset to previous valid quantity
-        const item = wishlistItems.find(item => item.postId === productId)
-        if (item) {
-          setQuantities(prev => ({
-            ...prev,
-            [productId]: item.quantity.toString()
-          }))
-        }
-        return
-      }
-      
-      setActionLoading(prev => ({
-        ...prev,
-        [productId]: { ...prev[productId], updatingQuantity: true }
-      }))
-
-      // Get the token
-      const token = localStorage.getItem("clientImpersonationToken")
-
-      if (!token) {
-        throw new Error("No authentication token found. Please refresh the page and try again.")
-      }
-
-      const response = await fetch("https://evershinebackend-2.onrender.com/api/updateWishlistItem", {
-        method: "PUT",
+      setLoading(true)
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/getUserWishlist`, {
         headers: {
           Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          productId,
-          quantity
-        }),
       })
 
-      // Check for errors
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error("Authentication failed. Please refresh the token and try again.")
-        } else {
-          throw new Error(`API error: ${response.status} ${response.statusText}`)
-        }
-      }
-
-      const data = await response.json()
-
-      if (data.success) {
-        // Update local state
-        setWishlistItems(prev => 
-          prev.map(item => 
-            item.postId === productId 
-              ? { ...item, quantity } 
-              : item
-          )
-        )
-
-        toast({
-          title: "Quantity updated",
-          description: "Item quantity has been updated",
-          variant: "default",
-        })
+      if (response.data.success) {
+        setWishlistItems(response.data.data.items || [])
       } else {
-        throw new Error(data.message || "Failed to update quantity")
+        setError("Failed to fetch wishlist")
+        toast.error("Failed to fetch wishlist")
       }
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
-      console.error("Error updating quantity:", error)
-      toast({
-        title: "Error",
-        description: errorMessage || "Failed to update quantity. Please try again.",
-        variant: "destructive",
-      })
+    } catch (error) {
+      console.error("Error fetching wishlist:", error)
+      setError("Error fetching wishlist")
+      toast.error("Error fetching wishlist")
     } finally {
-      setActionLoading(prev => ({
-        ...prev,
-        [productId]: { ...prev[productId], updatingQuantity: false }
-      }))
+      setLoading(false)
     }
   }
 
-  // Remove item from wishlist
-  const removeFromWishlist = async (productId: string) => {
+  const fetchAgentCommission = async () => {
     try {
-      setActionLoading((prev) => ({
-        ...prev,
-        [productId]: { ...prev[productId], removing: true },
-      }))
-
-      // Get the token
-      const token = localStorage.getItem("clientImpersonationToken")
-
-      if (!token) {
-        throw new Error("No authentication token found. Please refresh the page and try again.")
-      }
-
-      console.log("Removing item from wishlist with token:", token.substring(0, 15) + "...")
-
-      const response = await fetch("https://evershinebackend-2.onrender.com/api/deleteUserWishlistItem", {
-        method: "DELETE",
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/client/agent-commission`, {
         headers: {
           Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
         },
-        body: JSON.stringify({ productId }),
       })
 
-      // Check for errors
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error("Authentication failed. Please refresh the token and try again.")
-        } else {
-          throw new Error(`API error: ${response.status} ${response.statusText}`)
-        }
+      if (response.data.success) {
+        setAgentCommission(response.data.data)
       }
+    } catch (error) {
+      console.error("Error fetching agent commission:", error)
+    }
+  }
 
-      const data = await response.json()
+  const removeFromWishlist = async (productId) => {
+    try {
+      const response = await axios.delete(`${process.env.REACT_APP_API_URL}/api/deleteUserWishlistItem`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        data: { productId },
+      })
 
-      if (data.success) {
-        setWishlistItems((prev) => prev.filter((item) => item.postId !== productId))
-
-        // Update localStorage
-        const currentWishlist = getClientItem("wishlist", clientId) || []
-        const updatedWishlist = currentWishlist.filter((id: string) => id !== productId)
-        setClientItem("wishlist", clientId, updatedWishlist)
-
-        toast({
-          title: "Item removed",
-          description: "Item has been removed from your wishlist",
-          variant: "default",
-        })
+      if (response.data.success) {
+        toast.success("Item removed from wishlist")
+        fetchWishlist() // Refresh the wishlist
       } else {
-        throw new Error(data.message || "Failed to remove item")
+        toast.error(response.data.message || "Failed to remove item")
       }
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
+    } catch (error) {
       console.error("Error removing item from wishlist:", error)
-      toast({
-        title: "Error",
-        description: errorMessage || "Failed to remove item from wishlist. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setActionLoading((prev) => ({
-        ...prev,
-        [productId]: { ...prev[productId], removing: false },
-      }))
+      toast.error("Error removing item from wishlist")
     }
   }
 
-  // Add item to cart and remove from wishlist
-  const addToCart = async (productId: string) => {
+  const addToCart = async (productId) => {
     try {
-      setActionLoading((prev) => ({
-        ...prev,
-        [productId]: { ...prev[productId], addingToCart: true },
-      }))
-
-      // Get the token
-      const token = localStorage.getItem("clientImpersonationToken")
-
-      if (!token) {
-        throw new Error("No authentication token found. Please refresh the page and try again.")
-      }
-
-      console.log("Adding item to cart with token:", token.substring(0, 15) + "...")
-
-      // Get the quantity from state
-      const quantity = parseInt(quantities[productId]) || 1
-
-      const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
+      const response = await axios.post(
+        `${process.env.REACT_APP_API_URL}/api/addToCart`,
+        { productId },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
-        body: JSON.stringify({
-          productId,
-          quantity
-        }),
-      })
+      )
 
-      // Check for errors
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error("Authentication failed. Please refresh the token and try again.")
-        } else {
-          throw new Error(`API error: ${response.status} ${response.statusText}`)
-        }
-      }
-
-      const data = await response.json()
-
-      if (data.success) {
-        // Increment cart count
-        setCartCount((prev) => prev + 1)
-
-        // Update localStorage for cart
-        const currentCart = getClientItem("cart", clientId) || []
-        if (!currentCart.includes(productId)) {
-          const updatedCart = [...currentCart, productId]
-          setClientItem("cart", clientId, updatedCart)
-        }
-
-        // Now remove from wishlist
-        await removeFromWishlist(productId)
-
-        toast({
-          title: "Added to cart",
-          description: "Item has been added to your cart and removed from wishlist",
-          variant: "default",
-        })
+      if (response.data.success) {
+        toast.success("Item added to cart")
       } else {
-        throw new Error(data.message || "Failed to add item to cart")
+        toast.error(response.data.message || "Failed to add item to cart")
       }
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
+    } catch (error) {
       console.error("Error adding item to cart:", error)
-      toast({
-        title: "Error",
-        description: errorMessage || "Failed to add item to cart. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setActionLoading((prev) => ({
-        ...prev,
-        [productId]: { ...prev[productId], addingToCart: false },
-      }))
+      toast.error("Error adding item to cart")
     }
   }
 
-  // Handle quantity blur (update when user clicks away)
-  const handleQuantityBlur = (productId: string) => {
-    const currentQuantity = wishlistItems.find(item => item.postId === productId)?.quantity.toString()
-    const newQuantity = quantities[productId]
-    
-    // Only update if quantity has changed
-    if (currentQuantity !== newQuantity && newQuantity !== "") {
-      updateQuantity(productId)
-    }
-  }
+  // Function to calculate commission breakdown
+  const getCommissionBreakdown = (basePrice, adjustedPrice) => {
+    if (!basePrice || !adjustedPrice || !agentCommission) return null
 
-  // Handle quantity key press (update when user presses Enter)
-  const handleQuantityKeyPress = (e: React.KeyboardEvent<HTMLInputElement>, productId: string) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      updateQuantity(productId)
+    const totalCommissionAmount = adjustedPrice - basePrice
+    const totalCommissionPercent = (adjustedPrice / basePrice - 1) * 100
+
+    return {
+      basePrice: basePrice.toFixed(2),
+      adjustedPrice: adjustedPrice.toFixed(2),
+      commissionAmount: totalCommissionAmount.toFixed(2),
+      commissionPercent: totalCommissionPercent.toFixed(1),
     }
   }
 
   if (loading) {
+    return <div className="text-center py-10">Loading wishlist...</div>
+  }
+
+  if (error) {
+    return <div className="text-center py-10 text-red-500">{error}</div>
+  }
+
+  if (wishlistItems.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-[80vh]">
-        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-muted-foreground">Loading your wishlist...</p>
+      <div className="text-center py-10">
+        <h2 className="text-xl font-semibold mb-4">Your Wishlist</h2>
+        <p>Your wishlist is empty</p>
       </div>
     )
   }
 
   return (
-    <div className="p-6 md:p-8">
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center">
-          <Button variant="ghost" size="icon" onClick={() => router.back()} className="mr-4">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-3xl font-bold">Your Wishlist</h1>
-        </div>
+    <div className="container mx-auto px-4 py-8">
+      <h2 className="text-2xl font-bold mb-6">Your Wishlist</h2>
 
-        {/* Cart icon in the top */}
-        <Link
-          href={`/client-dashboard/${clientId}/cart`}
-          className="relative p-2 rounded-full hover:bg-gray-100 transition-colors"
-        >
-          <ShoppingCart className="h-6 w-6 text-gray-600" />
-          {cartCount > 0 && (
-            <span className="absolute -top-1 -right-1 bg-primary text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-              {cartCount}
-            </span>
-          )}
-        </Link>
-      </div>
-
-      {wishlistItems.length === 0 ? (
-        <div className="text-center py-12 bg-muted/20 rounded-lg">
-          <Heart className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-          <p className="text-xl font-medium mb-4">Your wishlist is empty</p>
-          <p className="text-muted-foreground mb-6">Add some products to your wishlist to see them here</p>
-          <Button
-            onClick={() => router.push(`/client-dashboard/${clientId}/products`)}
-            className="bg-primary hover:bg-primary/90"
-          >
-            Browse Products
-          </Button>
-        </div>
-      ) : (
-        <div className="bg-card rounded-lg border border-border overflow-hidden">
-          <div className="p-4 bg-muted/20 border-b border-border">
-            <h2 className="font-semibold">Wishlist Items ({wishlistItems.length})</h2>
-          </div>
-          <div className="divide-y divide-border">
-            {wishlistItems.map((item) => (
-              <div key={item.postId} className="p-4 flex items-center">
-                <div className="relative h-20 w-20 rounded-md overflow-hidden flex-shrink-0">
-                  <Image
-                    src={item.image && item.image.length > 0 ? item.image[0] : "/placeholder.svg?height=80&width=80"}
-                    alt={item.name}
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-                <div className="ml-4 flex-grow">
-                  <h3 className="font-medium">{item.name}</h3>
-                  <p className="text-sm text-muted-foreground">{item.category}</p>
-                  <div className="flex items-center justify-between mt-2">
-                    <div className="flex items-center">
-                      <p className="font-semibold mr-4">₹{item.price.toLocaleString()}</p>
-                      <div className="flex items-center">
-                        <span className="text-sm text-muted-foreground mr-2">Qty:</span>
-                        <div className="relative w-16">
-                          <Input
-                            type="text"
-                            value={quantities[item.postId] || "1"}
-                            onChange={(e) => handleQuantityChange(item.postId, e.target.value)}
-                            onBlur={() => handleQuantityBlur(item.postId)}
-                            onKeyPress={(e) => handleQuantityKeyPress(e, item.postId)}
-                            className="h-8 px-2 py-1 text-center"
-                            disabled={actionLoading[item.postId]?.updatingQuantity}
-                          />
-                          {actionLoading[item.postId]?.updatingQuantity && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-white/80">
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => addToCart(item.postId)}
-                        disabled={actionLoading[item.postId]?.addingToCart}
-                        className="flex items-center"
-                      >
-                        {actionLoading[item.postId]?.addingToCart ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        ) : (
-                          <ShoppingCart className="h-4 w-4 mr-2" />
-                        )}
-                        Add to Cart
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeFromWishlist(item.postId)}
-                        disabled={actionLoading[item.postId]?.removing}
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                      >
-                        {actionLoading[item.postId]?.removing ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="p-4 bg-muted/10 border-t border-border">
-            <div className="flex justify-end">
-              <Link href={`/client-dashboard/${clientId}/products`} className="text-sm text-primary hover:underline">
-                Continue Shopping
-              </Link>
+      {agentCommission && (
+        <div className="bg-blue-50 p-4 rounded-lg mb-6">
+          <h3 className="font-semibold">Your Commission Information:</h3>
+          <p>Base Commission Rate: {agentCommission.commissionRate}%</p>
+          {agentCommission.categoryCommissions && Object.keys(agentCommission.categoryCommissions).length > 0 && (
+            <div>
+              <p className="font-medium mt-2">Category-Specific Rates:</p>
+              <ul className="ml-4">
+                {Object.entries(agentCommission.categoryCommissions).map(([category, rate]) => (
+                  <li key={category}>
+                    {category}: {rate}%
+                  </li>
+                ))}
+              </ul>
             </div>
-          </div>
+          )}
         </div>
       )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {wishlistItems.map((item) => {
+          const commissionInfo = getCommissionBreakdown(item.basePrice, item.price)
+
+          return (
+            <div key={item.postId} className="border rounded-lg overflow-hidden shadow-md">
+              <div className="relative h-48 overflow-hidden">
+                {item.image && item.image.length > 0 ? (
+                  <img
+                    src={item.image[0] || "/placeholder.svg"}
+                    alt={item.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                    <span className="text-gray-500">No image</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-4">
+                <h3 className="font-bold text-lg mb-1">{item.name}</h3>
+                <p className="text-gray-600 mb-2">{item.category}</p>
+
+                <div className="mb-3">
+                  {commissionInfo ? (
+                    <div className="space-y-1">
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Base Price:</span>
+                        <span className="line-through">${commissionInfo.basePrice}</span>
+                      </div>
+                      <div className="flex justify-between font-bold">
+                        <span>Your Price:</span>
+                        <span className="text-green-600">${commissionInfo.adjustedPrice}</span>
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        Includes {commissionInfo.commissionPercent}% commission (${commissionInfo.commissionAmount})
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="font-bold">${item.price.toFixed(2)}</div>
+                  )}
+                </div>
+
+                <div className="flex space-x-2 mt-4">
+                  <button
+                    onClick={() => addToCart(item.postId)}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded flex-1"
+                  >
+                    Add to Cart
+                  </button>
+                  <button
+                    onClick={() => removeFromWishlist(item.postId)}
+                    className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
+
+export default Wishlist
