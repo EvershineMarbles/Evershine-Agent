@@ -75,6 +75,38 @@ export default function ProductsPage() {
   const [commissionLoading, setCommissionLoading] = useState(false)
   const [wishlistLoading, setWishlistLoading] = useState(false)
 
+  // Load saved commission rate from localStorage on component mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      // Use a client-specific key for commission rate
+      const savedRate = localStorage.getItem(`commission-override-${clientId}`)
+      if (savedRate) {
+        setOverrideCommissionRate(Number(savedRate))
+      } else {
+        // Reset to null if no saved rate for this client
+        setOverrideCommissionRate(null)
+      }
+    }
+  }, [clientId])
+
+  // Save commission rate to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      // Use a client-specific key for commission rate
+      if (overrideCommissionRate !== null) {
+        localStorage.setItem(`commission-override-${clientId}`, overrideCommissionRate.toString())
+      } else {
+        localStorage.removeItem(`commission-override-${clientId}`)
+      }
+    }
+  }, [overrideCommissionRate, clientId])
+
+  // Handle commission rate change
+  const handleCommissionRateChange = (rate: number | null) => {
+    setOverrideCommissionRate(rate)
+    console.log(`Setting commission rate for client ${clientId} to ${rate}`)
+  }
+
   // Debug scroll event
   useEffect(() => {
     console.log("Setting up scroll debug in ProductsPage")
@@ -378,18 +410,32 @@ export default function ProductsPage() {
               description: "Item has been removed from your wishlist",
               variant: "default",
             })
+
+            // Refresh wishlist from backend to ensure sync
+            fetchWishlist()
           } else {
             throw new Error(data.message || "Failed to remove from wishlist")
           }
         } else {
           // Add to wishlist
+          const product = products.find((p) => p.postId === productId)
+          if (!product) {
+            throw new Error("Product not found")
+          }
+
+          const adjustedPrice = calculateAdjustedPrice(product)
+
           const response = await fetch("https://evershinebackend-2.onrender.com/api/addToWishlist", {
             method: "POST",
             headers: {
               Authorization: `Bearer ${token}`,
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ productId }),
+            body: JSON.stringify({
+              productId,
+              // Include the current price with commission applied
+              price: adjustedPrice,
+            }),
           })
 
           if (!response.ok) {
@@ -415,6 +461,9 @@ export default function ProductsPage() {
               ),
               variant: "default",
             })
+
+            // Refresh wishlist from backend to ensure sync
+            fetchWishlist()
           } else {
             throw new Error(data.message || "Failed to add to wishlist")
           }
@@ -440,7 +489,7 @@ export default function ProductsPage() {
         setAddingToWishlist((prev) => ({ ...prev, [productId]: false }))
       }
     },
-    [wishlist, toast, clientId, router],
+    [wishlist, toast, clientId, router, fetchWishlist, products, calculateAdjustedPrice],
   )
 
   // Add to cart function
@@ -475,6 +524,13 @@ export default function ProductsPage() {
         throw new Error("No authentication token found. Please refresh the token and try again.")
       }
 
+      const product = products.find((p) => p.postId === productId)
+      if (!product) {
+        throw new Error("Product not found")
+      }
+
+      const adjustedPrice = calculateAdjustedPrice(product)
+
       // Make API request in background
       const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
         method: "POST",
@@ -482,7 +538,11 @@ export default function ProductsPage() {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ productId }),
+        body: JSON.stringify({
+          productId,
+          // Include the current price with commission applied
+          price: adjustedPrice,
+        }),
       })
 
       if (!response.ok) {
@@ -514,6 +574,15 @@ export default function ProductsPage() {
       // Clear loading state
       setAddingToCart((prev) => ({ ...prev, [productId]: false }))
     }
+  }
+
+  // Add refresh wishlist function
+  const refreshWishlist = () => {
+    fetchWishlist()
+    toast({
+      title: "Refreshing wishlist",
+      description: "Getting the latest wishlist data from the server",
+    })
   }
 
   // Filter products based on search query
@@ -590,7 +659,6 @@ export default function ProductsPage() {
     <ErrorBoundary>
       <div className="p-6 md:p-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-          <h1 className="text-3xl font-bold">Welcome, {clientData?.name?.split(" ")[0] || "Client"}</h1>
         </div>
         {error && (
           <Alert variant="destructive" className="mb-4">
@@ -606,26 +674,26 @@ export default function ProductsPage() {
             {/* Commission dots moved before scan button */}
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setOverrideCommissionRate(5)}
+                onClick={() => handleCommissionRateChange(5)}
                 className={`w-6 h-6 rounded-full bg-red-500 hover:ring-2 hover:ring-red-300 transition-all ${overrideCommissionRate === 5 ? "ring-2 ring-gray-400 border border-gray-400 scale-110" : ""}`}
                 title="Set 5% additional commission"
                 aria-label="Set 5% additional commission"
               />
               <button
-                onClick={() => setOverrideCommissionRate(10)}
+                onClick={() => handleCommissionRateChange(10)}
                 className={`w-6 h-6 rounded-full bg-yellow-500 hover:ring-2 hover:ring-yellow-300 transition-all ${overrideCommissionRate === 10 ? "ring-2 ring-gray-400 border border-gray-400 scale-110" : ""}`}
                 title="Set 10% additional commission"
                 aria-label="Set 10% additional commission"
               />
               <button
-                onClick={() => setOverrideCommissionRate(15)}
+                onClick={() => handleCommissionRateChange(15)}
                 className={`w-6 h-6 rounded-full bg-purple-500 hover:ring-2 hover:ring-purple-300 transition-all ${overrideCommissionRate === 15 ? "ring-2 ring-gray-400 border border-gray-400 scale-110" : ""}`}
                 title="Set 15% additional commission"
                 aria-label="Set 15% additional commission"
               />
               {overrideCommissionRate !== null && (
                 <button
-                  onClick={() => setOverrideCommissionRate(null)}
+                  onClick={() => handleCommissionRateChange(null)}
                   className="text-xs text-gray-600 hover:text-gray-900"
                   title="Reset to default commission"
                 >
@@ -633,6 +701,37 @@ export default function ProductsPage() {
                 </button>
               )}
             </div>
+
+            {/* Refresh Wishlist Button */}
+            <button
+              onClick={refreshWishlist}
+              className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+              aria-label="Refresh Wishlist"
+              title="Refresh Wishlist"
+              disabled={wishlistLoading}
+            >
+              {wishlistLoading ? (
+                <Loader2 className="h-5 w-5 animate-spin text-gray-600" />
+              ) : (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-6 w-6 text-gray-600"
+                >
+                  <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                  <path d="M3 3v5h5" />
+                  <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+                  <path d="M16 21h5v-5" />
+                </svg>
+              )}
+            </button>
 
             {/* Scan QR Button */}
             <button
@@ -688,7 +787,7 @@ export default function ProductsPage() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             {filteredProducts.map((product) => {
               // Calculate the adjusted price based on commission
               const adjustedPrice = calculateAdjustedPrice(product)
