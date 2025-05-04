@@ -20,6 +20,15 @@ interface WishlistItem {
   basePrice?: number
 }
 
+// Add the CommissionData interface
+interface CommissionData {
+  agentId: string
+  name: string
+  email: string
+  commissionRate: number
+  categoryCommissions?: Record<string, number>
+}
+
 export default function WishlistPage() {
   const params = useParams()
   const router = useRouter()
@@ -32,12 +41,77 @@ export default function WishlistPage() {
   const [cartCount, setCartCount] = useState(0)
   const [quantities, setQuantities] = useState<Record<string, number>>({})
   const [error, setError] = useState<string | null>(null)
+  const [commissionData, setCommissionData] = useState<CommissionData | null>(null)
+  const [overrideCommissionRate, setOverrideCommissionRate] = useState<number | null>(null)
+
+  // Load saved commission rate from localStorage on component mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedRate = localStorage.getItem(`commission-override-${clientId}`)
+      if (savedRate) {
+        setOverrideCommissionRate(Number(savedRate))
+      }
+    }
+  }, [clientId])
+
+  // Fetch commission data
+  const fetchCommissionData = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("clientImpersonationToken")
+      if (!token) {
+        return null
+      }
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
+      const response = await fetch(`${apiUrl}/api/client/agent-commission`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (!response.ok) {
+        return null
+      }
+
+      const data = await response.json()
+      if (data.success && data.data) {
+        setCommissionData(data.data)
+        return data.data
+      }
+      return null
+    } catch (error) {
+      console.error("Error fetching commission data:", error)
+      return null
+    }
+  }, [])
+
+  // Calculate adjusted price function
+  const calculateAdjustedPrice = useCallback(
+    (basePrice: number, category: string) => {
+      // Get the default commission rate (from agent or category-specific)
+      let defaultRate = commissionData?.commissionRate || 10
+
+      // Check for category-specific commission
+      if (commissionData?.categoryCommissions && category && commissionData.categoryCommissions[category]) {
+        defaultRate = commissionData.categoryCommissions[category]
+      }
+
+      // Add the override rate to the default rate if an override is set
+      const finalRate = overrideCommissionRate !== null ? defaultRate + overrideCommissionRate : defaultRate
+
+      // Calculate adjusted price based on the original basePrice
+      const adjustedPrice = basePrice * (1 + finalRate / 100)
+      return Math.round(adjustedPrice * 100) / 100 // Round to 2 decimal places
+    },
+    [commissionData, overrideCommissionRate],
+  )
 
   // Fetch wishlist items
   const fetchWishlist = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
+
+      // First fetch commission data
+      await fetchCommissionData()
 
       // Get the token
       const token = localStorage.getItem("clientImpersonationToken")
@@ -70,11 +144,45 @@ export default function WishlistPage() {
       if (data.data) {
         console.log("Wishlist data:", data.data)
         const items = data.data.items || []
-        setWishlistItems(items)
+
+        // Fetch original product data to get basePrice
+        const productsResponse = await fetch("https://evershinebackend-2.onrender.com/api/getAllProducts", {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (!productsResponse.ok) {
+          throw new Error(`API error: ${productsResponse.status} ${productsResponse.statusText}`)
+        }
+
+        const productsData = await productsResponse.json()
+        const products = productsData.success && Array.isArray(productsData.data) ? productsData.data : []
+
+        // Map products to wishlist items to ensure we have the latest prices
+        const updatedItems = items.map((item: WishlistItem) => {
+          const product = products.find((p: any) => p.postId === item.postId)
+          if (product) {
+            // Calculate the adjusted price using the current commission settings
+            const basePrice = product.basePrice || product.price
+            const adjustedPrice = calculateAdjustedPrice(basePrice, product.category)
+
+            return {
+              ...item,
+              price: adjustedPrice, // Use the freshly calculated adjusted price
+              basePrice: basePrice, // Store the base price for future calculations
+            }
+          }
+          return item
+        })
+
+        setWishlistItems(updatedItems)
 
         // Initialize quantities state
         const initialQuantities: Record<string, number> = {}
-        items.forEach((item: WishlistItem) => {
+        updatedItems.forEach((item: WishlistItem) => {
           initialQuantities[item.postId] = item.quantity || 1
         })
         setQuantities(initialQuantities)
@@ -93,7 +201,7 @@ export default function WishlistPage() {
     } finally {
       setLoading(false)
     }
-  }, [toast])
+  }, [toast, fetchCommissionData, calculateAdjustedPrice])
 
   // Fetch wishlist on component mount
   useEffect(() => {
@@ -294,6 +402,15 @@ export default function WishlistPage() {
     }
   }
 
+  // Refresh wishlist
+  const refreshWishlist = () => {
+    fetchWishlist()
+    toast({
+      title: "Refreshing wishlist",
+      description: "Getting the latest wishlist data with updated prices",
+    })
+  }
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-[80vh]">
@@ -334,18 +451,42 @@ export default function WishlistPage() {
           <h1 className="text-3xl font-bold">Your Wishlist</h1>
         </div>
 
-        {/* Cart icon in the top */}
-        <Link
-          href={`/client-dashboard/${clientId}/cart`}
-          className="relative p-2 rounded-full hover:bg-gray-100 transition-colors"
-        >
-          <ShoppingCart className="h-6 w-6 text-gray-600" />
-          {cartCount > 0 && (
-            <span className="absolute -top-1 -right-1 bg-primary text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-              {cartCount}
-            </span>
-          )}
-        </Link>
+        <div className="flex items-center gap-2">
+          {/* Refresh Wishlist Button */}
+          <Button variant="outline" size="sm" onClick={refreshWishlist} className="flex items-center gap-1">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4"
+            >
+              <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+              <path d="M3 3v5h5" />
+              <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+              <path d="M16 21h5v-5" />
+            </svg>
+            Refresh Prices
+          </Button>
+
+          {/* Cart icon */}
+          <Link
+            href={`/client-dashboard/${clientId}/cart`}
+            className="relative p-2 rounded-full hover:bg-gray-100 transition-colors"
+          >
+            <ShoppingCart className="h-6 w-6 text-gray-600" />
+            {cartCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-primary text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                {cartCount}
+              </span>
+            )}
+          </Link>
+        </div>
       </div>
 
       {wishlistItems.length === 0 ? (
@@ -362,8 +503,9 @@ export default function WishlistPage() {
         </div>
       ) : (
         <div className="bg-card rounded-lg border border-border overflow-hidden">
-          <div className="p-4 bg-muted/20 border-b border-border">
+          <div className="p-4 bg-muted/20 border-b border-border flex justify-between items-center">
             <h2 className="font-semibold">Wishlist Items ({wishlistItems.length})</h2>
+            <p className="text-xs text-muted-foreground">Prices include commission</p>
           </div>
           <div className="divide-y divide-border">
             {wishlistItems.map((item) => (
