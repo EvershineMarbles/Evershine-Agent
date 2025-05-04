@@ -445,14 +445,65 @@ export default function WishlistPage() {
     }
   }
 
-  // Refresh wishlist - ONLY when manually triggered
+  // Function to update wishlist prices based on current commission rates
+  const updateWishlistPrices = async () => {
+    try {
+      setIsRefreshing(true)
+      const token = localStorage.getItem("clientImpersonationToken")
+
+      if (!token) {
+        throw new Error("No authentication token found. Please refresh the page and try again.")
+      }
+
+      // Send the client data with the consultant level
+      const response = await fetch("https://evershinebackend-2.onrender.com/api/updateWishlistPrices", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          clientData: {
+            consultantLevel: clientData?.consultantLevel || "red",
+          },
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`)
+      }
+
+      const data = await response.json()
+
+      if (data.success) {
+        toast({
+          title: "Prices Updated",
+          description: "Wishlist prices have been updated based on your current commission rate",
+          variant: "default",
+        })
+
+        // Refresh the wishlist to show updated prices
+        fetchWishlist()
+      } else {
+        throw new Error(data.message || "Failed to update prices")
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
+      console.error("Error updating wishlist prices:", error)
+      toast({
+        title: "Error",
+        description: errorMessage || "Failed to update wishlist prices. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
+
+  // Update the refreshWishlist function to call updateWishlistPrices
   const refreshWishlist = () => {
     if (!isRefreshing) {
-      fetchWishlist()
-      toast({
-        title: "Refreshing wishlist",
-        description: "Getting the latest wishlist data with updated prices",
-      })
+      updateWishlistPrices()
     }
   }
 
@@ -543,7 +594,7 @@ export default function WishlistPage() {
                 <path d="M16 21h5v-5" />
               </svg>
             )}
-            Update Wishlist
+            Update Prices & Refresh
           </Button>
 
           {/* Cart icon */}
