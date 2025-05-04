@@ -438,6 +438,11 @@ export default function ProductsPage() {
             }),
           })
 
+          // Add console log to debug the price being sent
+          console.log(
+            `Adding to wishlist: Product ${productId} with price ${adjustedPrice} (commission rate: ${overrideCommissionRate !== null ? overrideCommissionRate : "default"})`,
+          )
+
           if (!response.ok) {
             throw new Error(`API error: ${response.status} ${response.statusText}`)
           }
