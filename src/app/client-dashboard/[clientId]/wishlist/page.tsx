@@ -115,7 +115,7 @@ export default function WishlistPage() {
       setError(null)
 
       // First fetch commission data
-      await fetchCommissionData()
+      const commissionInfo = await fetchCommissionData()
 
       // Get the token
       const token = localStorage.getItem("clientImpersonationToken")
@@ -467,7 +467,7 @@ export default function WishlistPage() {
             variant="outline"
             size="sm"
             onClick={refreshWishlist}
-            className="flex items-center gap-1"
+            className="flex items-center gap-1 bg-blue-50 hover:bg-blue-100 border-blue-200"
             disabled={isRefreshing}
           >
             {isRefreshing ? (
@@ -544,6 +544,7 @@ export default function WishlistPage() {
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between mt-2 gap-3">
                     <div>
                       <p className="font-semibold">₹{item.price?.toLocaleString()}/sqft</p>
+                      <p className="text-xs text-muted-foreground">Price includes commission</p>
                     </div>
 
                     <div className="flex flex-col md:flex-row items-start md:items-center gap-3">
