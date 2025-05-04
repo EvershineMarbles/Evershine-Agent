@@ -20,15 +20,6 @@ interface WishlistItem {
   basePrice?: number
 }
 
-// Add the CommissionData interface
-interface CommissionData {
-  agentId: string
-  name: string
-  email: string
-  commissionRate: number
-  categoryCommissions?: Record<string, number>
-}
-
 export default function WishlistPage() {
   const params = useParams()
   const router = useRouter()
@@ -41,70 +32,10 @@ export default function WishlistPage() {
   const [cartCount, setCartCount] = useState(0)
   const [quantities, setQuantities] = useState<Record<string, number>>({})
   const [error, setError] = useState<string | null>(null)
-  const [commissionData, setCommissionData] = useState<CommissionData | null>(null)
-  const [overrideCommissionRate, setOverrideCommissionRate] = useState<number | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [clientData, setClientData] = useState<any>(null)
-
-  // Load saved commission rate from localStorage on component mount
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const savedRate = localStorage.getItem(`commission-override-${clientId}`)
-      if (savedRate) {
-        setOverrideCommissionRate(Number(savedRate))
-      }
-    }
-  }, [clientId])
-
-  // Fetch commission data
-  const fetchCommissionData = useCallback(async () => {
-    try {
-      const token = localStorage.getItem("clientImpersonationToken")
-      if (!token) {
-        return null
-      }
-
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
-      const response = await fetch(`${apiUrl}/api/client/agent-commission`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-
-      if (!response.ok) {
-        return null
-      }
-
-      const data = await response.json()
-      if (data.success && data.data) {
-        setCommissionData(data.data)
-        return data.data
-      }
-      return null
-    } catch (error) {
-      console.error("Error fetching commission data:", error)
-      return null
-    }
-  }, [])
-
-  // Calculate adjusted price function
-  const calculateAdjustedPrice = useCallback(
-    (basePrice: number, category: string) => {
-      // Get the default commission rate (from agent or category-specific)
-      let defaultRate = commissionData?.commissionRate || 10
-
-      // Check for category-specific commission
-      if (commissionData?.categoryCommissions && category && commissionData.categoryCommissions[category]) {
-        defaultRate = commissionData.categoryCommissions[category]
-      }
-
-      // Add the override rate to the default rate if an override is set
-      const finalRate = overrideCommissionRate !== null ? defaultRate + overrideCommissionRate : defaultRate
-
-      // Calculate adjusted price based on the original basePrice
-      const adjustedPrice = basePrice * (1 + finalRate / 100)
-      return Math.round(adjustedPrice * 100) / 100 // Round to 2 decimal places
-    },
-    [commissionData, overrideCommissionRate],
-  )
+  const [consultantLevel, setConsultantLevel] = useState<string | null>(null)
+  const [commissionRate, setCommissionRate] = useState<number | null>(null)
 
   // Fetch client data
   useEffect(() => {
@@ -125,30 +56,33 @@ export default function WishlistPage() {
           if (data.data) {
             setClientData(data.data)
 
-            // Set commission rate based on consultant level color
+            // Set consultant level and commission rate
             if (data.data.consultantLevel) {
-              const consultantLevel = data.data.consultantLevel
-              console.log("Client consultant level:", consultantLevel)
+              const level = data.data.consultantLevel
+              setConsultantLevel(level)
+              console.log("Client consultant level:", level)
 
               // Map color to commission rate
-              let commissionRate = null
-              switch (consultantLevel) {
+              let rate = null
+              switch (level) {
                 case "red":
-                  commissionRate = 5
+                  rate = 5
                   break
                 case "yellow":
-                  commissionRate = 10
+                  rate = 10
                   break
                 case "purple":
-                  commissionRate = 15
+                  rate = 15
                   break
                 default:
-                  commissionRate = null
+                  rate = 5
               }
 
-              // Set the override commission rate
-              setOverrideCommissionRate(commissionRate)
-              console.log(`Setting commission rate to ${commissionRate}% based on consultant level ${consultantLevel}`)
+              setCommissionRate(rate)
+              console.log(`Setting commission rate to ${rate}% based on consultant level ${level}`)
+
+              // Store in localStorage for other components
+              localStorage.setItem("consultantLevel", level)
             }
           }
         }
@@ -160,17 +94,6 @@ export default function WishlistPage() {
     fetchClientData()
   }, [clientId])
 
-  // Show toast when commission rate is automatically set from client data
-  useEffect(() => {
-    if (clientData?.consultantLevel && overrideCommissionRate !== null) {
-      toast({
-        title: "Commission Rate Applied",
-        description: `${overrideCommissionRate}% commission rate applied based on client's ${clientData.consultantLevel} consultant level`,
-        duration: 3000,
-      })
-    }
-  }, [clientData?.consultantLevel, overrideCommissionRate, toast])
-
   // Fetch wishlist items
   const fetchWishlist = useCallback(async () => {
     if (isRefreshing) return // Prevent multiple simultaneous fetches
@@ -179,9 +102,6 @@ export default function WishlistPage() {
       setLoading(true)
       setIsRefreshing(true)
       setError(null)
-
-      // First fetch commission data
-      const commissionInfo = await fetchCommissionData()
 
       // Get the token
       const token = localStorage.getItem("clientImpersonationToken")
@@ -210,14 +130,22 @@ export default function WishlistPage() {
       }
 
       const data = await response.json()
+      console.log("Wishlist data:", data)
 
-      if (data.data) {
-        console.log("Wishlist data:", data.data)
+      if (data.success && data.data && data.data.items) {
         const items = data.data.items || []
+        console.log("Wishlist items:", items)
 
-        // IMPORTANT: Use the prices directly from the wishlist items
-        // These prices were saved when the items were added to the wishlist
-        // with the commission rate that was selected at that time
+        // Log each item's price for debugging
+        if (items.length > 0) {
+          console.log("Wishlist items with prices:")
+          items.forEach((item: WishlistItem) => {
+            console.log(
+              `Item ${item.postId}: ${item.name}, Price: ${item.price}, Base Price: ${item.basePrice || "N/A"}`,
+            )
+          })
+        }
+
         setWishlistItems(items)
 
         // Initialize quantities state
@@ -227,6 +155,7 @@ export default function WishlistPage() {
         })
         setQuantities(initialQuantities)
       } else {
+        console.log("No wishlist items found or invalid response format")
         setWishlistItems([])
       }
     } catch (error: unknown) {
@@ -242,16 +171,14 @@ export default function WishlistPage() {
       setLoading(false)
       setIsRefreshing(false)
     }
-  }, [toast, fetchCommissionData, isRefreshing])
+  }, [toast, isRefreshing])
 
-  // Fetch wishlist on component mount - ONLY ONCE
+  // Fetch wishlist on component mount
   useEffect(() => {
     fetchWishlist()
-    // Do not include fetchWishlist in the dependency array to prevent constant refreshing
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [fetchWishlist])
 
-  // Fetch cart count - ONLY ONCE
+  // Fetch cart count
   useEffect(() => {
     const fetchCartCount = async () => {
       try {
@@ -312,8 +239,6 @@ export default function WishlistPage() {
       if (!token) {
         throw new Error("No authentication token found. Please refresh the page and try again.")
       }
-
-      console.log("Removing item from wishlist with token:", token.substring(0, 15) + "...")
 
       const response = await fetch("https://evershinebackend-2.onrender.com/api/deleteUserWishlistItem", {
         method: "DELETE",
@@ -387,8 +312,7 @@ export default function WishlistPage() {
         throw new Error("Item not found in wishlist")
       }
 
-      console.log("Adding item to cart with token:", token.substring(0, 15) + "...")
-      console.log("Using price from wishlist:", wishlistItem.price)
+      console.log(`Adding item ${productId} to cart with price ${wishlistItem.price}`)
 
       const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
         method: "POST",
@@ -399,7 +323,7 @@ export default function WishlistPage() {
         body: JSON.stringify({
           productId,
           quantity,
-          // Pass the adjusted price that was saved in the wishlist
+          // Pass the price from the wishlist item
           price: wishlistItem.price,
         }),
       })
@@ -456,7 +380,16 @@ export default function WishlistPage() {
         throw new Error("No authentication token found. Please refresh the page and try again.")
       }
 
-      // Send the client data with the consultant level
+      // Use the current consultant level from state
+      const level = consultantLevel || "red"
+
+      // Calculate commission rate based on consultant level
+      let rate = 5 // Default to red (5%)
+      if (level === "yellow") rate = 10
+      else if (level === "purple") rate = 15
+
+      console.log(`Updating wishlist prices with commission rate ${rate}% based on consultant level ${level}`)
+
       const response = await fetch("https://evershinebackend-2.onrender.com/api/updateWishlistPrices", {
         method: "POST",
         headers: {
@@ -464,8 +397,9 @@ export default function WishlistPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          commissionRate: rate,
           clientData: {
-            consultantLevel: clientData?.consultantLevel || "red",
+            consultantLevel: level,
           },
         }),
       })
@@ -479,7 +413,7 @@ export default function WishlistPage() {
       if (data.success) {
         toast({
           title: "Prices Updated",
-          description: "Wishlist prices have been updated based on your current commission rate",
+          description: "Wishlist prices have been updated based on your consultant level",
           variant: "default",
         })
 
@@ -498,13 +432,6 @@ export default function WishlistPage() {
       })
     } finally {
       setIsRefreshing(false)
-    }
-  }
-
-  // Update the refreshWishlist function to call updateWishlistPrices
-  const refreshWishlist = () => {
-    if (!isRefreshing) {
-      updateWishlistPrices()
     }
   }
 
@@ -530,7 +457,7 @@ export default function WishlistPage() {
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800">
           <p className="font-medium">Error loading wishlist</p>
           <p className="mt-1">{error}</p>
-          <Button onClick={refreshWishlist} variant="outline" className="mt-4" disabled={isRefreshing}>
+          <Button onClick={fetchWishlist} variant="outline" className="mt-4" disabled={isRefreshing}>
             {isRefreshing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             Try Again
           </Button>
@@ -551,18 +478,20 @@ export default function WishlistPage() {
 
         <div className="flex items-center gap-2">
           {/* Display consultant level indicator */}
-          {clientData?.consultantLevel && (
+          {consultantLevel && (
             <div className="flex items-center mr-2">
               <div
                 className={`w-4 h-4 rounded-full mr-1 ${
-                  clientData.consultantLevel === "red"
+                  consultantLevel === "red"
                     ? "bg-red-500"
-                    : clientData.consultantLevel === "yellow"
+                    : consultantLevel === "yellow"
                       ? "bg-yellow-500"
                       : "bg-purple-500"
                 }`}
               />
-              <span className="text-xs text-gray-600">{clientData.consultantLevel} level</span>
+              <span className="text-xs text-gray-600">
+                {consultantLevel} level ({commissionRate}% commission)
+              </span>
             </div>
           )}
 
@@ -570,7 +499,7 @@ export default function WishlistPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={refreshWishlist}
+            onClick={updateWishlistPrices}
             className="flex items-center gap-1 bg-blue-50 hover:bg-blue-100 border-blue-200"
             disabled={isRefreshing}
           >
@@ -630,9 +559,9 @@ export default function WishlistPage() {
           <div className="p-4 bg-muted/20 border-b border-border flex justify-between items-center">
             <h2 className="font-semibold">Wishlist Items ({wishlistItems.length})</h2>
             <div className="flex items-center">
-              {clientData?.consultantLevel && (
+              {consultantLevel && (
                 <span className="text-xs text-muted-foreground mr-2">
-                  {overrideCommissionRate}% commission ({clientData.consultantLevel} level)
+                  {commissionRate}% commission ({consultantLevel} level)
                 </span>
               )}
               <p className="text-xs text-muted-foreground">Prices include commission</p>
@@ -654,10 +583,12 @@ export default function WishlistPage() {
                   <p className="text-sm text-muted-foreground">{item.category}</p>
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between mt-2 gap-3">
                     <div>
-                      {/* Display the price from the wishlist item directly */}
-                      <p className="font-semibold">₹{item.price?.toFixed(2)}/sqft</p>
+                      {/* Display the price with 2 decimal places */}
+                      <p className="font-semibold">₹{Number(item.price).toFixed(2)}/sqft</p>
                       {item.basePrice && (
-                        <p className="text-xs text-muted-foreground">Base price: ₹{item.basePrice?.toFixed(2)}/sqft</p>
+                        <p className="text-xs text-muted-foreground">
+                          Base price: ₹{Number(item.basePrice).toFixed(2)}/sqft
+                        </p>
                       )}
                     </div>
 
