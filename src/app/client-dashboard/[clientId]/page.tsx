@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode } from 'lucide-react'
+import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode } from "lucide-react"
 import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -78,9 +78,13 @@ export default function ProductsPage() {
   // Load saved commission rate from localStorage on component mount
   useEffect(() => {
     if (typeof window !== "undefined") {
+      // Use a client-specific key for commission rate
       const savedRate = localStorage.getItem(`commission-override-${clientId}`)
       if (savedRate) {
         setOverrideCommissionRate(Number(savedRate))
+      } else {
+        // Reset to null if no saved rate for this client
+        setOverrideCommissionRate(null)
       }
     }
   }, [clientId])
@@ -88,6 +92,7 @@ export default function ProductsPage() {
   // Save commission rate to localStorage whenever it changes
   useEffect(() => {
     if (typeof window !== "undefined") {
+      // Use a client-specific key for commission rate
       if (overrideCommissionRate !== null) {
         localStorage.setItem(`commission-override-${clientId}`, overrideCommissionRate.toString())
       } else {
@@ -99,6 +104,7 @@ export default function ProductsPage() {
   // Handle commission rate change
   const handleCommissionRateChange = (rate: number | null) => {
     setOverrideCommissionRate(rate)
+    console.log(`Setting commission rate for client ${clientId} to ${rate}`)
   }
 
   // Debug scroll event
@@ -412,18 +418,23 @@ export default function ProductsPage() {
           }
         } else {
           // Add to wishlist
+          const product = products.find((p) => p.postId === productId)
+          if (!product) {
+            throw new Error("Product not found")
+          }
+
+          const adjustedPrice = calculateAdjustedPrice(product)
+
           const response = await fetch("https://evershinebackend-2.onrender.com/api/addToWishlist", {
             method: "POST",
             headers: {
               Authorization: `Bearer ${token}`,
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ 
+            body: JSON.stringify({
               productId,
               // Include the current price with commission applied
-              price: products.find(p => p.postId === productId) ? 
-                calculateAdjustedPrice(products.find(p => p.postId === productId)!) : 
-                undefined
+              price: adjustedPrice,
             }),
           })
 
@@ -513,6 +524,13 @@ export default function ProductsPage() {
         throw new Error("No authentication token found. Please refresh the token and try again.")
       }
 
+      const product = products.find((p) => p.postId === productId)
+      if (!product) {
+        throw new Error("Product not found")
+      }
+
+      const adjustedPrice = calculateAdjustedPrice(product)
+
       // Make API request in background
       const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
         method: "POST",
@@ -520,12 +538,10 @@ export default function ProductsPage() {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           productId,
           // Include the current price with commission applied
-          price: products.find(p => p.postId === productId) ? 
-            calculateAdjustedPrice(products.find(p => p.postId === productId)!) : 
-            undefined
+          price: adjustedPrice,
         }),
       })
 

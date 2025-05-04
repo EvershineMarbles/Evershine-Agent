@@ -43,6 +43,7 @@ export default function WishlistPage() {
   const [error, setError] = useState<string | null>(null)
   const [commissionData, setCommissionData] = useState<CommissionData | null>(null)
   const [overrideCommissionRate, setOverrideCommissionRate] = useState<number | null>(null)
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
   // Load saved commission rate from localStorage on component mount
   useEffect(() => {
@@ -106,8 +107,11 @@ export default function WishlistPage() {
 
   // Fetch wishlist items
   const fetchWishlist = useCallback(async () => {
+    if (isRefreshing) return // Prevent multiple simultaneous fetches
+
     try {
       setLoading(true)
+      setIsRefreshing(true)
       setError(null)
 
       // First fetch commission data
@@ -200,15 +204,18 @@ export default function WishlistPage() {
       })
     } finally {
       setLoading(false)
+      setIsRefreshing(false)
     }
-  }, [toast, fetchCommissionData, calculateAdjustedPrice])
+  }, [toast, fetchCommissionData, calculateAdjustedPrice, isRefreshing])
 
-  // Fetch wishlist on component mount
+  // Fetch wishlist on component mount - ONLY ONCE
   useEffect(() => {
     fetchWishlist()
-  }, [fetchWishlist])
+    // Do not include fetchWishlist in the dependency array to prevent constant refreshing
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  // Fetch cart count
+  // Fetch cart count - ONLY ONCE
   useEffect(() => {
     const fetchCartCount = async () => {
       try {
@@ -402,13 +409,15 @@ export default function WishlistPage() {
     }
   }
 
-  // Refresh wishlist
+  // Refresh wishlist - ONLY when manually triggered
   const refreshWishlist = () => {
-    fetchWishlist()
-    toast({
-      title: "Refreshing wishlist",
-      description: "Getting the latest wishlist data with updated prices",
-    })
+    if (!isRefreshing) {
+      fetchWishlist()
+      toast({
+        title: "Refreshing wishlist",
+        description: "Getting the latest wishlist data with updated prices",
+      })
+    }
   }
 
   if (loading) {
@@ -433,7 +442,8 @@ export default function WishlistPage() {
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800">
           <p className="font-medium">Error loading wishlist</p>
           <p className="mt-1">{error}</p>
-          <Button onClick={fetchWishlist} variant="outline" className="mt-4">
+          <Button onClick={refreshWishlist} variant="outline" className="mt-4" disabled={isRefreshing}>
+            {isRefreshing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             Try Again
           </Button>
         </div>
@@ -453,24 +463,34 @@ export default function WishlistPage() {
 
         <div className="flex items-center gap-2">
           {/* Refresh Wishlist Button */}
-          <Button variant="outline" size="sm" onClick={refreshWishlist} className="flex items-center gap-1">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-4 w-4"
-            >
-              <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-              <path d="M3 3v5h5" />
-              <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
-              <path d="M16 21h5v-5" />
-            </svg>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={refreshWishlist}
+            className="flex items-center gap-1"
+            disabled={isRefreshing}
+          >
+            {isRefreshing ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4"
+              >
+                <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                <path d="M3 3v5h5" />
+                <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+                <path d="M16 21h5v-5" />
+              </svg>
+            )}
             Refresh Prices
           </Button>
 
