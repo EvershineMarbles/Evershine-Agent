@@ -35,6 +35,11 @@ export default function WishlistPage() {
   const [quantities, setQuantities] = useState<Record<string, number>>({})
   const [debugInfo, setDebugInfo] = useState<string | null>(null)
 
+  // Get API URL from environment or use default
+  const getApiUrl = () => {
+    return process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
+  }
+
   // Get token from localStorage
   const getToken = () => {
     try {
@@ -62,7 +67,7 @@ export default function WishlistPage() {
         return
       }
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
+      const apiUrl = getApiUrl()
 
       const response = await axios.get(`${apiUrl}/api/getUserWishlist`, {
         headers: {
@@ -107,7 +112,7 @@ export default function WishlistPage() {
       const token = getToken()
       if (!token) return
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
+      const apiUrl = getApiUrl()
 
       const response = await axios.get(`${apiUrl}/api/getUserCart`, {
         headers: {
@@ -152,7 +157,7 @@ export default function WishlistPage() {
       const token = getToken()
       if (!token) return
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
+      const apiUrl = getApiUrl()
 
       const response = await axios.delete(`${apiUrl}/api/deleteUserWishlistItem`, {
         headers: {
@@ -198,7 +203,36 @@ export default function WishlistPage() {
     }
   }
 
-  // Add item to cart using fetch instead of axios
+  // Try the debug endpoint first to check if API is working
+  const testDebugEndpoint = async (productId: string) => {
+    try {
+      const token = getToken()
+      if (!token) return false
+
+      const apiUrl = getApiUrl()
+
+      // First try the debug endpoint
+      const debugResponse = await fetch(`${apiUrl}/api/debug/addToCart`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ productId }),
+      })
+
+      const debugData = await debugResponse.json()
+      setDebugInfo(`Debug endpoint response: ${JSON.stringify(debugData)}`)
+
+      return debugResponse.ok
+    } catch (error) {
+      console.error("Debug endpoint error:", error)
+      setDebugInfo(`Debug endpoint error: ${error instanceof Error ? error.message : String(error)}`)
+      return false
+    }
+  }
+
+  // Add item to cart
   const addToCart = async (productId: string) => {
     try {
       setActionLoading((prev) => ({
@@ -209,9 +243,12 @@ export default function WishlistPage() {
       const token = getToken()
       if (!token) return
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
+      const apiUrl = getApiUrl()
 
-      // Use fetch API instead of axios
+      // First test the debug endpoint
+      await testDebugEndpoint(productId)
+
+      // Try with a simple fetch request
       const response = await fetch(`${apiUrl}/api/addToCart`, {
         method: "POST",
         headers: {
@@ -221,16 +258,20 @@ export default function WishlistPage() {
         body: JSON.stringify({ productId }),
       })
 
-      // Log the response for debugging
-      const responseText = await response.text()
       let responseData
       try {
-        responseData = JSON.parse(responseText)
-      } catch (e) {
-        responseData = { success: false, message: "Invalid JSON response" }
-      }
+        const responseText = await response.text()
+        setDebugInfo(`API Response: ${response.status} ${response.statusText}\n${responseText}`)
 
-      setDebugInfo(`Status: ${response.status}, Response: ${responseText}`)
+        try {
+          responseData = JSON.parse(responseText)
+        } catch (e) {
+          responseData = { success: false, message: "Invalid JSON response" }
+        }
+      } catch (e) {
+        setDebugInfo(`Error reading response: ${e instanceof Error ? e.message : String(e)}`)
+        throw e
+      }
 
       if (response.ok && responseData.success) {
         // Then remove from wishlist
@@ -255,6 +296,53 @@ export default function WishlistPage() {
           ),
         })
       } else {
+        // Try a fallback approach with axios
+        try {
+          setDebugInfo(`Trying fallback with axios...`)
+
+          const axiosResponse = await axios.post(
+            `${apiUrl}/api/addToCart`,
+            { productId },
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            },
+          )
+
+          if (axiosResponse.data.success) {
+            // Then remove from wishlist
+            await axios.delete(`${apiUrl}/api/deleteUserWishlistItem`, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+              data: { productId },
+            })
+
+            // Update local state
+            setWishlistItems((prev) => prev.filter((item) => (item.postId || item._id) !== productId))
+            setCartCount((prev) => prev + 1)
+
+            toast({
+              title: "Added to cart",
+              description: `Item has been added to your cart`,
+              action: (
+                <Button variant="outline" size="sm" onClick={() => router.push(`/client-dashboard/${clientId}/cart`)}>
+                  View Cart
+                </Button>
+              ),
+            })
+
+            return
+          }
+
+          setDebugInfo(`Axios fallback response: ${JSON.stringify(axiosResponse.data)}`)
+        } catch (axiosError: any) {
+          setDebugInfo(
+            `Axios fallback error: ${axiosError.message}\n${JSON.stringify(axiosError.response?.data || {})}`,
+          )
+        }
+
         toast({
           title: "Failed to add item",
           description: responseData.message || "Failed to add item to cart",
@@ -355,7 +443,7 @@ export default function WishlistPage() {
       {debugInfo && (
         <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-sm overflow-auto">
           <p className="font-medium mb-1">Debug Information:</p>
-          <pre className="whitespace-pre-wrap">{debugInfo}</pre>
+          <pre className="whitespace-pre-wrap break-all">{debugInfo}</pre>
           <Button variant="outline" size="sm" className="mt-2" onClick={() => setDebugInfo(null)}>
             Clear
           </Button>
