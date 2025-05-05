@@ -662,17 +662,16 @@ export default function ProductsPage() {
     fetchClientData()
   }, [clientId])
 
-  // Show toast when commission rate is automatically set from client data
   useEffect(() => {
     if (clientData?.consultantLevel && overrideCommissionRate !== null) {
-      toast({
-        title: "Commission Rate Applied",
-        description: `${overrideCommissionRate}% commission rate applied based on client's consultant level`,
-        duration: 3000,
-      })
+      // toast({
+      //   title: "Commission Rate Applied",
+      //   description: `${overrideCommissionRate}% commission rate applied based on client's consultant level`,
+      //   duration: 3000,
+      // });
     }
-  }, [clientData?.consultantLevel, overrideCommissionRate, toast])
-
+  }, [clientData?.consultantLevel, overrideCommissionRate, toast]);
+  
   // Loading state
   if (loading) {
     return (

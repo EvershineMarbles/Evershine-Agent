@@ -438,6 +438,11 @@ export default function ProductsPage() {
             }),
           })
 
+          // Add console log to debug the price being sent
+          console.log(
+            `Adding to wishlist: Product ${productId} with price ${adjustedPrice} (commission rate: ${overrideCommissionRate !== null ? overrideCommissionRate : "default"})`,
+          )
+
           if (!response.ok) {
             throw new Error(`API error: ${response.status} ${response.statusText}`)
           }
@@ -621,6 +626,32 @@ export default function ProductsPage() {
           const data = await response.json()
           if (data.data) {
             setClientData(data.data)
+
+            // Set commission rate based on consultant level color
+            if (data.data.consultantLevel) {
+              const consultantLevel = data.data.consultantLevel
+              console.log("Client consultant level:", consultantLevel)
+
+              // Map color to commission rate
+              let commissionRate = null
+              switch (consultantLevel) {
+                case "red":
+                  commissionRate = 5
+                  break
+                case "yellow":
+                  commissionRate = 10
+                  break
+                case "purple":
+                  commissionRate = 15
+                  break
+                default:
+                  commissionRate = null
+              }
+
+              // Set the override commission rate
+              setOverrideCommissionRate(commissionRate)
+              console.log(`Setting commission rate to ${commissionRate}% based on consultant level ${consultantLevel}`)
+            }
           }
         }
       } catch (error) {
@@ -631,6 +662,16 @@ export default function ProductsPage() {
     fetchClientData()
   }, [clientId])
 
+  useEffect(() => {
+    if (clientData?.consultantLevel && overrideCommissionRate !== null) {
+      // toast({
+      //   title: "Commission Rate Applied",
+      //   description: `${overrideCommissionRate}% commission rate applied based on client's consultant level`,
+      //   duration: 3000,
+      // });
+    }
+  }, [clientData?.consultantLevel, overrideCommissionRate, toast]);
+  
   // Loading state
   if (loading) {
     return (
@@ -658,8 +699,7 @@ export default function ProductsPage() {
   return (
     <ErrorBoundary>
       <div className="p-6 md:p-8">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-        </div>
+       
         {error && (
           <Alert variant="destructive" className="mb-4">
             <AlertCircle className="h-4 w-4" />
@@ -699,6 +739,9 @@ export default function ProductsPage() {
                 >
                   Reset
                 </button>
+              )}
+              {clientData?.consultantLevel && (
+                <span className="text-xs text-gray-600 ml-1">({clientData.consultantLevel} level)</span>
               )}
             </div>
 
