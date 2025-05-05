@@ -159,7 +159,7 @@ const WishlistPage = () => {
         return
       }
 
-      // Make sure we're using the correct API URL
+      // Make sure we're using he correct API URL
       const apiUrl = process.env.REACT_APP_API_URL || "https://evershinebackend-2.onrender.com"
 
       const response = await axios.post(
