@@ -9,10 +9,9 @@ const WishlistPage = () => {
   const [error, setError] = useState(null)
   const [authStatus, setAuthStatus] = useState(null)
 
-  // Get token from localStorage with better error handling - USING clientImpersonationToken
+  // Get token from localStorage with better error handling
   const getToken = () => {
     try {
-      // Use clientImpersonationToken instead of token
       const token = localStorage.getItem("clientImpersonationToken")
       if (!token) {
         console.error("No clientImpersonationToken found in localStorage")
@@ -61,6 +60,10 @@ const WishlistPage = () => {
 
       if (response.data.success) {
         const items = response.data.data.items || []
+
+        // Log the raw items to see their structure
+        console.log("Raw wishlist items:", JSON.stringify(items, null, 2))
+
         setWishlistItems(items)
 
         // Log each item's details
@@ -68,6 +71,7 @@ const WishlistPage = () => {
           console.log(`Wishlist item ${index + 1}:`, {
             id: item.postId,
             name: item.name,
+            category: item.category,
             basePrice: item.basePrice,
             adjustedPrice: item.price,
             commission: item.price - item.basePrice,
@@ -83,8 +87,6 @@ const WishlistPage = () => {
 
       // Provide more detailed error information
       if (error.response) {
-        // The request was made and the server responded with a status code
-        // that falls out of the range of 2xx
         console.error("Response error data:", error.response.data)
         console.error("Response error status:", error.response.status)
 
@@ -95,11 +97,9 @@ const WishlistPage = () => {
           setError(`Server error: ${error.response.status} - ${error.response.data?.message || "Unknown error"}`)
         }
       } else if (error.request) {
-        // The request was made but no response was received
         console.error("No response received:", error.request)
         setError("No response from server. Please check your internet connection.")
       } else {
-        // Something happened in setting up the request that triggered an Error
         console.error("Request setup error:", error.message)
         setError("Error setting up request: " + error.message)
       }
@@ -195,6 +195,37 @@ const WishlistPage = () => {
     window.location.href = "/login"
   }
 
+  const fixExistingWishlistItems = async () => {
+    try {
+      console.log("Fixing existing wishlist items...")
+
+      const token = getToken()
+      if (!token) return
+
+      const apiUrl = process.env.REACT_APP_API_URL || "https://evershinebackend-2.onrender.com"
+
+      // Create a script endpoint to fix wishlist items
+      const response = await axios.post(
+        `${apiUrl}/api/fixWishlistItems`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+
+      console.log("Fix wishlist response:", response.data)
+
+      if (response.data.success) {
+        console.log("Wishlist items fixed successfully")
+        fetchWishlist() // Refresh the wishlist
+      }
+    } catch (error) {
+      console.error("Error fixing wishlist items:", error)
+    }
+  }
+
   if (loading) {
     return <div className="text-center p-8">Loading wishlist...</div>
   }
@@ -237,17 +268,18 @@ const WishlistPage = () => {
           </thead>
           <tbody>
             {wishlistItems.map((item) => {
+              const itemId = item.postId || item._id // Use _id as fallback
               const basePrice = item.basePrice || item.price
               const commission = item.price - basePrice
               const commissionPercent = basePrice ? ((item.price / basePrice - 1) * 100).toFixed(2) : 0
 
               return (
-                <tr key={item.postId} className="hover:bg-gray-50">
+                <tr key={itemId} className="hover:bg-gray-50">
                   <td className="py-2 px-4 border">
                     {item.image && item.image.length > 0 ? (
                       <img
                         src={item.image[0] || "/placeholder.svg"}
-                        alt={item.name}
+                        alt={item.name || "Product image"}
                         className="w-16 h-16 object-cover"
                         onError={(e) => {
                           console.log("Image failed to load:", item.image[0])
@@ -260,8 +292,8 @@ const WishlistPage = () => {
                       </div>
                     )}
                   </td>
-                  <td className="py-2 px-4 border">{item.name}</td>
-                  <td className="py-2 px-4 border">{item.category}</td>
+                  <td className="py-2 px-4 border">{item.name || "Unknown Product"}</td>
+                  <td className="py-2 px-4 border">{item.category || "Uncategorized"}</td>
                   <td className="py-2 px-4 border">
                     {basePrice !== item.price ? (
                       <span className="line-through">${basePrice.toFixed(2)}</span>
@@ -282,13 +314,13 @@ const WishlistPage = () => {
                   <td className="py-2 px-4 border">
                     <div className="flex space-x-2">
                       <button
-                        onClick={() => addToCart(item.postId)}
+                        onClick={() => addToCart(itemId)}
                         className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm"
                       >
                         Add to Cart
                       </button>
                       <button
-                        onClick={() => removeFromWishlist(item.postId)}
+                        onClick={() => removeFromWishlist(itemId)}
                         className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
                       >
                         Remove
@@ -321,6 +353,12 @@ const WishlistPage = () => {
           className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm ml-2"
         >
           Check Token
+        </button>
+        <button
+          onClick={fixExistingWishlistItems}
+          className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm ml-2"
+        >
+          Fix Wishlist Items
         </button>
         <p className="mt-2 text-sm text-gray-600">
           Open your browser's developer console (F12) to see detailed information about your wishlist items.
