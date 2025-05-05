@@ -4,10 +4,10 @@ import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowLeft, Trash2, Loader2, Heart, ShoppingCart, RefreshCw, AlertCircle } from "lucide-react"
+import { ArrowLeft, Trash2, Loader2, Heart, ShoppingCart, RefreshCw, AlertCircle, Plus, Minus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
-import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 import axios from "axios"
 
 interface WishlistItem {
@@ -33,6 +33,7 @@ export default function WishlistPage() {
   const [actionLoading, setActionLoading] = useState<Record<string, { removing: boolean; addingToCart: boolean }>>({})
   const [cartCount, setCartCount] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
+  const [quantities, setQuantities] = useState<Record<string, number>>({})
 
   // Get token from localStorage with better error handling
   const getToken = () => {
@@ -90,26 +91,25 @@ export default function WishlistPage() {
 
         // Initialize action loading state for each item
         const initialState: Record<string, { removing: boolean; addingToCart: boolean }> = {}
+        const initialQuantities: Record<string, number> = {}
+
         items.forEach((item: WishlistItem) => {
           const itemId = item.postId || item._id
           initialState[itemId] = { removing: false, addingToCart: false }
+          initialQuantities[itemId] = 1 // Default quantity is 1
         })
+
         setActionLoading(initialState)
+        setQuantities(initialQuantities)
 
         // Log each item's details
         items.forEach((item: WishlistItem, index: number) => {
           const itemId = item.postId || item._id
-          const basePrice = item.basePrice || item.price
-          const commission = item.price - (basePrice || 0)
-
           console.log(`Wishlist item ${index + 1}:`, {
             id: itemId,
             name: item.name,
             category: item.category,
-            basePrice: basePrice,
-            adjustedPrice: item.price,
-            commission: commission,
-            commissionPercent: basePrice ? ((item.price / basePrice - 1) * 100).toFixed(2) + "%" : "N/A",
+            price: item.price,
           })
         })
       } else {
@@ -170,6 +170,35 @@ export default function WishlistPage() {
     fetchWishlist()
     fetchCartCount()
   }, [])
+
+  // Handle quantity change
+  const handleQuantityChange = (itemId: string, value: string) => {
+    const numValue = Number.parseInt(value, 10)
+
+    // Ensure quantity is at least 1 and is a valid number
+    if (!isNaN(numValue) && numValue > 0) {
+      setQuantities((prev) => ({
+        ...prev,
+        [itemId]: numValue,
+      }))
+    }
+  }
+
+  // Increment quantity
+  const incrementQuantity = (itemId: string) => {
+    setQuantities((prev) => ({
+      ...prev,
+      [itemId]: (prev[itemId] || 1) + 1,
+    }))
+  }
+
+  // Decrement quantity
+  const decrementQuantity = (itemId: string) => {
+    setQuantities((prev) => ({
+      ...prev,
+      [itemId]: Math.max(1, (prev[itemId] || 1) - 1),
+    }))
+  }
 
   // Remove item from wishlist
   const removeFromWishlist = async (productId: string) => {
@@ -252,7 +281,8 @@ export default function WishlistPage() {
         [productId]: { ...prev[productId], addingToCart: true },
       }))
 
-      console.log(`Adding product ${productId} to cart...`)
+      const quantity = quantities[productId] || 1
+      console.log(`Adding product ${productId} to cart with quantity ${quantity}...`)
 
       const token = getToken()
       if (!token) {
@@ -269,7 +299,10 @@ export default function WishlistPage() {
 
       const response = await axios.post(
         `${apiUrl}/api/addToCart`,
-        { productId },
+        {
+          productId,
+          quantity,
+        },
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -288,7 +321,7 @@ export default function WishlistPage() {
 
         toast({
           title: "Added to cart",
-          description: "Item has been added to your cart and removed from wishlist",
+          description: `Item has been added to your cart with quantity ${quantity}`,
           action: (
             <Button variant="outline" size="sm" onClick={() => router.push(`/client-dashboard/${clientId}/cart`)}>
               View Cart
@@ -421,9 +454,6 @@ export default function WishlistPage() {
           <div className="divide-y divide-border">
             {wishlistItems.map((item) => {
               const itemId = item.postId || item._id
-              const basePrice = item.basePrice || item.price
-              const commission = item.price - (basePrice || 0)
-              const commissionPercent = basePrice ? ((item.price / basePrice - 1) * 100).toFixed(2) : "0"
 
               return (
                 <div key={itemId} className="p-4 flex flex-col md:flex-row md:items-center">
@@ -440,54 +470,64 @@ export default function WishlistPage() {
                     <h3 className="font-medium">{item.name || "Unknown Product"}</h3>
                     <p className="text-sm text-muted-foreground">{item.category || "Uncategorized"}</p>
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2">
-                      <div>
-                        {basePrice !== item.price ? (
-                          <div>
-                            <span className="line-through text-sm text-muted-foreground">
-                              ₹{basePrice.toLocaleString()}
-                            </span>
-                            <span className="font-semibold ml-2">₹{item.price.toLocaleString()}</span>
-                          </div>
-                        ) : (
-                          <span className="font-semibold">₹{item.price.toLocaleString()}</span>
-                        )}
-                      </div>
-
-                      {commission > 0 && (
-                        <Badge variant="outline" className="text-green-600 bg-green-50">
-                          +₹{commission.toLocaleString()} ({commissionPercent}%)
-                        </Badge>
-                      )}
+                      <span className="font-semibold">₹{item.price.toLocaleString()}</span>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2 mt-4 md:mt-0">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => addToCart(itemId)}
-                      disabled={actionLoading[itemId]?.addingToCart}
-                      className="flex items-center"
-                    >
-                      {actionLoading[itemId]?.addingToCart ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      ) : (
-                        <ShoppingCart className="h-4 w-4 mr-2" />
-                      )}
-                      Add to Cart
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeFromWishlist(itemId)}
-                      disabled={actionLoading[itemId]?.removing}
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                    >
-                      {actionLoading[itemId]?.removing ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-4 w-4" />
-                      )}
-                    </Button>
+                  <div className="flex flex-col md:flex-row items-center gap-4 mt-4 md:mt-0">
+                    <div className="flex items-center border rounded-md overflow-hidden">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 rounded-none"
+                        onClick={() => decrementQuantity(itemId)}
+                      >
+                        <Minus className="h-3 w-3" />
+                      </Button>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={quantities[itemId] || 1}
+                        onChange={(e) => handleQuantityChange(itemId, e.target.value)}
+                        className="h-8 w-16 text-center border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 rounded-none"
+                        onClick={() => incrementQuantity(itemId)}
+                      >
+                        <Plus className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => addToCart(itemId)}
+                        disabled={actionLoading[itemId]?.addingToCart}
+                        className="flex items-center"
+                      >
+                        {actionLoading[itemId]?.addingToCart ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <ShoppingCart className="h-4 w-4 mr-2" />
+                        )}
+                        Add to Cart
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeFromWishlist(itemId)}
+                        disabled={actionLoading[itemId]?.removing}
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                      >
+                        {actionLoading[itemId]?.removing ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               )
