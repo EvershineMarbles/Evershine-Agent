@@ -211,12 +211,13 @@ export default function WishlistPage() {
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
 
-      // First add to cart
+      // Make sure we're sending the correct data format that the API expects
       const response = await axios.post(
         `${apiUrl}/api/addToCart`,
-        { productId, quantity },
+        { productId }, // Only send productId as the API expects
         {
           headers: {
+            "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
         },
@@ -237,7 +238,7 @@ export default function WishlistPage() {
 
         toast({
           title: "Added to cart",
-          description: `Item has been added to your cart with quantity ${quantity}`,
+          description: `Item has been added to your cart`,
           action: (
             <Button variant="outline" size="sm" onClick={() => router.push(`/client-dashboard/${clientId}/cart`)}>
               View Cart
@@ -252,19 +253,13 @@ export default function WishlistPage() {
         })
       }
     } catch (error: any) {
-      if (error.response && error.response.status === 401) {
-        toast({
-          title: "Authentication failed",
-          description: "Please log in again to continue.",
-          variant: "destructive",
-        })
-      } else {
-        toast({
-          title: "Error",
-          description: "Failed to add item to cart",
-          variant: "destructive",
-        })
-      }
+      console.error("Error adding to cart:", error.response || error)
+
+      toast({
+        title: "Error",
+        description: "Failed to add item to cart. Please try again.",
+        variant: "destructive",
+      })
     } finally {
       setActionLoading((prev) => ({
         ...prev,
