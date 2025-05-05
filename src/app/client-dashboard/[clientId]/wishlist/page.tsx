@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowLeft, Trash2, Loader2, Heart, ShoppingCart, RefreshCw } from "lucide-react"
+import { ArrowLeft, Trash2, Loader2, Heart, ShoppingCart, RefreshCw, AlertCircle, Plus, Minus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
 import { Input } from "@/components/ui/input"
@@ -29,24 +29,25 @@ export default function WishlistPage() {
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [authStatus, setAuthStatus] = useState<string | null>(null)
   const [actionLoading, setActionLoading] = useState<Record<string, { removing: boolean; addingToCart: boolean }>>({})
   const [cartCount, setCartCount] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
   const [quantities, setQuantities] = useState<Record<string, number>>({})
-  const [debugInfo, setDebugInfo] = useState<string | null>(null)
 
-  // Get token from localStorage
+  // Get token from localStorage with better error handling
   const getToken = () => {
     try {
-      // Try both token storage options
-      const token = localStorage.getItem("clientImpersonationToken") || localStorage.getItem("token")
+      const token = localStorage.getItem("clientImpersonationToken")
       if (!token) {
-        setError("No authentication token found. Please log in again.")
+        console.error("No clientImpersonationToken found in localStorage")
+        setAuthStatus("No clientImpersonationToken found")
         return null
       }
       return token
     } catch (e) {
-      setError("Error accessing authentication. Please refresh the page.")
+      console.error("Error accessing localStorage:", e)
+      setAuthStatus("Error accessing localStorage")
       return null
     }
   }
@@ -55,14 +56,22 @@ export default function WishlistPage() {
   const fetchWishlist = async () => {
     try {
       setLoading(true)
+      console.log("Fetching wishlist...")
 
       const token = getToken()
       if (!token) {
+        setError("Authentication required. Please log in again.")
         setLoading(false)
         return
       }
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
+      // Log the token format (first few characters for security)
+      console.log(`Token format check: ${token.substring(0, 10)}...`)
+      setAuthStatus(`Using token starting with: ${token.substring(0, 10)}...`)
+
+      // Make sure we're using the correct API URL
+      const apiUrl = process.env.REACT_APP_API_URL || "https://evershinebackend-2.onrender.com"
+      console.log(`Using API URL: ${apiUrl}`)
 
       const response = await axios.get(`${apiUrl}/api/getUserWishlist`, {
         headers: {
@@ -70,8 +79,14 @@ export default function WishlistPage() {
         },
       })
 
+      console.log("Wishlist API response:", response.data)
+
       if (response.data.success) {
         const items = response.data.data.items || []
+
+        // Log the raw items to see their structure
+        console.log("Raw wishlist items:", JSON.stringify(items, null, 2))
+
         setWishlistItems(items)
 
         // Initialize action loading state for each item
@@ -86,14 +101,41 @@ export default function WishlistPage() {
 
         setActionLoading(initialState)
         setQuantities(initialQuantities)
+
+        // Log each item's details
+        items.forEach((item: WishlistItem, index: number) => {
+          const itemId = item.postId || item._id
+          console.log(`Wishlist item ${index + 1}:`, {
+            id: itemId,
+            name: item.name,
+            category: item.category,
+            price: item.price,
+          })
+        })
       } else {
+        console.error("Failed to fetch wishlist:", response.data.message)
         setError("Failed to fetch wishlist: " + (response.data.message || "Unknown error"))
       }
     } catch (error: any) {
-      if (error.response && error.response.status === 401) {
-        setError("Authentication failed. Please log in again.")
+      console.error("Error fetching wishlist:", error)
+
+      // Provide more detailed error information
+      if (error.response) {
+        console.error("Response error data:", error.response.data)
+        console.error("Response error status:", error.response.status)
+
+        if (error.response.status === 401) {
+          setError("Authentication failed. Please log in again.")
+          setAuthStatus("Token rejected by server (401)")
+        } else {
+          setError(`Server error: ${error.response.status} - ${error.response.data?.message || "Unknown error"}`)
+        }
+      } else if (error.request) {
+        console.error("No response received:", error.request)
+        setError("No response from server. Please check your internet connection.")
       } else {
-        setError("Error loading wishlist. Please try again.")
+        console.error("Request setup error:", error.message)
+        setError("Error setting up request: " + error.message)
       }
     } finally {
       setLoading(false)
@@ -107,7 +149,7 @@ export default function WishlistPage() {
       const token = getToken()
       if (!token) return
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
+      const apiUrl = process.env.REACT_APP_API_URL || "https://evershinebackend-2.onrender.com"
 
       const response = await axios.get(`${apiUrl}/api/getUserCart`, {
         headers: {
@@ -119,7 +161,7 @@ export default function WishlistPage() {
         setCartCount(response.data.data.items.length)
       }
     } catch (error) {
-      // Silently fail for cart count
+      console.error("Error fetching cart count:", error)
     }
   }
 
@@ -131,14 +173,31 @@ export default function WishlistPage() {
 
   // Handle quantity change
   const handleQuantityChange = (itemId: string, value: string) => {
-    const numValue = Number.parseInt(value)
+    const numValue = Number.parseInt(value, 10)
 
+    // Ensure quantity is at least 1 and is a valid number
     if (!isNaN(numValue) && numValue > 0) {
       setQuantities((prev) => ({
         ...prev,
         [itemId]: numValue,
       }))
     }
+  }
+
+  // Increment quantity
+  const incrementQuantity = (itemId: string) => {
+    setQuantities((prev) => ({
+      ...prev,
+      [itemId]: (prev[itemId] || 1) + 1,
+    }))
+  }
+
+  // Decrement quantity
+  const decrementQuantity = (itemId: string) => {
+    setQuantities((prev) => ({
+      ...prev,
+      [itemId]: Math.max(1, (prev[itemId] || 1) - 1),
+    }))
   }
 
   // Remove item from wishlist
@@ -149,10 +208,20 @@ export default function WishlistPage() {
         [productId]: { ...prev[productId], removing: true },
       }))
 
-      const token = getToken()
-      if (!token) return
+      console.log(`Removing product ${productId} from wishlist...`)
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
+      const token = getToken()
+      if (!token) {
+        toast({
+          title: "Authentication required",
+          description: "Please log in again to continue.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Make sure we're using the correct API URL
+      const apiUrl = process.env.REACT_APP_API_URL || "https://evershinebackend-2.onrender.com"
 
       const response = await axios.delete(`${apiUrl}/api/deleteUserWishlistItem`, {
         headers: {
@@ -161,7 +230,10 @@ export default function WishlistPage() {
         data: { productId },
       })
 
+      console.log("Remove from wishlist response:", response.data)
+
       if (response.data.success) {
+        console.log(`Product ${productId} removed successfully`)
         // Update local state
         setWishlistItems((prev) => prev.filter((item) => (item.postId || item._id) !== productId))
 
@@ -170,6 +242,7 @@ export default function WishlistPage() {
           description: "Item has been removed from your wishlist",
         })
       } else {
+        console.error("Failed to remove item:", response.data.message)
         toast({
           title: "Failed to remove item",
           description: response.data.message || "Unknown error",
@@ -177,6 +250,8 @@ export default function WishlistPage() {
         })
       }
     } catch (error: any) {
+      console.error("Error removing item from wishlist:", error)
+
       if (error.response && error.response.status === 401) {
         toast({
           title: "Authentication failed",
@@ -186,7 +261,7 @@ export default function WishlistPage() {
       } else {
         toast({
           title: "Error",
-          description: "Failed to remove item from wishlist",
+          description: error.message || "Failed to remove item from wishlist",
           variant: "destructive",
         })
       }
@@ -198,7 +273,7 @@ export default function WishlistPage() {
     }
   }
 
-  // Add item to cart using fetch instead of axios
+  // Add item to cart
   const addToCart = async (productId: string) => {
     try {
       setActionLoading((prev) => ({
@@ -206,48 +281,47 @@ export default function WishlistPage() {
         [productId]: { ...prev[productId], addingToCart: true },
       }))
 
+      const quantity = quantities[productId] || 1
+      console.log(`Adding product ${productId} to cart with quantity ${quantity}...`)
+
       const token = getToken()
-      if (!token) return
-
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
-
-      // Use fetch API instead of axios
-      const response = await fetch(`${apiUrl}/api/addToCart`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ productId }),
-      })
-
-      // Log the response for debugging
-      const responseText = await response.text()
-      let responseData
-      try {
-        responseData = JSON.parse(responseText)
-      } catch (e) {
-        responseData = { success: false, message: "Invalid JSON response" }
+      if (!token) {
+        toast({
+          title: "Authentication required",
+          description: "Please log in again to continue.",
+          variant: "destructive",
+        })
+        return
       }
 
-      setDebugInfo(`Status: ${response.status}, Response: ${responseText}`)
+      // Make sure we're using the correct API URL
+      const apiUrl = process.env.REACT_APP_API_URL || "https://evershinebackend-2.onrender.com"
 
-      if (response.ok && responseData.success) {
-        // Then remove from wishlist
-        await axios.delete(`${apiUrl}/api/deleteUserWishlistItem`, {
+      const response = await axios.post(
+        `${apiUrl}/api/addToCart`,
+        {
+          productId,
+          quantity,
+        },
+        {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-          data: { productId },
-        })
+        },
+      )
 
-        // Update local state
-        setWishlistItems((prev) => prev.filter((item) => (item.postId || item._id) !== productId))
+      console.log("Add to cart response:", response.data)
+
+      if (response.data.success) {
+        // Increment cart count
         setCartCount((prev) => prev + 1)
+
+        // Remove from wishlist
+        await removeFromWishlist(productId)
 
         toast({
           title: "Added to cart",
-          description: `Item has been added to your cart`,
+          description: `Item has been added to your cart with quantity ${quantity}`,
           action: (
             <Button variant="outline" size="sm" onClick={() => router.push(`/client-dashboard/${clientId}/cart`)}>
               View Cart
@@ -257,19 +331,26 @@ export default function WishlistPage() {
       } else {
         toast({
           title: "Failed to add item",
-          description: responseData.message || "Failed to add item to cart",
+          description: response.data.message || "Failed to add item to cart",
           variant: "destructive",
         })
       }
     } catch (error: any) {
-      console.error("Error adding to cart:", error)
-      setDebugInfo(`Error: ${error.message}`)
+      console.error("Error adding item to cart:", error)
 
-      toast({
-        title: "Error",
-        description: "Failed to add item to cart. Please try again.",
-        variant: "destructive",
-      })
+      if (error.response && error.response.status === 401) {
+        toast({
+          title: "Authentication failed",
+          description: "Please log in again to continue.",
+          variant: "destructive",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to add item to cart",
+          variant: "destructive",
+        })
+      }
     } finally {
       setActionLoading((prev) => ({
         ...prev,
@@ -306,10 +387,11 @@ export default function WishlistPage() {
       <div className="flex flex-col items-center justify-center h-[60vh] p-6">
         <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md w-full">
           <div className="flex items-center mb-4">
-            <div className="h-6 w-6 text-red-500 mr-2" />
+            <AlertCircle className="h-6 w-6 text-red-500 mr-2" />
             <h2 className="text-xl font-semibold text-red-700">Error Loading Wishlist</h2>
           </div>
           <p className="text-red-600 mb-4">{error}</p>
+          {authStatus && <p className="text-sm text-gray-500 mb-4">Auth status: {authStatus}</p>}
           <div className="flex flex-wrap gap-2 mt-4">
             <Button onClick={handleLogin} variant="default">
               Go to Login
@@ -352,16 +434,6 @@ export default function WishlistPage() {
         </div>
       </div>
 
-      {debugInfo && (
-        <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-sm overflow-auto">
-          <p className="font-medium mb-1">Debug Information:</p>
-          <pre className="whitespace-pre-wrap">{debugInfo}</pre>
-          <Button variant="outline" size="sm" className="mt-2" onClick={() => setDebugInfo(null)}>
-            Clear
-          </Button>
-        </div>
-      )}
-
       {wishlistItems.length === 0 ? (
         <div className="text-center py-12 bg-muted/20 rounded-lg">
           <Heart className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
@@ -402,14 +474,30 @@ export default function WishlistPage() {
                     </div>
                   </div>
                   <div className="flex flex-col md:flex-row items-center gap-4 mt-4 md:mt-0">
-                    <div className="flex items-center">
+                    <div className="flex items-center border rounded-md overflow-hidden">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 rounded-none"
+                        onClick={() => decrementQuantity(itemId)}
+                      >
+                        <Minus className="h-3 w-3" />
+                      </Button>
                       <Input
                         type="number"
                         min="1"
                         value={quantities[itemId] || 1}
                         onChange={(e) => handleQuantityChange(itemId, e.target.value)}
-                        className="h-9 w-24 text-center"
+                        className="h-8 w-16 text-center border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
                       />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 rounded-none"
+                        onClick={() => incrementQuantity(itemId)}
+                      >
+                        <Plus className="h-3 w-3" />
+                      </Button>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Button
