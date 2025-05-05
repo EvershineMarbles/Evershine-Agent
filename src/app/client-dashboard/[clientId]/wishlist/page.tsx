@@ -9,13 +9,14 @@ const WishlistPage = () => {
   const [error, setError] = useState(null)
   const [authStatus, setAuthStatus] = useState(null)
 
-  // Get token from localStorage with better error handling
+  // Get token from localStorage with better error handling - USING clientImpersonationToken
   const getToken = () => {
     try {
-      const token = localStorage.getItem("token")
+      // Use clientImpersonationToken instead of token
+      const token = localStorage.getItem("clientImpersonationToken")
       if (!token) {
-        console.error("No authentication token found in localStorage")
-        setAuthStatus("No token found")
+        console.error("No clientImpersonationToken found in localStorage")
+        setAuthStatus("No clientImpersonationToken found")
         return null
       }
       return token
@@ -91,7 +92,7 @@ const WishlistPage = () => {
           setError("Authentication failed. Please log in again.")
           setAuthStatus("Token rejected by server (401)")
         } else {
-          setError(`Server error: ${error.response.status} - ${error.response.data.message || "Unknown error"}`)
+          setError(`Server error: ${error.response.status} - ${error.response.data?.message || "Unknown error"}`)
         }
       } else if (error.request) {
         // The request was made but no response was received
@@ -190,7 +191,7 @@ const WishlistPage = () => {
   }
 
   const handleLogin = () => {
-    // Redirect to login page
+    // Redirect to login page - adjust this URL as needed
     window.location.href = "/login"
   }
 
@@ -314,6 +315,12 @@ const WishlistPage = () => {
           className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm ml-2"
         >
           Log Auth Status
+        </button>
+        <button
+          onClick={() => console.log("Token:", localStorage.getItem("clientImpersonationToken"))}
+          className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm ml-2"
+        >
+          Check Token
         </button>
         <p className="mt-2 text-sm text-gray-600">
           Open your browser's developer console (F12) to see detailed information about your wishlist items.
