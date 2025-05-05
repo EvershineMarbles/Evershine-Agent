@@ -33,11 +33,13 @@ export default function WishlistPage() {
   const [cartCount, setCartCount] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
   const [quantities, setQuantities] = useState<Record<string, number>>({})
+  const [debugInfo, setDebugInfo] = useState<string | null>(null)
 
   // Get token from localStorage
   const getToken = () => {
     try {
-      const token = localStorage.getItem("clientImpersonationToken")
+      // Try both token storage options
+      const token = localStorage.getItem("clientImpersonationToken") || localStorage.getItem("token")
       if (!token) {
         setError("No authentication token found. Please log in again.")
         return null
@@ -196,7 +198,7 @@ export default function WishlistPage() {
     }
   }
 
-  // Add item to cart
+  // Add item to cart using fetch instead of axios
   const addToCart = async (productId: string) => {
     try {
       setActionLoading((prev) => ({
@@ -204,26 +206,33 @@ export default function WishlistPage() {
         [productId]: { ...prev[productId], addingToCart: true },
       }))
 
-      const quantity = quantities[productId] || 1
-
       const token = getToken()
       if (!token) return
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
 
-      // Make sure we're sending the correct data format that the API expects
-      const response = await axios.post(
-        `${apiUrl}/api/addToCart`,
-        { productId }, // Only send productId as the API expects
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
+      // Use fetch API instead of axios
+      const response = await fetch(`${apiUrl}/api/addToCart`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-      )
+        body: JSON.stringify({ productId }),
+      })
 
-      if (response.data.success) {
+      // Log the response for debugging
+      const responseText = await response.text()
+      let responseData
+      try {
+        responseData = JSON.parse(responseText)
+      } catch (e) {
+        responseData = { success: false, message: "Invalid JSON response" }
+      }
+
+      setDebugInfo(`Status: ${response.status}, Response: ${responseText}`)
+
+      if (response.ok && responseData.success) {
         // Then remove from wishlist
         await axios.delete(`${apiUrl}/api/deleteUserWishlistItem`, {
           headers: {
@@ -248,12 +257,13 @@ export default function WishlistPage() {
       } else {
         toast({
           title: "Failed to add item",
-          description: response.data.message || "Failed to add item to cart",
+          description: responseData.message || "Failed to add item to cart",
           variant: "destructive",
         })
       }
     } catch (error: any) {
-      console.error("Error adding to cart:", error.response || error)
+      console.error("Error adding to cart:", error)
+      setDebugInfo(`Error: ${error.message}`)
 
       toast({
         title: "Error",
@@ -341,6 +351,16 @@ export default function WishlistPage() {
           </Link>
         </div>
       </div>
+
+      {debugInfo && (
+        <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-sm overflow-auto">
+          <p className="font-medium mb-1">Debug Information:</p>
+          <pre className="whitespace-pre-wrap">{debugInfo}</pre>
+          <Button variant="outline" size="sm" className="mt-2" onClick={() => setDebugInfo(null)}>
+            Clear
+          </Button>
+        </div>
+      )}
 
       {wishlistItems.length === 0 ? (
         <div className="text-center py-12 bg-muted/20 rounded-lg">
