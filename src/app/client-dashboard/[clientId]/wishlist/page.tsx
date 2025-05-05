@@ -33,7 +33,6 @@ export default function WishlistPage() {
   const [cartCount, setCartCount] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
   const [quantities, setQuantities] = useState<Record<string, number>>({})
-  const [debugInfo, setDebugInfo] = useState<string | null>(null)
 
   // Get API URL from environment or use default
   const getApiUrl = () => {
@@ -203,35 +202,6 @@ export default function WishlistPage() {
     }
   }
 
-  // Try the debug endpoint first to check if API is working
-  const testDebugEndpoint = async (productId: string) => {
-    try {
-      const token = getToken()
-      if (!token) return false
-
-      const apiUrl = getApiUrl()
-
-      // First try the debug endpoint
-      const debugResponse = await fetch(`${apiUrl}/api/debug/addToCart`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ productId }),
-      })
-
-      const debugData = await debugResponse.json()
-      setDebugInfo(`Debug endpoint response: ${JSON.stringify(debugData)}`)
-
-      return debugResponse.ok
-    } catch (error) {
-      console.error("Debug endpoint error:", error)
-      setDebugInfo(`Debug endpoint error: ${error instanceof Error ? error.message : String(error)}`)
-      return false
-    }
-  }
-
   // Add item to cart
   const addToCart = async (productId: string) => {
     try {
@@ -245,35 +215,18 @@ export default function WishlistPage() {
 
       const apiUrl = getApiUrl()
 
-      // First test the debug endpoint
-      await testDebugEndpoint(productId)
-
-      // Try with a simple fetch request
-      const response = await fetch(`${apiUrl}/api/addToCart`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+      // Try with axios
+      const response = await axios.post(
+        `${apiUrl}/api/addToCart`,
+        { productId },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
-        body: JSON.stringify({ productId }),
-      })
+      )
 
-      let responseData
-      try {
-        const responseText = await response.text()
-        setDebugInfo(`API Response: ${response.status} ${response.statusText}\n${responseText}`)
-
-        try {
-          responseData = JSON.parse(responseText)
-        } catch (e) {
-          responseData = { success: false, message: "Invalid JSON response" }
-        }
-      } catch (e) {
-        setDebugInfo(`Error reading response: ${e instanceof Error ? e.message : String(e)}`)
-        throw e
-      }
-
-      if (response.ok && responseData.success) {
+      if (response.data.success) {
         // Then remove from wishlist
         await axios.delete(`${apiUrl}/api/deleteUserWishlistItem`, {
           headers: {
@@ -296,63 +249,13 @@ export default function WishlistPage() {
           ),
         })
       } else {
-        // Try a fallback approach with axios
-        try {
-          setDebugInfo(`Trying fallback with axios...`)
-
-          const axiosResponse = await axios.post(
-            `${apiUrl}/api/addToCart`,
-            { productId },
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            },
-          )
-
-          if (axiosResponse.data.success) {
-            // Then remove from wishlist
-            await axios.delete(`${apiUrl}/api/deleteUserWishlistItem`, {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-              data: { productId },
-            })
-
-            // Update local state
-            setWishlistItems((prev) => prev.filter((item) => (item.postId || item._id) !== productId))
-            setCartCount((prev) => prev + 1)
-
-            toast({
-              title: "Added to cart",
-              description: `Item has been added to your cart`,
-              action: (
-                <Button variant="outline" size="sm" onClick={() => router.push(`/client-dashboard/${clientId}/cart`)}>
-                  View Cart
-                </Button>
-              ),
-            })
-
-            return
-          }
-
-          setDebugInfo(`Axios fallback response: ${JSON.stringify(axiosResponse.data)}`)
-        } catch (axiosError: any) {
-          setDebugInfo(
-            `Axios fallback error: ${axiosError.message}\n${JSON.stringify(axiosError.response?.data || {})}`,
-          )
-        }
-
         toast({
           title: "Failed to add item",
-          description: responseData.message || "Failed to add item to cart",
+          description: response.data.message || "Failed to add item to cart",
           variant: "destructive",
         })
       }
     } catch (error: any) {
-      console.error("Error adding to cart:", error)
-      setDebugInfo(`Error: ${error.message}`)
-
       toast({
         title: "Error",
         description: "Failed to add item to cart. Please try again.",
@@ -439,16 +342,6 @@ export default function WishlistPage() {
           </Link>
         </div>
       </div>
-
-      {debugInfo && (
-        <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-sm overflow-auto">
-          <p className="font-medium mb-1">Debug Information:</p>
-          <pre className="whitespace-pre-wrap break-all">{debugInfo}</pre>
-          <Button variant="outline" size="sm" className="mt-2" onClick={() => setDebugInfo(null)}>
-            Clear
-          </Button>
-        </div>
-      )}
 
       {wishlistItems.length === 0 ? (
         <div className="text-center py-12 bg-muted/20 rounded-lg">
