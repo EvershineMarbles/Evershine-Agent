@@ -1,13 +1,15 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowLeft, Trash2, Loader2, ShoppingBag, Plus, Minus } from 'lucide-react'
+import { ArrowLeft, Trash2, Loader2, ShoppingBag, Plus, Minus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Input } from "@/components/ui/input"
+import axios from "axios"
 
 interface CartItem {
   _id: string
@@ -20,10 +22,8 @@ interface CartItem {
 }
 
 export default function CartPage() {
-  const params = useParams()
   const router = useRouter()
   const { toast } = useToast()
-  const clientId = params.clientId as string
 
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -31,6 +31,35 @@ export default function CartPage() {
   const [updating, setUpdating] = useState<Record<string, boolean>>({})
   const [isCheckingOut, setIsCheckingOut] = useState(false)
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
+
+  // Get API URL from environment or use default
+  const getApiUrl = () => {
+    return process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
+  }
+
+  // Get token from localStorage
+  const getToken = () => {
+    try {
+      // Try both token storage options
+      const token = localStorage.getItem("clientImpersonationToken") || localStorage.getItem("token")
+      if (!token) {
+        toast({
+          title: "Authentication Error",
+          description: "No authentication token found. Please log in again.",
+          variant: "destructive",
+        })
+        return null
+      }
+      return token
+    } catch (e) {
+      toast({
+        title: "Authentication Error",
+        description: "Error accessing authentication. Please refresh the page.",
+        variant: "destructive",
+      })
+      return null
+    }
+  }
 
   // Fetch cart items from server
   useEffect(() => {
@@ -40,66 +69,60 @@ export default function CartPage() {
   const fetchCart = async () => {
     try {
       setLoading(true)
-
-      // Get the token
-      const token = localStorage.getItem("clientImpersonationToken")
+      const token = getToken()
 
       if (!token) {
-        throw new Error("No authentication token found. Please refresh the page and try again.")
+        setLoading(false)
+        return
       }
 
-      const response = await fetch("https://evershinebackend-2.onrender.com/api/getUserCart", {
-        method: "GET",
+      const apiUrl = getApiUrl()
+      const response = await axios.get(`${apiUrl}/api/getUserCart`, {
         headers: {
           Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
         },
       })
 
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error("Authentication failed. Please refresh the token and try again.")
-        } else {
-          throw new Error(`API error: ${response.status} ${response.statusText}`)
-        }
-      }
-
-      const data = await response.json()
-
-      if (data.data) {
-        // Filter out any items with null or undefined postId
-        const validItems = (data.data.items || []).filter(
+      if (response.data && response.data.data) {
+        const validItems = (response.data.data.items || []).filter(
           (item: CartItem) => item.postId && typeof item.postId === "string",
         )
 
-        // Get quantities from localStorage
-        const savedCartQuantities = localStorage.getItem("cartQuantities")
-        const cartQuantities = savedCartQuantities ? JSON.parse(savedCartQuantities) : {}
+        // Ensure all items have valid prices (not 1 or 0)
+        const itemsWithCorrectPrices = await Promise.all(
+          validItems.map(async (item: CartItem) => {
+            // If price is suspiciously low (1 or less), try to fetch the correct price
+            if (item.price <= 1) {
+              try {
+                const productResponse = await axios.get(`${apiUrl}/api/getPostDataById?id=${item.postId}`, {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                  },
+                })
 
-        // Apply quantities from localStorage
-        const itemsWithQuantities = validItems.map((item: CartItem) => {
-          // Get quantity from localStorage or use the one from API
-          const storedQuantity = cartQuantities[item.postId]
-          return {
-            ...item,
-            quantity: storedQuantity || item.quantity || 1,
-          }
-        })
+                if (productResponse.data && productResponse.data.data && productResponse.data.data[0]) {
+                  // Update the price from the product data
+                  return {
+                    ...item,
+                    price: productResponse.data.data[0].price || item.price,
+                  }
+                }
+              } catch (error) {
+                // If fetching fails, keep the original price
+              }
+            }
+            return item
+          }),
+        )
 
-        setCartItems(itemsWithQuantities)
-
-        // Update localStorage cart to match server
-        const cartIds = validItems.map((item: CartItem) => item.postId)
-        localStorage.setItem("cart", JSON.stringify(cartIds))
+        setCartItems(itemsWithCorrectPrices)
       } else {
         setCartItems([])
-        localStorage.removeItem("cart")
       }
     } catch (error: any) {
-      console.error("Error fetching cart:", error)
       toast({
         title: "Error",
-        description: error.message || "Failed to load your cart. Please try again.",
+        description: "Failed to load your cart. Please try again.",
         variant: "destructive",
       })
       setCartItems([])
@@ -114,44 +137,30 @@ export default function CartPage() {
 
     try {
       setUpdating((prev) => ({ ...prev, [productId]: true }))
+      const token = getToken()
 
-      // Get the token
-      const token = localStorage.getItem("clientImpersonationToken")
+      if (!token) return
 
-      if (!token) {
-        throw new Error("No authentication token found. Please refresh the page and try again.")
-      }
+      const apiUrl = getApiUrl()
 
       // First remove the item
-      const removeResponse = await fetch("https://evershinebackend-2.onrender.com/api/deleteUserCartItem", {
-        method: "DELETE",
+      await axios.delete(`${apiUrl}/api/deleteUserCartItem`, {
         headers: {
           Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
         },
-        body: JSON.stringify({ productId }),
+        data: { productId },
       })
-
-      if (!removeResponse.ok) {
-        throw new Error(`Failed to update quantity: ${removeResponse.status}`)
-      }
 
       // Then add it back with the new quantity
-      const addResponse = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
+      await axios.post(
+        `${apiUrl}/api/addToCart`,
+        { productId, quantity: newQuantity },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
-        body: JSON.stringify({
-          productId,
-          quantity: newQuantity,
-        }),
-      })
-
-      if (!addResponse.ok) {
-        throw new Error(`Failed to update quantity: ${addResponse.status}`)
-      }
+      )
 
       // Update local state
       setCartItems((prev) =>
@@ -161,13 +170,11 @@ export default function CartPage() {
       toast({
         title: "Quantity Updated",
         description: "Item quantity has been updated",
-        variant: "default",
       })
     } catch (error: any) {
-      console.error("Error updating quantity:", error)
       toast({
         title: "Error",
-        description: error.message || "Failed to update quantity. Please try again.",
+        description: "Failed to update quantity. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -175,60 +182,44 @@ export default function CartPage() {
     }
   }
 
+  // Handle direct quantity input
+  const handleQuantityChange = (productId: string, value: string) => {
+    const numValue = Number.parseInt(value)
+    if (!isNaN(numValue) && numValue > 0) {
+      updateQuantity(productId, numValue)
+    }
+  }
+
   // Remove item from cart
   const removeFromCart = async (productId: string) => {
     try {
       setRemoving((prev) => ({ ...prev, [productId]: true }))
+      const token = getToken()
 
-      // Get the token
-      const token = localStorage.getItem("clientImpersonationToken")
+      if (!token) return
 
-      if (!token) {
-        throw new Error("No authentication token found. Please refresh the page and try again.")
-      }
+      const apiUrl = getApiUrl()
 
-      const response = await fetch("https://evershinebackend-2.onrender.com/api/deleteUserCartItem", {
-        method: "DELETE",
+      const response = await axios.delete(`${apiUrl}/api/deleteUserCartItem`, {
         headers: {
           Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
         },
-        body: JSON.stringify({ productId }),
+        data: { productId },
       })
 
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error("Authentication failed. Please refresh the token and try again.")
-        } else {
-          throw new Error(`API error: ${response.status} ${response.statusText}`)
-        }
-      }
-
-      const data = await response.json()
-
-      if (data.success) {
+      if (response.data.success) {
         setCartItems((prev) => prev.filter((item) => item.postId !== productId))
-
-        // Update localStorage cart
-        const savedCart = localStorage.getItem("cart")
-        if (savedCart) {
-          const cartArray = JSON.parse(savedCart)
-          localStorage.setItem("cart", JSON.stringify(cartArray.filter((id: string) => id !== productId)))
-        }
-
         toast({
           title: "Item removed",
           description: "Item has been removed from your cart",
-          variant: "default",
         })
       } else {
-        throw new Error(data.message || "Failed to remove item")
+        throw new Error("Failed to remove item")
       }
     } catch (error: any) {
-      console.error("Error removing item from cart:", error)
       toast({
         title: "Error",
-        description: error.message || "Failed to remove item from cart. Please try again.",
+        description: "Failed to remove item from cart. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -247,19 +238,15 @@ export default function CartPage() {
       setIsCheckingOut(true)
       setCheckoutError(null)
 
-      // Validate cart has items
       if (cartItems.length === 0) {
-        throw new Error("Your cart is empty. Please add items before checking out.")
+        throw new Error("Your cart is empty")
       }
 
-      // Get the token
-      const token = localStorage.getItem("clientImpersonationToken")
+      const token = getToken()
+      if (!token) return
 
-      if (!token) {
-        throw new Error("No authentication token found. Please refresh the page and try again.")
-      }
+      const apiUrl = getApiUrl()
 
-      // Basic shipping address - in a real app, you would collect this from the user
       const shippingAddress = {
         street: "123 Main Street",
         city: "Mumbai",
@@ -270,46 +257,31 @@ export default function CartPage() {
 
       const payload = {
         shippingAddress,
-        paymentMethod: "bank_transfer", // Default payment method
-        notes: "Order placed via agent dashboard",
+        paymentMethod: "bank_transfer",
+        notes: "Order placed via dashboard",
       }
 
-      // Make API request to create order
-      const response = await fetch("https://evershinebackend-2.onrender.com/api/createOrder", {
-        method: "POST",
+      const response = await axios.post(`${apiUrl}/api/createOrder`, payload, {
         headers: {
           Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
         },
-        body: JSON.stringify(payload),
       })
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.message || `API error: ${response.status} ${response.statusText}`)
-      }
-
-      const data = await response.json()
-
-      if (data.success) {
-        // Clear cart items from state
+      if (response.data.success) {
         setCartItems([])
-
-        // Clear localStorage cart
-        localStorage.removeItem("cart")
-
-        // Redirect to orders page
-        router.push(`/client-dashboard/${clientId}/orders`)
+        toast({
+          title: "Order Placed",
+          description: "Your order has been placed successfully!",
+        })
+        router.push("/orders")
       } else {
-        throw new Error(data.message || "Failed to place order")
+        throw new Error("Failed to place order")
       }
     } catch (error: any) {
-      console.error("Error during checkout:", error)
-      setCheckoutError(error.message || "An unknown error occurred during checkout")
-
+      setCheckoutError(error.message || "An error occurred during checkout")
       toast({
         title: "Checkout Failed",
-        description: error.message || "Failed to place your order. Please try again.",
+        description: "Failed to place your order. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -321,43 +293,33 @@ export default function CartPage() {
   const clearCart = async () => {
     try {
       setLoading(true)
+      const token = getToken()
 
-      // Get the token
-      const token = localStorage.getItem("clientImpersonationToken")
+      if (!token) return
 
-      if (!token) {
-        throw new Error("No authentication token found. Please refresh the page and try again.")
-      }
+      const apiUrl = getApiUrl()
 
-      // Call the clear cart API endpoint
-      const response = await fetch("https://evershinebackend-2.onrender.com/api/clearCart", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
+      const response = await axios.post(
+        `${apiUrl}/api/clearCart`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
-      })
+      )
 
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status} ${response.statusText}`)
+      if (response.data.success) {
+        setCartItems([])
+        toast({
+          title: "Cart Cleared",
+          description: "All items have been removed from your cart",
+        })
       }
-
-      // Clear local state
-      setCartItems([])
-
-      // Clear localStorage
-      localStorage.removeItem("cart")
-
-      toast({
-        title: "Cart Cleared",
-        description: "All items have been removed from your cart",
-        variant: "default",
-      })
     } catch (error: any) {
-      console.error("Error clearing cart:", error)
       toast({
         title: "Error",
-        description: error.message || "Failed to clear cart. Please try again.",
+        description: "Failed to clear cart. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -375,7 +337,7 @@ export default function CartPage() {
   }
 
   return (
-    <div className="p-6 md:p-8">
+    <div className="container mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center">
           <Button variant="ghost" size="icon" onClick={() => router.back()} className="mr-4">
@@ -399,13 +361,15 @@ export default function CartPage() {
       )}
 
       {cartItems.length === 0 ? (
-        <div className="text-center py-12 bg-muted/20 rounded-lg">
-          <ShoppingBag className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-          <p className="text-xl font-medium mb-4">Your cart is empty</p>
-          <p className="text-muted-foreground mb-6">Add some products to your cart to see them here</p>
+        <div className="text-center py-16 bg-muted/20 rounded-lg shadow-sm">
+          <ShoppingBag className="h-20 w-20 mx-auto text-muted-foreground mb-6" />
+          <p className="text-2xl font-medium mb-4">Your cart is empty</p>
+          <p className="text-muted-foreground mb-8 max-w-md mx-auto">
+            Looks like you haven't added any products to your cart yet.
+          </p>
           <Button
-            onClick={() => router.push(`/client-dashboard/${clientId}/products`)}
-            className="bg-primary hover:bg-primary/90"
+            onClick={() => router.push("/products")}
+            className="bg-primary hover:bg-primary/90 px-8 py-6 h-auto text-lg"
           >
             Browse Products
           </Button>
@@ -413,67 +377,70 @@ export default function CartPage() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
-            <div className="bg-card rounded-lg border border-border overflow-hidden">
-              <div className="p-4 bg-muted/20 border-b border-border">
-                <h2 className="font-semibold">Cart Items ({cartItems.length})</h2>
+            <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
+              <div className="p-4 bg-muted/20 border-b">
+                <h2 className="font-semibold text-lg">Cart Items ({cartItems.length})</h2>
               </div>
-              <div className="divide-y divide-border">
+              <div className="divide-y">
                 {cartItems.map((item) => (
-                  <div key={item._id || item.postId} className="p-4 flex items-center">
-                    <div className="relative h-20 w-20 rounded-md overflow-hidden flex-shrink-0">
+                  <div key={item.postId} className="p-6 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                    <div className="relative h-24 w-24 rounded-md overflow-hidden flex-shrink-0 border">
                       <Image
                         src={
-                          item.image && item.image.length > 0 ? item.image[0] : "/placeholder.svg?height=80&width=80"
+                          item.image && item.image.length > 0 ? item.image[0] : "/placeholder.svg?height=96&width=96"
                         }
                         alt={item.name}
                         fill
-                        unoptimized={true}
                         className="object-cover"
                       />
                     </div>
-                    <div className="ml-4 flex-grow">
-                      <h3 className="font-medium">{item.name}</h3>
-                      <p className="text-sm text-muted-foreground">{item.category}</p>
-                      <div className="flex items-center justify-between mt-2">
-                        <p className="font-semibold">₹{item.price.toLocaleString()}/sqft</p>
-                        <div className="flex items-center">
-                          {/* Quantity controls */}
-                          <div className="flex items-center border rounded-md mr-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 p-0"
-                              onClick={() => updateQuantity(item.postId, item.quantity - 1)}
-                              disabled={updating[item.postId] || item.quantity <= 1}
-                            >
-                              <Minus className="h-3 w-3" />
-                            </Button>
-                            <span className="w-8 text-center">{item.quantity}</span>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 p-0"
-                              onClick={() => updateQuantity(item.postId, item.quantity + 1)}
-                              disabled={updating[item.postId]}
-                            >
-                              <Plus className="h-3 w-3" />
-                            </Button>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => removeFromCart(item.postId)}
-                            disabled={removing[item.postId]}
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                          >
-                            {removing[item.postId] ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </div>
+                    <div className="flex-grow">
+                      <h3 className="font-medium text-lg">{item.name}</h3>
+                      <p className="text-sm text-muted-foreground mb-2">{item.category}</p>
+                      <p className="font-semibold text-lg text-primary">₹{item.price.toLocaleString()}</p>
+                    </div>
+                    <div className="flex flex-col sm:flex-row items-center gap-4 mt-2 sm:mt-0">
+                      {/* Quantity controls */}
+                      <div className="flex items-center border rounded-md">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-10 w-10"
+                          onClick={() => updateQuantity(item.postId, item.quantity - 1)}
+                          disabled={updating[item.postId] || item.quantity <= 1}
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <Input
+                          type="number"
+                          min="1"
+                          value={item.quantity}
+                          onChange={(e) => handleQuantityChange(item.postId, e.target.value)}
+                          className="h-10 w-16 text-center border-0"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-10 w-10"
+                          onClick={() => updateQuantity(item.postId, item.quantity + 1)}
+                          disabled={updating[item.postId]}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
                       </div>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => removeFromCart(item.postId)}
+                        disabled={removing[item.postId]}
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 h-10 w-10"
+                      >
+                        {removing[item.postId] ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -482,15 +449,15 @@ export default function CartPage() {
           </div>
 
           <div className="lg:col-span-1">
-            <div className="bg-card rounded-lg border border-border overflow-hidden sticky top-4">
-              <div className="p-4 bg-muted/20 border-b border-border">
-                <h2 className="font-semibold">Order Summary</h2>
+            <div className="bg-white rounded-lg border shadow-sm overflow-hidden sticky top-4">
+              <div className="p-4 bg-muted/20 border-b">
+                <h2 className="font-semibold text-lg">Order Summary</h2>
               </div>
-              <div className="p-4">
-                <div className="space-y-2">
+              <div className="p-6">
+                <div className="space-y-4">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Subtotal</span>
-                    <span>₹{calculateTotal().toLocaleString()}</span>
+                    <span className="font-medium">₹{calculateTotal().toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Shipping</span>
@@ -500,22 +467,22 @@ export default function CartPage() {
                     <span className="text-muted-foreground">Tax</span>
                     <span>Calculated at checkout</span>
                   </div>
-                  <div className="border-t border-border pt-2 mt-2">
-                    <div className="flex justify-between font-semibold">
+                  <div className="border-t pt-4 mt-2">
+                    <div className="flex justify-between font-semibold text-lg">
                       <span>Total</span>
-                      <span>₹{calculateTotal().toLocaleString()}</span>
+                      <span className="text-primary">₹{calculateTotal().toLocaleString()}</span>
                     </div>
                   </div>
                 </div>
 
                 <Button
                   onClick={handleCheckout}
-                  className="w-full mt-6 bg-primary hover:bg-primary/90"
+                  className="w-full mt-8 bg-primary hover:bg-primary/90 py-6 h-auto text-lg"
                   disabled={isCheckingOut || cartItems.length === 0}
                 >
                   {isCheckingOut ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                       Processing...
                     </>
                   ) : (
@@ -523,11 +490,8 @@ export default function CartPage() {
                   )}
                 </Button>
 
-                <div className="mt-4 text-center">
-                  <Link
-                    href={`/client-dashboard/${clientId}/products`}
-                    className="text-sm text-primary hover:underline"
-                  >
+                <div className="mt-6 text-center">
+                  <Link href="/products" className="text-primary hover:underline font-medium">
                     Continue Shopping
                   </Link>
                 </div>
