@@ -4,12 +4,11 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowLeft, Trash2, Loader2, ShoppingBag, Plus, Minus } from "lucide-react"
+import { ArrowLeft, Trash2, Loader2, ShoppingBag } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
-import axios from "axios"
 
 interface CartItem {
   _id: string
@@ -44,8 +43,8 @@ export default function CartPage() {
       const token = localStorage.getItem("clientImpersonationToken") || localStorage.getItem("token")
       if (!token) {
         toast({
-          title: "Authentication Error",
-          description: "No authentication token found. Please log in again.",
+          title: "Authentication required",
+          description: "Please log in to view your cart",
           variant: "destructive",
         })
         return null
@@ -53,7 +52,7 @@ export default function CartPage() {
       return token
     } catch (e) {
       toast({
-        title: "Authentication Error",
+        title: "Error",
         description: "Error accessing authentication. Please refresh the page.",
         variant: "destructive",
       })
@@ -77,45 +76,43 @@ export default function CartPage() {
       }
 
       const apiUrl = getApiUrl()
-      const response = await axios.get(`${apiUrl}/api/getUserCart`, {
+
+      const response = await fetch(`${apiUrl}/api/getUserCart`, {
+        method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
       })
 
-      if (response.data && response.data.data) {
-        const validItems = (response.data.data.items || []).filter(
+      if (!response.ok) {
+        throw new Error("Failed to fetch cart")
+      }
+
+      const data = await response.json()
+
+      if (data.data) {
+        const validItems = (data.data.items || []).filter(
           (item: CartItem) => item.postId && typeof item.postId === "string",
         )
 
-        // Ensure all items have valid prices (not 1 or 0)
-        const itemsWithCorrectPrices = await Promise.all(
-          validItems.map(async (item: CartItem) => {
-            // If price is suspiciously low (1 or less), try to fetch the correct price
-            if (item.price <= 1) {
-              try {
-                const productResponse = await axios.get(`${apiUrl}/api/getPostDataById?id=${item.postId}`, {
-                  headers: {
-                    Authorization: `Bearer ${token}`,
-                  },
-                })
-
-                if (productResponse.data && productResponse.data.data && productResponse.data.data[0]) {
-                  // Update the price from the product data
-                  return {
-                    ...item,
-                    price: productResponse.data.data[0].price || item.price,
-                  }
-                }
-              } catch (error) {
-                // If fetching fails, keep the original price
+        // Ensure all items have valid prices
+        const itemsWithValidPrices = validItems.map((item: CartItem) => {
+          // If price is missing or invalid, try to get it from the product
+          if (!item.price || item.price <= 0) {
+            // We'll fetch the product details to get the correct price
+            fetchProductPrice(item.postId).then((price) => {
+              if (price > 0) {
+                setCartItems((prev) =>
+                  prev.map((cartItem) => (cartItem.postId === item.postId ? { ...cartItem, price } : cartItem)),
+                )
               }
-            }
-            return item
-          }),
-        )
+            })
+          }
+          return item
+        })
 
-        setCartItems(itemsWithCorrectPrices)
+        setCartItems(itemsWithValidPrices)
       } else {
         setCartItems([])
       }
@@ -131,6 +128,35 @@ export default function CartPage() {
     }
   }
 
+  // Fetch product price if needed
+  const fetchProductPrice = async (productId: string): Promise<number> => {
+    try {
+      const token = getToken()
+      if (!token) return 0
+
+      const apiUrl = getApiUrl()
+
+      const response = await fetch(`${apiUrl}/api/getProduct/${productId}`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (!response.ok) return 0
+
+      const data = await response.json()
+      if (data.success && data.data && data.data.price) {
+        return data.data.price
+      }
+
+      return 0
+    } catch (error) {
+      return 0
+    }
+  }
+
   // Update item quantity
   const updateQuantity = async (productId: string, newQuantity: number) => {
     if (newQuantity < 1) return
@@ -143,24 +169,33 @@ export default function CartPage() {
 
       const apiUrl = getApiUrl()
 
+      // Get the current item to preserve its price
+      const currentItem = cartItems.find((item) => item.postId === productId)
+      if (!currentItem) return
+
       // First remove the item
-      await axios.delete(`${apiUrl}/api/deleteUserCartItem`, {
+      await fetch(`${apiUrl}/api/deleteUserCartItem`, {
+        method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
-        data: { productId },
+        body: JSON.stringify({ productId }),
       })
 
-      // Then add it back with the new quantity
-      await axios.post(
-        `${apiUrl}/api/addToCart`,
-        { productId, quantity: newQuantity },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+      // Then add it back with the new quantity and preserve the price
+      await fetch(`${apiUrl}/api/addToCart`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
-      )
+        body: JSON.stringify({
+          productId,
+          quantity: newQuantity,
+          price: currentItem.price, // Preserve the price
+        }),
+      })
 
       // Update local state
       setCartItems((prev) =>
@@ -200,14 +235,22 @@ export default function CartPage() {
 
       const apiUrl = getApiUrl()
 
-      const response = await axios.delete(`${apiUrl}/api/deleteUserCartItem`, {
+      const response = await fetch(`${apiUrl}/api/deleteUserCartItem`, {
+        method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
-        data: { productId },
+        body: JSON.stringify({ productId }),
       })
 
-      if (response.data.success) {
+      if (!response.ok) {
+        throw new Error("Failed to remove item")
+      }
+
+      const data = await response.json()
+
+      if (data.success) {
         setCartItems((prev) => prev.filter((item) => item.postId !== productId))
         toast({
           title: "Item removed",
@@ -243,6 +286,7 @@ export default function CartPage() {
       }
 
       const token = getToken()
+
       if (!token) return
 
       const apiUrl = getApiUrl()
@@ -261,13 +305,22 @@ export default function CartPage() {
         notes: "Order placed via dashboard",
       }
 
-      const response = await axios.post(`${apiUrl}/api/createOrder`, payload, {
+      const response = await fetch(`${apiUrl}/api/createOrder`, {
+        method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
+        body: JSON.stringify(payload),
       })
 
-      if (response.data.success) {
+      if (!response.ok) {
+        throw new Error("Failed to place order")
+      }
+
+      const data = await response.json()
+
+      if (data.success) {
         setCartItems([])
         toast({
           title: "Order Placed",
@@ -299,23 +352,23 @@ export default function CartPage() {
 
       const apiUrl = getApiUrl()
 
-      const response = await axios.post(
-        `${apiUrl}/api/clearCart`,
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+      const response = await fetch(`${apiUrl}/api/clearCart`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
-      )
+      })
 
-      if (response.data.success) {
-        setCartItems([])
-        toast({
-          title: "Cart Cleared",
-          description: "All items have been removed from your cart",
-        })
+      if (!response.ok) {
+        throw new Error("Failed to clear cart")
       }
+
+      setCartItems([])
+      toast({
+        title: "Cart Cleared",
+        description: "All items have been removed from your cart",
+      })
     } catch (error: any) {
       toast({
         title: "Error",
@@ -400,33 +453,16 @@ export default function CartPage() {
                       <p className="font-semibold text-lg text-primary">₹{item.price.toLocaleString()}</p>
                     </div>
                     <div className="flex flex-col sm:flex-row items-center gap-4 mt-2 sm:mt-0">
-                      {/* Quantity controls */}
+                      {/* Quantity input */}
                       <div className="flex items-center border rounded-md">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-10 w-10"
-                          onClick={() => updateQuantity(item.postId, item.quantity - 1)}
-                          disabled={updating[item.postId] || item.quantity <= 1}
-                        >
-                          <Minus className="h-4 w-4" />
-                        </Button>
                         <Input
                           type="number"
                           min="1"
                           value={item.quantity}
                           onChange={(e) => handleQuantityChange(item.postId, e.target.value)}
-                          className="h-10 w-16 text-center border-0"
-                        />
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-10 w-10"
-                          onClick={() => updateQuantity(item.postId, item.quantity + 1)}
+                          className="h-10 w-20 text-center"
                           disabled={updating[item.postId]}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
+                        />
                       </div>
                       <Button
                         variant="outline"
