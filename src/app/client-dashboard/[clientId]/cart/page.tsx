@@ -326,7 +326,7 @@ export default function CartPage() {
           title: "Order Placed",
           description: "Your order has been placed successfully!",
         })
-        router.push("client-dashboard/${clientId}/orders")
+        router.push("/client-dashboard/${clientId}/orders")
       } else {
         throw new Error("Failed to place order")
       }
