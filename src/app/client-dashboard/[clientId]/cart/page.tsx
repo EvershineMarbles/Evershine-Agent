@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useParams } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
 import { ArrowLeft, Trash2, Loader2, ShoppingBag } from "lucide-react"
@@ -22,6 +22,8 @@ interface CartItem {
 
 export default function CartPage() {
   const router = useRouter()
+  const params = useParams()
+  const clientId = params.clientId as string
   const { toast } = useToast()
 
   const [cartItems, setCartItems] = useState<CartItem[]>([])
@@ -326,7 +328,7 @@ export default function CartPage() {
           title: "Order Placed",
           description: "Your order has been placed successfully!",
         })
-        router.push("/client-dashboard/${clientId}/orders")
+        router.push(`/client-dashboard/${clientId}/orders`)
       } else {
         throw new Error("Failed to place order")
       }
