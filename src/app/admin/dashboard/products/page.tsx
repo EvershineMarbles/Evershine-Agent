@@ -6,7 +6,7 @@ import { useState, useEffect } from "react"
 import axios from "axios"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Search, Pencil, ArrowLeft, Loader2, Home } from "lucide-react"
+import { Search, Pencil, ArrowLeft, Loader2, Home, Grid, List } from "lucide-react"
 import Image from "next/image"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
@@ -24,7 +24,6 @@ export default function Products() {
   const router = useRouter()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<"all" | "pending" | "approved" | "draft">("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [imageError, setImageError] = useState<Record<string, boolean>>({})
   const [editLoading, setEditLoading] = useState<string | null>(null)
@@ -53,7 +52,7 @@ export default function Products() {
       setEditLoading(productId)
       const response = await axios.get(`${API_URL}/api/getPostDataById?id=${productId}`)
       if (response.data.success) {
-        router.push(`/admin/dashboard/edit-product/${productId}`)
+        router.push(`/edit-product/${productId}`)
       } else {
         throw new Error("Product not found")
       }
@@ -67,8 +66,7 @@ export default function Products() {
 
   const filteredProducts = products.filter((product) => {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesTab = activeTab === "all" || product.status === activeTab
-    return matchesSearch && matchesTab
+    return matchesSearch
   })
 
   const handleImageError = (productId: string) => {
@@ -85,14 +83,26 @@ export default function Products() {
 
   return (
     <div className="min-h-screen bg-white">
-
+      {/* Dashboard Header Strip */}
+      <div className="w-full bg-[rgb(25,74,149)] py-4 px-6 shadow-md">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <h1 className="text-white text-xl font-medium">Evershine Dashboard</h1>
+          <button
+            onClick={() => router.push("https://evershine-two.vercel.app/")}
+            className="flex items-center text-white hover:text-gray-200 transition-colors"
+          >
+            <Home className="h-5 w-5" />
+            <span className="ml-2">Home</span>
+          </button>
+        </div>
+      </div>
 
       {/* Back Button Header */}
       <div className="sticky top-0 z-10 bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
           <div className="py-4">
             <button
-              onClick={() => router.push("https://evershine-agent.vercel.app/admin/dashboard")}
+              onClick={() => router.push("https://evershine-two.vercel.app/")}
               className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
             >
               <ArrowLeft className="h-6 w-6" />
@@ -120,20 +130,21 @@ export default function Products() {
           </div>
         </div>
 
-        {/* Filter Tabs and Add Buton */}
+        {/* View Toggle and Add Button */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-          <div className="flex flex-wrap gap-2">
-            {(["all", "pending", "approved", "draft"] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2 rounded-lg transition-colors ${
-                  activeTab === tab ? "bg-[#194a95] text-white" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
-              </button>
-            ))}
+          <div className="flex items-center gap-2 border rounded-lg overflow-hidden">
+            <button className="flex items-center gap-1 px-4 py-2 bg-[#194a95] text-white" aria-label="Grid view">
+              <Grid className="h-4 w-4" />
+              <span>Grid</span>
+            </button>
+            <button
+              onClick={() => router.push("/all-qr")}
+              className="flex items-center gap-1 px-4 py-2 text-gray-600 hover:bg-gray-100"
+              aria-label="List view"
+            >
+              <List className="h-4 w-4" />
+              <span>List</span>
+            </button>
           </div>
           <button
             onClick={() => router.push("/add-product")}
@@ -150,13 +161,13 @@ export default function Products() {
         </p>
 
         {/* Products Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 lg:gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5 lg:gap-6 mb-8">
           {filteredProducts.map((product) => (
             <div
               key={product._id}
               className="group relative bg-white rounded-2xl overflow-hidden border border-gray-200/80 hover:border-gray-300/80 transition-colors"
             >
-              <Link href={`/admin/dashboard/product/${product.postId}`} className="block">
+              <Link href={`/product/${product.postId}`} className="block">
                 <div className="p-3">
                   <div
                     className="relative w-full overflow-hidden rounded-xl bg-gray-50
