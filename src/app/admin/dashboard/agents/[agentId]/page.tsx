@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Trash2 } from "lucide-react"
+import { Trash2, ArrowLeft } from "lucide-react"
 import { fetchWithAdminAuth } from "@/lib/admin-auth"
 import { Separator } from "@/components/ui/separator"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
@@ -16,7 +16,6 @@ interface Agent {
   mobile?: string
   agentId: string
   createdAt: string
-  commissionRate?: number 
 }
 
 export default function AgentDetailsPage() {
@@ -106,7 +105,18 @@ export default function AgentDetailsPage() {
     <div className="p-4 md:p-6">
       <div className="flex flex-col">
         <div className="flex flex-col mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold mb-4">Consultant Details</h1>
+          <div className="flex items-center mb-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => router.back()}
+              className="mr-2 hover:bg-gray-100"
+              aria-label="Go back"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <h1 className="text-2xl md:text-3xl font-bold">Consultant Details</h1>
+          </div>
         </div>
 
         {error && (
@@ -151,16 +161,10 @@ export default function AgentDetailsPage() {
                 </div>
 
                 <div>
-                <div className="flex flex-col sm:flex-row sm:items-baseline">
-                <span className="text-lg md:text-xl font-medium">
-                  Current Price Increase % - 
-                </span>
-                <span className="text-lg md:text-xl font-bold sm:ml-2">
-                  {(agentDetails?.commissionRate || 0)}%
-                </span>
-              </div>
-
-
+                  <div className="flex flex-col sm:flex-row sm:items-baseline">
+                    <span className="text-lg md:text-xl font-medium">Commission Rate - </span>
+                    <span className="text-lg md:text-xl font-bold sm:ml-2">10%</span>
+                  </div>
                   <Separator className="mt-2" />
                 </div>
               </div>
