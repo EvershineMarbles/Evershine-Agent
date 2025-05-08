@@ -97,9 +97,7 @@ export default function AgentClientsTable({ agentEmail, agentName }: AgentClient
           <Button variant="outline" size="icon" onClick={fetchClients} disabled={loading}>
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
-          <Button>
-            <Plus className="mr-2 h-4 w-4" /> Add Client
-          </Button>
+      
         </div>
       </CardHeader>
       <CardContent>

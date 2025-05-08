@@ -6,7 +6,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Loader2, Plus, RefreshCw, Search, Eye, Edit, Trash2, Users } from 'lucide-react'
+import { Loader2, Plus, RefreshCw, Search, Eye, Edit, Trash2, Users } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { getAllAgents, fetchWithAdminAuth } from "@/lib/admin-auth"
 import { Badge } from "@/components/ui/badge"
@@ -364,7 +364,7 @@ export default function AgentTable() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search advisors..."
+                placeholder="Search consultants..."
                 className="w-[250px] pl-10"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -423,7 +423,7 @@ export default function AgentTable() {
                       <Users size={16} />
                       <span>0 Clients</span>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-nowrap whitespace-nowrap">
                       <Button
                         variant="outline"
                         size="sm"
@@ -497,9 +497,6 @@ export default function AgentTable() {
                   value={editFormData.commissionRate}
                   onChange={handleEditInputChange}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Example: A 15% commission rate means a product with base price 100 will be shown as 115 to this agent.
-                </p>
               </div>
             </div>
             <DialogFooter>
@@ -547,7 +544,7 @@ export default function AgentTable() {
                   Deleting...
                 </>
               ) : (
-                "Delete Consultant"
+                "Suspend Consultant"
               )}
             </Button>
           </DialogFooter>
@@ -558,8 +555,8 @@ export default function AgentTable() {
       <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create New Agent</DialogTitle>
-            <DialogDescription>Add a new agent to the system.</DialogDescription>
+            <DialogTitle>Create New Consultant</DialogTitle>
+            <DialogDescription>Add a new consultant to the system.</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreateSubmit}>
             <div className="grid gap-4 py-4">
@@ -614,9 +611,7 @@ export default function AgentTable() {
                   value={createFormData.commissionRate}
                   onChange={handleCreateInputChange}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Example: A 15% commission rate means a product with base price 100 will be shown as 115 to this agent.
-                </p>
+           
               </div>
             </div>
             <DialogFooter>
@@ -630,7 +625,7 @@ export default function AgentTable() {
                     Creating...
                   </>
                 ) : (
-                  "Create Agent"
+                  "Create Consultant"
                 )}
               </Button>
             </DialogFooter>

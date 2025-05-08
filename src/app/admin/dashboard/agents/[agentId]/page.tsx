@@ -185,7 +185,7 @@ export default function AgentDetailsPage() {
                   onClick={() => setIsDeleteDialogOpen(true)}
                 >
                   <Trash2 className="h-5 w-5" />
-                  Delete Consultant
+                  Suspend Consultant
                 </Button>
               </div>
 

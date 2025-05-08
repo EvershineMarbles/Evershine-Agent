@@ -17,7 +17,7 @@ export default function AdminLayout({
         <div className="ml-16 flex items-center justify-between">
           <Link href="https://evershine-two.vercel.app/" className="flex items-center gap-2">
             <ArrowLeft className="h-5 w-5" />
-            <span className="font-medium hidden sm:inline">Back to Home</span>
+            <span className="font-medium hidden sm:inline">Back to Dashboard</span>
           </Link>
         </div>
       </div>

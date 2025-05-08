@@ -55,13 +55,13 @@ export default function CreateAgentForm() {
   return (
     <Card className="max-w-md mx-auto">
       <CardHeader>
-        <CardTitle>Create New Agent</CardTitle>
+        <CardTitle>Create New Consultant</CardTitle>
       </CardHeader>
       <CardContent>
         {error && <div className="bg-red-50 text-red-500 p-3 rounded-md mb-4">{error}</div>}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Agent Name</Label>
+            <Label htmlFor="name">Consultant Name</Label>
             <Input
               id="name"
               name="name"
