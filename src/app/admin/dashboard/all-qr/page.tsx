@@ -257,21 +257,6 @@ export default function AllQR() {
 
   return (
     <div className="min-h-screen bg-white">
-     
-
-      {/* Back Button Header */}
-      <div className="sticky top-0 z-10 bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
-          <div className="py-4">
-            <button
-              onClick={() => router.push("https://evershine-agent.vercel.app/admin/dashboard")}
-              className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              <ArrowLeft className="h-6 w-6" />
-            </button>
-          </div>
-        </div>
-      </div>
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-6">
@@ -280,7 +265,7 @@ export default function AllQR() {
         <Button
               variant="ghost"
               size="icon"
-              onClick={() => router.back()}
+              onClick={() => router.push(`/admin/dashboard}`)}
               className="mr-2 hover:bg-gray-100"
               aria-label="Go back"
             >

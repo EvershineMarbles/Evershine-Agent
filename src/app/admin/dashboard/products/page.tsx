@@ -92,7 +92,7 @@ export default function Products() {
         <Button
               variant="ghost"
               size="icon"
-              onClick={() => router.back()}
+              onClick={() => router.push(`/admin/dashboard}`)}
               className="mr-2 hover:bg-gray-100"
               aria-label="Go back"
             >
