@@ -126,7 +126,7 @@ export default function Products() {
               <span>Grid</span>
             </button>
             <button
-              onClick={() => router.push("/all-qr")}
+              onClick={() => router.push("/admin/dashboard/all-qr")}
               className="flex items-center gap-1 px-4 py-2 text-gray-600 hover:bg-gray-100"
               aria-label="List view"
             >
