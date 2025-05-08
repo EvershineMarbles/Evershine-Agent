@@ -3,8 +3,7 @@
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Search, Trash2 } from "lucide-react"
+import { Trash2 } from "lucide-react"
 import { fetchWithAdminAuth } from "@/lib/admin-auth"
 import { Separator } from "@/components/ui/separator"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
@@ -132,9 +131,7 @@ export default function AgentDetailsPage() {
                   <Separator className="mt-2" />
                 </div>
 
-                <div>
-
-                </div>
+                <div></div>
 
                 <div>
                   <div className="flex flex-col sm:flex-row sm:items-baseline">
@@ -161,13 +158,13 @@ export default function AgentDetailsPage() {
                 </div>
               </div>
 
-              {/* Buttons moved to the end of the page */}
-              <div className="flex flex-col space-y-3 mt-8 pt-4 border-t">
-                <Button className="bg-[#1e4b95] hover:bg-[#1e4b95]/90 text-white px-4 py-2 rounded-md w-full">
+              {/* Buttons in a single horizontal line */}
+              <div className="flex flex-row gap-3 mt-8 pt-4 border-t flex-wrap md:flex-nowrap">
+                <Button className="bg-[#1e4b95] hover:bg-[#1e4b95]/90 text-white px-4 py-2 rounded-md flex-1 whitespace-nowrap">
                   Edit
                 </Button>
                 <Button
-                  className="bg-[#1e4b95] hover:bg-[#1e4b95]/90 text-white px-4 py-2 rounded-md w-full"
+                  className="bg-[#1e4b95] hover:bg-[#1e4b95]/90 text-white px-4 py-2 rounded-md flex-1 whitespace-nowrap"
                   onClick={() =>
                     router.push(
                       `/admin/dashboard/agents/${agentId}/clients?email=${agentDetails?.email}&name=${agentDetails?.name}`,
@@ -176,12 +173,9 @@ export default function AgentDetailsPage() {
                 >
                   Client List
                 </Button>
-                <Button variant="outline" className="border-[#1e4b95] text-[#1e4b95] px-4 py-2 rounded-md w-full">
-                  Suspend
-                </Button>
                 <Button
                   variant="ghost"
-                  className="text-red-500 hover:text-red-700 hover:bg-red-50 w-full flex items-center justify-center gap-2"
+                  className="text-red-500 hover:text-red-700 hover:bg-red-50 flex-1 flex items-center justify-center gap-2 whitespace-nowrap"
                   onClick={() => setIsDeleteDialogOpen(true)}
                 >
                   <Trash2 className="h-5 w-5" />
