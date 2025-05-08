@@ -128,9 +128,9 @@ export default function RegisterAgent() {
 
         <Card className="w-full shadow-lg border-0">
           <CardHeader className="space-y-1 bg-blue/5 border-b pb-4">
-            <CardTitle className="text-2xl text-center text-blue">Register New Agent</CardTitle>
+            <CardTitle className="text-2xl text-center text-blue">Register New Consultant</CardTitle>
             <CardDescription className="text-center">
-              Create a new agent account to access the dashboard
+              Create a new consultant account to access the dashboard
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-6">
@@ -144,7 +144,7 @@ export default function RegisterAgent() {
             {success && (
               <Alert className="mb-4 bg-green-50 text-green-800 border-green-200">
                 <CheckCircle2 className="h-4 w-4 text-green-600" />
-                <AlertDescription>Agent registered successfully! Redirecting to dashboard...</AlertDescription>
+                <AlertDescription>Consultant registered successfully! Redirecting to dashboard...</AlertDescription>
               </Alert>
             )}
 
@@ -192,10 +192,10 @@ export default function RegisterAgent() {
 
               <Button
                 type="submit"
-                className="w-full h-12 mt-6 bg-coral hover:bg-coral/90 text-white rounded-md text-base"
+                className="w-full h-12 mt-6 bg-blue hover:bg-blue/90 text-white rounded-md text-base"
                 disabled={isLoading || success}
               >
-                {isLoading ? "Registering..." : "Register Agent"}
+                {isLoading ? "Registering..." : "Register Consultant"}
               </Button>
             </form>
           </CardContent>
