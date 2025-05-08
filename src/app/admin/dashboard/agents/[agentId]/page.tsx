@@ -16,6 +16,7 @@ interface Agent {
   mobile?: string
   agentId: string
   createdAt: string
+  commissionRate?: number 
 }
 
 export default function AgentDetailsPage() {
@@ -150,10 +151,16 @@ export default function AgentDetailsPage() {
                 </div>
 
                 <div>
-                  <div className="flex flex-col sm:flex-row sm:items-baseline">
-                    <span className="text-lg md:text-xl font-medium">Current Price Increase % - </span>
-                    <span className="text-lg md:text-xl font-bold sm:ml-2">10%</span>
-                  </div>
+                <div className="flex flex-col sm:flex-row sm:items-baseline">
+                <span className="text-lg md:text-xl font-medium">
+                  Current Price Increase % - 
+                </span>
+                <span className="text-lg md:text-xl font-bold sm:ml-2">
+                  {(agentDetails?.commissionRate || 0)}%
+                </span>
+              </div>
+
+
                   <Separator className="mt-2" />
                 </div>
               </div>
