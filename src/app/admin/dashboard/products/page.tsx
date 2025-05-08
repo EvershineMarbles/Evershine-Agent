@@ -8,6 +8,8 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Search, Pencil, ArrowLeft, Loader2, Home, Grid, List } from "lucide-react"
 import Image from "next/image"
+import { Button } from "@/components/ui/button"
+
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
@@ -83,26 +85,19 @@ export default function Products() {
 
   return (
     <div className="min-h-screen bg-white">
-
-
-      {/* Back Button Header */}
-      <div className="sticky top-0 z-10 bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
-          <div className="py-4">
-            <button
-              onClick={() => router.push("https://evershine-agent.vercel.app/admin/dashboard")}
-              className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              <ArrowLeft className="h-6 w-6" />
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-6">
         {/* Header with Search */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+        <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => router.back()}
+              className="mr-2 hover:bg-gray-100"
+              aria-label="Go back"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
           <h1 className="text-4xl font-bold text-[#181818]">All Products</h1>
           <div className="relative w-full md:w-auto">
             <div className="relative">
