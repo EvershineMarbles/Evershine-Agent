@@ -261,16 +261,16 @@ export default function AllQR() {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-6">
         {/* Header with Search */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-        <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => router.push(`/admin/dashboard}`)}
-              className="mr-2 hover:bg-gray-100"
-              aria-label="Go back"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
+        <div className="flex items-center gap-3 mb-8">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => router.push(`/admin/dashboard`)}
+            className="hover:bg-gray-100"
+            aria-label="Go back"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
           <h1 className="text-4xl font-bold text-[#181818]">All Products</h1>
           <div className="relative w-full md:w-auto">
             <div className="relative">
