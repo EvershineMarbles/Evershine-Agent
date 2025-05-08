@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/use-toast"
+import { ArrowLeft } from "lucide-react"
+
 
 interface Agent {
   _id: string
@@ -381,6 +383,15 @@ export default function AgentTable() {
       <Card className="shadow-sm border-0">
         <CardHeader className="flex flex-row items-center justify-between p-6">
           <div className="flex items-center gap-2">
+          <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => router.back()}
+              className="mr-2 hover:bg-gray-100"
+              aria-label="Go back"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
             <h2 className="text-xl font-bold">Consultants</h2>
             <Badge variant="outline" className="ml-2 bg-primary/10 text-primary">
               {agents.length}
