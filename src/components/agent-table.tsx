@@ -28,6 +28,7 @@ interface Agent {
   agentId: string
   createdAt: string
   commissionRate?: number
+  clientCount?: number
 }
 
 export default function AgentTable() {
@@ -71,7 +72,32 @@ export default function AgentTable() {
       const response = await getAllAgents()
 
       if (response.success) {
-        setAgents(response.agents)
+        // Get the agents data
+        const agentsData = response.agents
+
+        // Fetch client counts for each agent
+        const agentsWithClientCounts = await Promise.all(
+          agentsData.map(async (agent: Agent) => {
+            try {
+              const clientsResponse = await fetchWithAdminAuth(`/api/admin/clients?agentAffiliated=${agent.email}`)
+              if (clientsResponse.ok) {
+                const clientsData = await clientsResponse.json()
+                if (clientsData.success && clientsData.data) {
+                  return {
+                    ...agent,
+                    clientCount: clientsData.data.clients.length,
+                  }
+                }
+              }
+              return { ...agent, clientCount: 0 }
+            } catch (err) {
+              console.error(`Error fetching client count for agent ${agent.email}:`, err)
+              return { ...agent, clientCount: 0 }
+            }
+          }),
+        )
+
+        setAgents(agentsWithClientCounts)
       } else {
         setError(response.message || "Failed to fetch agents")
       }
@@ -421,7 +447,7 @@ export default function AgentTable() {
                   <div className="flex flex-col md:flex-row items-start md:items-center gap-3">
                     <div className="flex items-center gap-2 text-sm text-gray-500">
                       <Users size={16} />
-                      <span>0 Clients</span>
+                      <span>{agent.clientCount || 0} Clients</span>
                     </div>
                     <div className="flex gap-2 flex-nowrap whitespace-nowrap">
                       <Button
@@ -611,7 +637,6 @@ export default function AgentTable() {
                   value={createFormData.commissionRate}
                   onChange={handleCreateInputChange}
                 />
-           
               </div>
             </div>
             <DialogFooter>
