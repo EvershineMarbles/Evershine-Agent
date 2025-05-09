@@ -27,8 +27,8 @@ export default function AdminDashboard() {
       </header>
 
       <main className="p-3">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        {/* Stats Cards - Now in a 2x2 grid */}
+        <div className="grid grid-cols-2 gap-3 mb-4">
           <Link href="/admin/dashboard/all-clients">
             <Card className="border rounded-xl overflow-hidden cursor-pointer hover:shadow-md hover:border-[#1e4b9a] transition-all h-full">
               <CardContent className="p-3 flex flex-col items-center justify-center">
@@ -78,7 +78,7 @@ export default function AdminDashboard() {
           </Link>
         </div>
 
-        {/* Action Buttons - All in one grid */}
+        {/* Action Buttons - Now in a 2x3 grid */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-4">
           <Link href="/admin/dashboard/agents" className="w-full">
             <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-9 text-sm font-normal w-full rounded-md">
