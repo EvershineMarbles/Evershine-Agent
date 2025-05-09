@@ -6,41 +6,34 @@ import { Button } from "@/components/ui/button"
 import { AlertCircle, CheckCircle, Clock, Truck, XCircle, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import Link from "next/link"
+import axios from "axios"
 
 // Define types for our stats
 interface DashboardStats {
-  agentCount: number
-  clientCount: number
-  productCount: number
-  orderCount: number
-  revenue: number
-  pendingOrders: number
-  ordersByStatus: {
-    pending: number
-    processing: number
-    shipped: number
-    delivered: number
-    cancelled: number
+  counts: {
+    clients: number
+    agents: number
+    products: number
+    orders: number
   }
   recentOrders: any[]
+  orderStats: any[]
+  productStats: any[]
+  totalRevenue: number
 }
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<DashboardStats>({
-    agentCount: 0,
-    clientCount: 0,
-    productCount: 0,
-    orderCount: 0,
-    revenue: 0,
-    pendingOrders: 0,
-    ordersByStatus: {
-      pending: 0,
-      processing: 0,
-      shipped: 0,
-      delivered: 0,
-      cancelled: 0,
+    counts: {
+      clients: 0,
+      agents: 0,
+      products: 0,
+      orders: 0,
     },
     recentOrders: [],
+    orderStats: [],
+    productStats: [],
+    totalRevenue: 0,
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -51,40 +44,33 @@ export default function AdminDashboard() {
         setLoading(true)
         setError(null)
 
-        // In a real app, you would fetch these stats from your API
-        // For now, we'll use dummy data
-        // const response = await fetchWithAdminAuth('/api/admin/dashboard');
-        // const data = await response.json();
+        // Get the token from localStorage
+        const token = localStorage.getItem("adminToken")
 
-        // Simulate API response with dummy data
-        setTimeout(() => {
-          setStats({
-            agentCount: 12,
-            clientCount: 248,
-            productCount: 456,
-            orderCount: 132,
-            revenue: 245000,
-            pendingOrders: 24,
-            ordersByStatus: {
-              pending: 24,
-              processing: 18,
-              shipped: 32,
-              delivered: 48,
-              cancelled: 10,
-            },
-            recentOrders: [
-              { id: "ORD-001", customer: "John Doe", amount: 12500, status: "delivered", date: "2023-06-15" },
-              { id: "ORD-002", customer: "Jane Smith", amount: 8700, status: "shipped", date: "2023-06-14" },
-              { id: "ORD-003", customer: "Robert Johnson", amount: 15200, status: "processing", date: "2023-06-14" },
-              { id: "ORD-004", customer: "Emily Davis", amount: 6300, status: "pending", date: "2023-06-13" },
-              { id: "ORD-005", customer: "Michael Brown", amount: 9800, status: "delivered", date: "2023-06-12" },
-            ],
-          })
+        if (!token) {
+          setError("Authentication token not found. Please log in again.")
           setLoading(false)
-        }, 1000)
+          return
+        }
+
+        // Fetch dashboard stats from the backend API
+        const response = await axios.get("https://evershinebackend-2.onrender.com/api/admin/dashboard", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+
+        // Set the stats from the API response
+        if (response.data && response.data.data) {
+          setStats(response.data.data)
+        } else {
+          throw new Error("Invalid response format from server")
+        }
+
+        setLoading(false)
       } catch (err: any) {
         console.error("Error fetching dashboard stats:", err)
-        setError(err.message || "Failed to load dashboard statistics")
+        setError(err.response?.data?.message || err.message || "Failed to load dashboard statistics")
         setLoading(false)
       }
     }
@@ -124,9 +110,6 @@ export default function AdminDashboard() {
     }
   }
 
-  // Calculate total orders for percentage
-  const totalOrders = Object.values(stats.ordersByStatus).reduce((sum, count) => sum + count, 0)
-
   return (
     <div className="flex-1 bg-white">
       <header className="p-6">
@@ -144,79 +127,86 @@ export default function AdminDashboard() {
       </header>
 
       <main className="p-6">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          <Card className="border-2 rounded-3xl overflow-hidden">
-            <CardContent className="p-6 flex flex-col items-center justify-center min-h-[120px]">
-              <h2 className="text-2xl font-semibold text-center">Total Clients</h2>
-              <p className="text-4xl font-bold mt-2">5</p>
-            </CardContent>
-          </Card>
+        {loading ? (
+          <div className="text-center py-10">Loading dashboard data...</div>
+        ) : error ? (
+          <div className="text-center py-10 text-red-500">{error}</div>
+        ) : (
+          <>
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              <Card className="border-2 rounded-3xl overflow-hidden">
+                <CardContent className="p-6 flex flex-col items-center justify-center min-h-[120px]">
+                  <h2 className="text-2xl font-semibold text-center">Total Clients</h2>
+                  <p className="text-4xl font-bold mt-2">{stats.counts.clients}</p>
+                </CardContent>
+              </Card>
 
-          <Card className="border-2 rounded-3xl overflow-hidden">
-            <CardContent className="p-6 flex flex-col items-center justify-center min-h-[120px]">
-              <h2 className="text-2xl font-semibold text-center">Active Sales Agents</h2>
-              <p className="text-4xl font-bold mt-2">4</p>
-            </CardContent>
-          </Card>
+              <Card className="border-2 rounded-3xl overflow-hidden">
+                <CardContent className="p-6 flex flex-col items-center justify-center min-h-[120px]">
+                  <h2 className="text-2xl font-semibold text-center">Active Sales Agents</h2>
+                  <p className="text-4xl font-bold mt-2">{stats.counts.agents}</p>
+                </CardContent>
+              </Card>
 
-          <Card className="border-2 rounded-3xl overflow-hidden">
-            <CardContent className="p-6 flex flex-col items-center justify-center min-h-[120px]">
-              <h2 className="text-2xl font-semibold text-center">Products Available</h2>
-              <p className="text-4xl font-bold mt-2">172</p>
-            </CardContent>
-          </Card>
+              <Card className="border-2 rounded-3xl overflow-hidden">
+                <CardContent className="p-6 flex flex-col items-center justify-center min-h-[120px]">
+                  <h2 className="text-2xl font-semibold text-center">Products Available</h2>
+                  <p className="text-4xl font-bold mt-2">{stats.counts.products}</p>
+                </CardContent>
+              </Card>
 
-          <Card className="border-2 rounded-3xl overflow-hidden">
-            <CardContent className="p-6 flex flex-col items-center justify-center min-h-[120px]">
-              <h2 className="text-2xl font-semibold text-center">Pending Follow-ups</h2>
-              <p className="text-4xl font-bold mt-2">200</p>
-            </CardContent>
-          </Card>
+              <Card className="border-2 rounded-3xl overflow-hidden">
+                <CardContent className="p-6 flex flex-col items-center justify-center min-h-[120px]">
+                  <h2 className="text-2xl font-semibold text-center">Pending Follow-ups</h2>
+                  <p className="text-4xl font-bold mt-2">200</p>
+                </CardContent>
+              </Card>
+            </div>
+          </>
+        )}
+
+        {/* Action Buttons - First Row */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <Link href="/admin/dashboard/agents" className="w-full">
+            <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-12 text-lg font-normal w-full rounded-md">
+              Consultants
+            </Button>
+          </Link>
+
+          <Link href="/admin/dashboard/all-clients" className="w-full">
+            <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-12 text-lg font-normal w-full rounded-md">
+              Client List
+            </Button>
+          </Link>
+
+          <Link href="/scan-qr" className="w-full">
+            <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-12 text-lg font-normal w-full rounded-md">
+              Scan QR Code
+            </Button>
+          </Link>
         </div>
- {/* Action Buttons - Firs Row */}
- <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <Link href="/admin/dashboard/agents" className="w-full">
-                <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-12 text-lg font-normal w-full rounded-md">
-                Consultants
-                </Button>
-              </Link>
 
-              <Link href="/admin/dashboard/all-clients" className="w-full">
-                <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-12 text-lg font-normal w-full rounded-md">
-                  Client List
-                </Button>
-              </Link>
+        {/* Action Buttons - Second Row */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <Link href="/admin/dashboard/followups" className="w-full">
+            <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-12 text-lg font-normal w-full rounded-md">
+              Follow-up Reminders
+            </Button>
+          </Link>
 
-              <Link href="/scan-qr" className="w-full">
-                <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-12 text-lg font-normal w-full rounded-md">
-                  Scan QR Code
-                </Button>
-              </Link>
+          <Link href="/admin/products/pricing" className="w-full">
+            <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-12 text-lg font-normal w-full rounded-md">
+              Change Standard Price
+            </Button>
+          </Link>
 
-            </div>
-
-            {/* Action Buttons - Second Row */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-              
-              <Link href="/admin/dashboard/followups" className="w-full">
-                <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-12 text-lg font-normal w-full rounded-md">
-                  Follow-up Reminders
-                </Button>
-              </Link>
-
-              <Link href="/admin/products/pricing" className="w-full">
-                <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-12 text-lg font-normal w-full rounded-md">
-                  Change Standard Price
-                </Button>
-              </Link>
-
-              <Link href="../register-client" className="w-full">
-                <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-12 text-lg font-normal w-full rounded-md">
-                  Register New Client
-                </Button>
-              </Link>
-            </div>
+          <Link href="../register-client" className="w-full">
+            <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-12 text-lg font-normal w-full rounded-md">
+              Register New Client
+            </Button>
+          </Link>
+        </div>
 
         {/* Erase All Data Button */}
         <div className="flex justify-center">
