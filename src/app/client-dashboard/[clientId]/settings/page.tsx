@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/components/ui/use-toast"
-import { Loader2, Save } from "lucide-react"
+import { Loader2, Save } from 'lucide-react'
 
 // Update the ClientSettings interface to include consultantLevel
 interface ClientSettings {
@@ -20,18 +20,18 @@ interface ClientSettings {
   mobile: string
   city: string
   profession: string
-  purpose: string
+  purpose: string // Kept in interface for API compatibility
   clientId: string
-  quantityRequired: number
+  quantityRequired: number // Kept in interface for API compatibility
   agentAffiliated: string
   createdAt?: string
   updatedAt?: string
-  address: string
+  address: string // Kept in interface for API compatibility
   dateOfBirth: string
   businessName: string
   gstNumber: string
   projectType: string
-  consultantLevel: string // Add this field
+  consultantLevel: string
 }
 
 export default function SettingsPage() {
@@ -306,29 +306,6 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="purpose">Purpose</Label>
-                    <Input
-                      id="purpose"
-                      name="purpose"
-                      value={settings.purpose}
-                      onChange={handleChange}
-                      disabled={saving}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="quantityRequired">Quantity Required</Label>
-                    <Input
-                      id="quantityRequired"
-                      name="quantityRequired"
-                      type="number"
-                      value={settings.quantityRequired || 0}
-                      onChange={handleChange}
-                      disabled={saving}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
                     <Label htmlFor="agentAffiliated">Agent Affiliated</Label>
                     <Input
                       id="agentAffiliated"
@@ -372,17 +349,6 @@ export default function SettingsPage() {
                       />
                     </div>
                   )}
-
-                  <div className="space-y-2">
-                    <Label htmlFor="address">Address</Label>
-                    <Input
-                      id="address"
-                      name="address"
-                      value={settings.address}
-                      onChange={handleChange}
-                      disabled={saving}
-                    />
-                  </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="dateOfBirth">Date of Birth</Label>
