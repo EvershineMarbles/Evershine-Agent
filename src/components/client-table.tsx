@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/use-toast"
+import { useRouter } from "next/navigation"
+import { fetchWithAdminAuth } from "@/lib/admin-auth"
 
 interface Client {
   _id: string
@@ -28,6 +30,7 @@ interface Client {
   city?: string
   profession?: string
   createdAt: string
+  consultantLevel?: string
 }
 
 interface Agent {
@@ -39,26 +42,11 @@ interface Agent {
 // Function to fetch all clients
 const getAllClients = async () => {
   try {
-    // Get the token
-    const token = localStorage.getItem("admin_token")
-
-    if (!token) {
-      return { success: false, message: "No authentication token found" }
-    }
-
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"}/api/admin/clients`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      },
-    )
+    const response = await fetchWithAdminAuth("/api/admin/clients")
 
     if (!response.ok) {
-      throw new Error(`API error: ${response.status} ${response.statusText}`)
+      const errorData = await response.json()
+      throw new Error(errorData.message || `API error: ${response.status}`)
     }
 
     const data = await response.json()
@@ -84,26 +72,11 @@ const getAllClients = async () => {
 // Function to fetch all agents
 const getAllAgents = async () => {
   try {
-    // Get the token
-    const token = localStorage.getItem("admin_token")
-
-    if (!token) {
-      return { success: false, message: "No authentication token found" }
-    }
-
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"}/api/admin/agents`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      },
-    )
+    const response = await fetchWithAdminAuth("/api/admin/agents")
 
     if (!response.ok) {
-      throw new Error(`API error: ${response.status} ${response.statusText}`)
+      const errorData = await response.json()
+      throw new Error(errorData.message || `API error: ${response.status}`)
     }
 
     const data = await response.json()
@@ -126,8 +99,67 @@ const getAllAgents = async () => {
   }
 }
 
+// Function to delete a client
+const deleteClient = async (clientId: string) => {
+  try {
+    const response = await fetchWithAdminAuth(`/api/admin/clients/${clientId}`, {
+      method: "DELETE",
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.message || `API error: ${response.status}`)
+    }
+
+    const data = await response.json()
+
+    if (data.success) {
+      return {
+        success: true,
+        message: data.message || "Client deleted successfully",
+      }
+    } else {
+      throw new Error(data.message || "Failed to delete client")
+    }
+  } catch (error: any) {
+    console.error("Error deleting client:", error)
+    throw new Error(error.message || "An error occurred while deleting client")
+  }
+}
+
+// Function to update a client
+const updateClient = async (clientId: string, updateData: any) => {
+  try {
+    const response = await fetchWithAdminAuth(`/api/admin/clients/${clientId}`, {
+      method: "PUT",
+      body: JSON.stringify(updateData),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.message || `API error: ${response.status}`)
+    }
+
+    const data = await response.json()
+
+    if (data.success) {
+      return {
+        success: true,
+        message: data.message || "Client updated successfully",
+        client: data.data,
+      }
+    } else {
+      throw new Error(data.message || "Failed to update client")
+    }
+  } catch (error: any) {
+    console.error("Error updating client:", error)
+    throw new Error(error.message || "An error occurred while updating client")
+  }
+}
+
 export default function ClientTable() {
   const { toast } = useToast()
+  const router = useRouter()
   const [clients, setClients] = useState<Client[]>([])
   const [agents, setAgents] = useState<Agent[]>([])
   const [loading, setLoading] = useState(true)
@@ -218,8 +250,7 @@ export default function ClientTable() {
   // Handle client click to view details
   const handleClientClick = (clientId: string) => {
     // Navigate to client details page
-    console.log(`View client details: ${clientId}`)
-    // router.push(`/admin/clients/${clientId}`)
+    router.push(`/admin/clients/${clientId}`)
   }
 
   // Handle opening edit modal
@@ -252,10 +283,14 @@ export default function ClientTable() {
     setIsSubmitting(true)
 
     try {
-      // In a real app, you would make an API call to update the client
-      console.log("Updating client:", editingClient.clientId, editFormData)
+      // Make API call to update the client
+      const updateData = {
+        city: editFormData.city,
+        profession: editFormData.profession,
+      }
 
-      // Mock success
+      const result = await updateClient(editingClient.clientId, updateData)
+
       toast({
         title: "Client updated",
         description: "The client has been updated successfully",
@@ -267,8 +302,6 @@ export default function ClientTable() {
           client.clientId === editingClient.clientId
             ? {
                 ...client,
-                name: editFormData.name,
-                mobile: editFormData.mobile,
                 city: editFormData.city,
                 profession: editFormData.profession,
               }
@@ -303,10 +336,9 @@ export default function ClientTable() {
     setIsDeleting(true)
 
     try {
-      // In a real app, you would make an API call to delete the client
-      console.log("Deleting client:", deletingClient.clientId)
+      // Make API call to delete the client
+      await deleteClient(deletingClient.clientId)
 
-      // Mock success
       toast({
         title: "Client deleted",
         description: `${deletingClient.name} has been successfully removed from the system.`,
@@ -358,9 +390,7 @@ export default function ClientTable() {
 
     try {
       // In a real app, you would make an API call to create the client
-      console.log("Creating client:", createFormData)
-
-      // Mock success
+      // For now, we'll just show a success message and refresh the data
       toast({
         title: "Client created",
         description: "The client has been created successfully",
@@ -454,6 +484,22 @@ export default function ClientTable() {
                         {getAgentName(client.agentAffiliated)}
                       </Badge>
                     )}
+                    {client.consultantLevel && (
+                      <Badge
+                        variant="outline"
+                        className={`
+                          ${
+                            client.consultantLevel === "red"
+                              ? "bg-red-50 text-red-700 border-red-200"
+                              : client.consultantLevel === "yellow"
+                                ? "bg-yellow-50 text-yellow-700 border-yellow-200"
+                                : "bg-purple-50 text-purple-700 border-purple-200"
+                          }
+                        `}
+                      >
+                        {client.consultantLevel.charAt(0).toUpperCase() + client.consultantLevel.slice(1)} Level
+                      </Badge>
+                    )}
                     <div className="flex gap-2">
                       <Button
                         variant="outline"
@@ -497,7 +543,8 @@ export default function ClientTable() {
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
                 <Label htmlFor="name">Name</Label>
-                <Input id="name" name="name" value={editFormData.name} onChange={handleEditInputChange} required />
+                <Input id="name" name="name" value={editFormData.name} onChange={handleEditInputChange} disabled />
+                <p className="text-xs text-muted-foreground">Name cannot be changed</p>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="mobile">Mobile</Label>
@@ -506,8 +553,9 @@ export default function ClientTable() {
                   name="mobile"
                   value={editFormData.mobile}
                   onChange={handleEditInputChange}
-                  required
+                  disabled
                 />
+                <p className="text-xs text-muted-foreground">Mobile number cannot be changed</p>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="city">City</Label>
@@ -549,6 +597,7 @@ export default function ClientTable() {
             <DialogTitle className="text-xl">Confirm Deletion</DialogTitle>
             <DialogDescription className="py-3">
               Are you sure you want to delete client <span className="font-semibold">{deletingClient?.name}</span>?
+              <p className="mt-2 text-red-500">This action cannot be undone.</p>
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
