@@ -62,30 +62,21 @@ export function getCurrentClientId(): string | null {
 }
 
 /**
- * Determines if the agent is in client context
- */
-export function isAgentInClientContext(): boolean {
-  return isAgent() && getCurrentClientId() !== null
-}
-
-/**
  * Gets the appropriate redirect URL based on user role
  */
-export function getRedirectUrl(productId: string): string {
-  // Check user roles
-  const isAdminUser = isAdmin()
-  const isAgentUser = isAgent()
-  const clientId = getCurrentClientId()
-
+export function getRedirectUrl(
+  productId: string,
+  isAdminUser: boolean,
+  isAgentUser: boolean,
+  clientId?: string,
+): string {
   if (isAdminUser) {
-    // Admin route
     return `/admin/dashboard/product/${productId}`
   } else if (isAgentUser && clientId) {
-    // Agent with client context
     return `/client-dashboard/${clientId}/product/${productId}`
   } else if (isAgentUser) {
-    // Agent without client context - agent dashboard product view
-    return `/dashboard/product/${productId}`
+    // Agent without client context - should go to dashboard
+    return `/dashboard`
   } else {
     // Regular user - public product page
     return `/product/${productId}`
