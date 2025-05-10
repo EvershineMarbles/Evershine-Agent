@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import axios, { AxiosError } from "axios"
-import { ArrowLeft, ChevronLeft, ChevronRight, Download, Loader2, Trash2, ChevronDown, ChevronUp } from "lucide-react"
+import { ArrowLeft, ChevronLeft, ChevronRight, Loader2, Trash2, ChevronDown, ChevronUp, Calculator, Download } from 'lucide-react'
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import {
@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import QRCodeGenerator from "@/components/QRCodeGenerator"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
@@ -33,8 +34,10 @@ interface Product {
   postId: string
   quantityAvailable: number
   size?: string
+  sizeUnit?: string
   numberOfPieces?: number | null
   thickness?: string
+  finishes?: string
 }
 
 interface ApiResponse {
@@ -79,6 +82,26 @@ const debugProductData = (data: any) => {
   console.log("=========================================")
 }
 
+// Function to calculate how quantity was derived
+const calculateQuantityFormula = (size: string, sizeUnit: string, numberOfPieces: number): string | null => {
+  if (!size || !numberOfPieces) return null
+
+  // Parse size (e.g., "60x120")
+  const match = size.replace(/\s+/g, "").match(/^(\d+(?:\.\d+)?)[x*-](\d+(?:\.\d+)?)$/)
+  if (!match) return null
+
+  const length = Number.parseFloat(match[1])
+  const height = Number.parseFloat(match[2])
+
+  if (sizeUnit === "inches") {
+    const calculatedQuantity = ((length * height * numberOfPieces) / 144).toFixed(2)
+    return `(${length} × ${height} × ${numberOfPieces}) ÷ 144 = ${calculatedQuantity} sqft`
+  } else {
+    const calculatedQuantity = ((length * height * numberOfPieces) / 929).toFixed(2)
+    return `(${length} × ${height} × ${numberOfPieces}) ÷ 929 = ${calculatedQuantity} sqft`
+  }
+}
+
 export default function ProductDetail() {
   const params = useParams()
   const router = useRouter()
@@ -91,6 +114,7 @@ export default function ProductDetail() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [qrCodeUrl, setQrCodeUrl] = useState<string>("")
   const [showFullDescription, setShowFullDescription] = useState(false)
+  const [quantityFormula, setQuantityFormula] = useState<string | null>(null)
 
   // Update the useEffect to use this enhanced debugging
   useEffect(() => {
@@ -116,14 +140,26 @@ export default function ProductDetail() {
           const processedProduct = {
             ...productData,
             size: productData.size !== undefined ? productData.size : "",
+            sizeUnit: productData.sizeUnit || "inches",
             numberOfPieces: productData.numberOfPieces !== undefined ? productData.numberOfPieces : null,
             thickness: productData.thickness !== undefined ? productData.thickness : "",
+            finishes: productData.finishes || "",
           }
 
           console.log("Processed product with added fields:", processedProduct)
 
           setProduct(processedProduct)
           setImageLoadError(new Array(productData.image.length).fill(false))
+
+          // Calculate quantity formula if all required fields are present
+          if (processedProduct.size && processedProduct.numberOfPieces) {
+            const formula = calculateQuantityFormula(
+              processedProduct.size,
+              processedProduct.sizeUnit || "inches",
+              Number(processedProduct.numberOfPieces),
+            )
+            setQuantityFormula(formula)
+          }
         } else {
           throw new Error(response.data.msg || "No data found")
         }
@@ -240,6 +276,38 @@ export default function ProductDetail() {
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
+  }
+
+  const downloadSimpleQRCode = async () => {
+    try {
+      if (!product) return
+
+      // Import QRCode dynamically to avoid SSR issues
+      const QRCode = (await import("qrcode")).default
+
+      // Generate the product URL
+      const productUrl = `${window.location.origin}/product/${product.postId}`
+
+      // Generate QR code
+      const qrCodeDataUrl = await QRCode.toDataURL(productUrl, {
+        width: 300,
+        margin: 1,
+        color: {
+          dark: "#000000",
+          light: "#ffffff",
+        },
+      })
+
+      // Download the QR code
+      const link = document.createElement("a")
+      link.href = qrCodeDataUrl
+      link.download = `evershine-qr-${product.postId}.png`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } catch (error) {
+      console.error("Error generating QR code:", error)
+    }
   }
 
   if (loading) {
@@ -393,7 +461,23 @@ export default function ProductDetail() {
 
             {/* Quantity Available */}
             <div className="pb-4 border-b border-gray-200">
-              <p className="text-gray-500">Quality Available (in sqft)</p>
+              <div className="flex items-center justify-between">
+                <p className="text-gray-500">Quantity Available (in sqft)</p>
+                {quantityFormula && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center text-gray-500 cursor-help">
+                          <Calculator className="h-4 w-4 mr-1" />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-sm">{quantityFormula}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </div>
               <p className="text-xl font-bold mt-1">{product.quantityAvailable}</p>
             </div>
 
@@ -402,7 +486,9 @@ export default function ProductDetail() {
               <div>
                 <p className="text-gray-500">Size</p>
                 <p className="text-lg font-bold mt-1">
-                  {product.size !== undefined && product.size !== null && product.size !== "" ? product.size : "-"}
+                  {product.size !== undefined && product.size !== null && product.size !== ""
+                    ? `${product.size} ${product.sizeUnit || "inches"}`
+                    : "-"}
                 </p>
               </div>
               <div>
@@ -422,6 +508,27 @@ export default function ProductDetail() {
                 </p>
               </div>
             </div>
+
+            {/* Finishes */}
+            {product.finishes && (
+              <div className="pb-4 border-b border-gray-200">
+                <p className="text-gray-500">Finishes</p>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {typeof product.finishes === "string" ? (
+                    product.finishes.split(",").map((finish, index) => (
+                      <Badge
+                        key={index}
+                        className="bg-[#194a95] hover:bg-[#194a95] text-white px-3 py-1 text-sm capitalize"
+                      >
+                        {finish.trim()}
+                      </Badge>
+                    ))
+                  ) : (
+                    <p className="text-lg font-bold mt-1 capitalize">No finishes specified</p>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Application Areas */}
             <div className="pb-4 border-b border-gray-200">
@@ -470,10 +577,18 @@ export default function ProductDetail() {
             {/* Action Buttons */}
             <div className="flex flex-wrap gap-4">
               <Button
-                onClick={() => router.push(`/admin/dashboard/edit-product/${product.postId}`)}
+                onClick={() => router.push(`/edit-product/${product.postId}`)}
                 className="px-8 py-3 bg-[#194a95] hover:bg-[#0f3a7a] text-white rounded-md"
               >
                 Edit
+              </Button>
+
+              <Button
+                onClick={downloadSimpleQRCode}
+                className="px-8 py-3 bg-[#194a95] hover:bg-[#0f3a7a] text-white rounded-md"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Download QR
               </Button>
 
               <AlertDialog>
@@ -524,6 +639,13 @@ export default function ProductDetail() {
               size={product.size}
             />
           )}
+        </div>
+        
+        {/* Disclaimer */}
+        <div className="max-w-6xl mx-auto mt-8 pt-4 border-t">
+          <p className="text-gray-500 text-sm italic text-center">
+            Disclaimer: Actual quantity can differ
+          </p>
         </div>
       </div>
     </div>
