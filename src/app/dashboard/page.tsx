@@ -71,35 +71,44 @@ export default function Dashboard() {
     <>
       <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
 
-      {/* Stats Cards */}
+      {/* Stats Cards - All made clickable with hover effects and centered numbers */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <Card className="border rounded-lg overflow-hidden" onClick={() => router.push("/dashboard/client-list")}>
+        <Card
+          className="border rounded-lg overflow-hidden cursor-pointer transition-all hover:shadow-md hover:border-[#194a95]"
+          onClick={() => router.push("/dashboard/client-list")}
+        >
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
               <Users className="h-5 w-5 text-[#194a95]" />
               <span className="text-gray-600 font-medium">Total Clients</span>
             </div>
-            <p className="text-3xl font-bold mt-2">{clients.length}</p>
+            <p className="text-3xl font-bold mt-2 text-center">{clients.length}</p>
           </CardContent>
         </Card>
 
-        <Card className="border rounded-lg overflow-hidden" onClick={() => router.push("/dashboard/consultant-orders")}>
+        <Card
+          className="border rounded-lg overflow-hidden cursor-pointer transition-all hover:shadow-md hover:border-[#194a95]"
+          onClick={() => router.push("/dashboard/consultant-orders")}
+        >
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
               <Package className="h-5 w-5 text-[#194a95]" />
               <span className="text-gray-600 font-medium">Active Orders</span>
             </div>
-            <p className="text-3xl font-bold mt-2">12</p>
+            <p className="text-3xl font-bold mt-2 text-center">12</p>
           </CardContent>
         </Card>
 
-        <Card className="border rounded-lg overflow-hidden">
+        <Card
+          className="border rounded-lg overflow-hidden cursor-pointer transition-all hover:shadow-md hover:border-[#194a95]"
+          onClick={() => router.push("/dashboard/reminders")}
+        >
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
               <Bell className="h-5 w-5 text-[#194a95]" />
               <span className="text-gray-600 font-medium">Pending Reminders</span>
             </div>
-            <p className="text-3xl font-bold mt-2">8</p>
+            <p className="text-3xl font-bold mt-2 text-center">8</p>
           </CardContent>
         </Card>
       </div>
@@ -107,7 +116,7 @@ export default function Dashboard() {
       {/* Action Buttons */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <button
-          className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg"
+          className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg transition-colors"
           onClick={() => router.push("/register-client")}
         >
           <UserPlus className="h-6 w-6" />
@@ -115,7 +124,7 @@ export default function Dashboard() {
         </button>
 
         <button
-          className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg"
+          className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg transition-colors"
           onClick={() => router.push("/dashboard/client-list")}
         >
           <List className="h-6 w-6" />
@@ -123,7 +132,7 @@ export default function Dashboard() {
         </button>
 
         <button
-          className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg"
+          className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg transition-colors"
           onClick={() => router.push("/scan-qr")}
         >
           <QrCode className="h-6 w-6" />
