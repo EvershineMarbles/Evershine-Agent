@@ -187,19 +187,7 @@ export default function GlobalCommissionSettings() {
                 <div className="bg-gray-50 p-4 rounded-md">
                   <div className="flex items-start">
                     <Info className="h-5 w-5 text-blue-500 mt-0.5 mr-2" />
-                    <div>
-                      <h3 className="font-medium">Current Status</h3>
-                      <p className="text-sm text-gray-600 mt-1">
-                        {settings.isActive
-                          ? `✅ Global commission rate is active at ${settings.globalCommissionRate}%`
-                          : "❌ Global commission rate is not active"}
-                      </p>
-                      {settings.isActive && settings.overrideAgentCommissions && (
-                        <p className="text-sm text-gray-600 mt-1">
-                          Individual agent commission rates are being overridden
-                        </p>
-                      )}
-                    </div>
+        
                   </div>
                 </div>
 
@@ -238,8 +226,6 @@ export default function GlobalCommissionSettings() {
               <ul className="list-disc list-inside mt-1 space-y-1">
                 <li>Set a global commission rate to standardize pricing across all agents</li>
                 <li>Enable override to apply this rate to all agents, ignoring their individual rates</li>
-                <li>When active, all product prices will be calculated using this global rate</li>
-                <li>Disable by clearing the rate or turning off the override toggle</li>
               </ul>
             </div>
           </CardFooter>
