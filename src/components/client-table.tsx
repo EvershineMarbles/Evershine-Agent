@@ -250,7 +250,7 @@ export default function ClientTable() {
   // Handle client click to view details
   const handleClientClick = (clientId: string) => {
     // Navigate to client details page
-    router.push(`/dashboard/clients/${clientId}`)
+    router.push(`/admin/dashboard/clients/${clientId}`)
   }
 
   // Handle opening edit modal
