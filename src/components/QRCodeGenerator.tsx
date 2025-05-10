@@ -34,8 +34,10 @@ export default function QRCodeGenerator({
     try {
       setIsGenerating(true)
 
-      // Generate QR code for the product URL
-      const productUrl = `${window.location.origin}/product/${productId}`
+      // Generate QR code with a special format that includes encryption marker
+      // Format: ev://product/{productId}
+      // This special format will be recognized by our scanner
+      const productUrl = `ev://product/${productId}`
       const qrCodeDataUrl = await QRCode.toDataURL(productUrl, {
         width: 200,
         margin: 1,

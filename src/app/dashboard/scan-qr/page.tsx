@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Camera, ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { ADMIN_TOKEN_KEY } from "@/lib/admin-auth"
 
 export default function ScanQRPage() {
   const [scanning, setScanning] = useState(false)
@@ -38,12 +39,27 @@ export default function ScanQRPage() {
             html5QrCode
               .stop()
               .then(() => {
-                // Check if the decoded text is a valid URL or contains client ID
-                if (decodedText.includes("/client-dashboard/")) {
-                  // Navigate to the client dashboard
+                // Check if the user is an admin
+                const isAdmin = localStorage.getItem(ADMIN_TOKEN_KEY) !== null
+
+                // Check if this is our special format
+                if (decodedText.startsWith("ev://product/")) {
+                  // Extract the product ID
+                  const productId = decodedText.replace("ev://product/", "")
+
+                  if (isAdmin) {
+                    // Admin route
+                    router.push(`/admin/dashboard/product/${productId}`)
+                  } else {
+                    // Not authorized
+                    alert("You are not authorized to view this product. Please log in as an admin.")
+                    setScanning(false)
+                  }
+                } else if (decodedText.includes("/client-dashboard/")) {
+                  // Legacy format - Navigate to the client dashboard
                   router.push(decodedText)
                 } else if (decodedText.includes("product/")) {
-                  // Navigate to product page
+                  // Legacy format - Navigate to product page
                   router.push(decodedText)
                 } else {
                   // Try to extract client ID or product ID
@@ -101,7 +117,7 @@ export default function ScanQRPage() {
   return (
     <div className="min-h-screen p-6 bg-gray-50 flex flex-col items-center">
       <div className="w-full max-w-md">
-        <Link href="/dashboard" className="inline-flex items-center text-dark hover:underline mb-6">
+        <Link href="/admin/dashboard" className="inline-flex items-center text-dark hover:underline mb-6">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back
         </Link>

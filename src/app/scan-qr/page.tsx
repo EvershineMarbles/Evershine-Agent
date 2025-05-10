@@ -38,12 +38,42 @@ export default function ScanQRPage() {
             html5QrCode
               .stop()
               .then(() => {
-                // Check if the decoded text is a valid URL or contains client ID
-                if (decodedText.includes("/client-dashboard/")) {
-                  // Navigate to the client dashboard
+                // Check if this is our special format
+                if (decodedText.startsWith("ev://product/")) {
+                  // For the main scan page, we need to determine if user is admin or agent
+                  const isAdmin = localStorage.getItem("admin_token") !== null
+                  const isAgent =
+                    localStorage.getItem("accessToken") !== null || sessionStorage.getItem("accessToken") !== null
+
+                  // Extract the product ID
+                  const productId = decodedText.replace("ev://product/", "")
+
+                  if (isAdmin) {
+                    // Admin route
+                    router.push(`/admin/dashboard/product/${productId}`)
+                  } else if (isAgent) {
+                    // Try to get client ID from local storage or other source
+                    // This is a simplified approach - you might need to adjust based on your app's logic
+                    const clientId = localStorage.getItem("currentClientId")
+
+                    if (clientId) {
+                      // Agent route with client context
+                      router.push(`/client-dashboard/${clientId}/product/${productId}`)
+                    } else {
+                      // Agent without client context - redirect to agent dashboard
+                      router.push(`/dashboard`)
+                      alert("Please select a client before scanning product QR codes.")
+                    }
+                  } else {
+                    // Not authorized
+                    alert("You are not authorized to view this product. Please log in as an admin or agent.")
+                    setScanning(false)
+                  }
+                } else if (decodedText.includes("/client-dashboard/")) {
+                  // Legacy format - Navigate to the client dashboard
                   router.push(decodedText)
                 } else if (decodedText.includes("product/")) {
-                  // Navigate to product page
+                  // Legacy format - Navigate to product page
                   router.push(decodedText)
                 } else {
                   // Try to extract client ID or product ID

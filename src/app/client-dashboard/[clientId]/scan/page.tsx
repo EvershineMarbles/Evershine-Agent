@@ -38,12 +38,30 @@ export default function ScanQRPage() {
             html5QrCode
               .stop()
               .then(() => {
-                // Check if the decoded text is a valid URL or contains client ID
-                if (decodedText.includes("/client-dashboard/")) {
-                  // Navigate to the client dashboard
+                // Get client ID from URL
+                const clientId = window.location.pathname.split("/")[2]
+
+                // Check if the user has a client impersonation token (agent)
+                const isAgent = localStorage.getItem("clientImpersonationToken") !== null
+
+                // Check if this is our special format
+                if (decodedText.startsWith("ev://product/")) {
+                  // Extract the product ID
+                  const productId = decodedText.replace("ev://product/", "")
+
+                  if (isAgent && clientId) {
+                    // Agent route with client context
+                    router.push(`/client-dashboard/${clientId}/product/${productId}`)
+                  } else {
+                    // Not authorized or missing client context
+                    alert("You are not authorized to view this product or missing client context.")
+                    setScanning(false)
+                  }
+                } else if (decodedText.includes("/client-dashboard/")) {
+                  // Legacy format - Navigate to the client dashboard
                   router.push(decodedText)
                 } else if (decodedText.includes("product/")) {
-                  // Navigate to product page
+                  // Legacy format - Navigate to product page
                   router.push(decodedText)
                 } else {
                   // Try to extract client ID or product ID
