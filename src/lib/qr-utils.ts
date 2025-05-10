@@ -2,9 +2,12 @@
  * Utility functions for QR code handling
  */
 
+// Base URL for the application
+const BASE_URL = typeof window !== "undefined" ? window.location.origin : "https://evershine-agent.vercel.app" // Fallback URL
+
 /**
  * Extracts a product ID from a QR code text
- * Handles both the special format and legacy URL formats
+ * Handles both the special format and standard URL formats
  */
 export function extractProductId(qrText: string): string | null {
   // Check if it's our special format
@@ -84,8 +87,16 @@ export function getRedirectUrl(
 }
 
 /**
- * Generates a QR code URL with our special format
+ * Generates a QR code URL for a product
+ * Uses a standard URL format that works with all phone cameras
  */
 export function generateProductQrUrl(productId: string): string {
+  return `${BASE_URL}/product/${productId}`
+}
+
+/**
+ * Generates a QR code URL with our special format (for internal use)
+ */
+export function generateInternalProductQrUrl(productId: string): string {
   return `ev://product/${productId}`
 }
