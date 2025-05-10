@@ -5,13 +5,12 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import axios from "axios"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Download, Loader2, Search, Home, Grid, List, Check } from "lucide-react"
+import { ArrowLeft, Download, Loader2, Search, Grid, List, Check } from "lucide-react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { toast } from "sonner"
 import QRCode from "qrcode"
-
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
@@ -128,9 +127,9 @@ export default function AllQR() {
     try {
       setGeneratingQR((prev) => ({ ...prev, [product.postId]: true }))
 
-      // Generate QR code for the product URL
-      const productUrl = `${window.location.origin}/product/${product.postId}`
-      const qrCodeDataUrl = await QRCode.toDataURL(productUrl, {
+      // Generate QR code with our special format for role-based access
+      const productData = `ev://product/${product.postId}`
+      const qrCodeDataUrl = await QRCode.toDataURL(productData, {
         width: 200,
         margin: 1,
         color: {
@@ -148,98 +147,98 @@ export default function AllQR() {
       canvas.width = 600
       canvas.height = 900
 
-      // Load the template image
-      const templateImage = document.createElement("img")
-      templateImage.crossOrigin = "anonymous"
+      // Create a simple template directly on canvas instead of loading an external image
+      // This avoids the template image loading issue
+      ctx.fillStyle = "#ffffff"
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-      templateImage.onload = () => {
-        // Draw the template image on the canvas
-        ctx.drawImage(templateImage, 0, 0, canvas.width, canvas.height)
+      // Add a border
+      ctx.strokeStyle = "#194a95"
+      ctx.lineWidth = 10
+      ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20)
 
-        // Load and draw the QR code
-        const qrCode = document.createElement("img")
-        qrCode.crossOrigin = "anonymous"
+      // Add company logo/name at the top
+      ctx.fillStyle = "#194a95"
+      ctx.font = "bold 40px Arial"
+      ctx.textAlign = "center"
+      ctx.fillText("EVERSHINE", canvas.width / 2, 80)
 
-        qrCode.onload = () => {
-          // Draw QR code in the white space
-          ctx.drawImage(qrCode, 380, 640, 150, 150)
+      // Add product details
+      ctx.fillStyle = "#000000"
+      ctx.font = "bold 24px Arial"
+      ctx.textAlign = "center"
+      ctx.fillText(product.name, canvas.width / 2, 150)
 
-          // Add product name below the QR code
-          ctx.font = "bold 16px Arial"
-          ctx.fillStyle = "#000000"
-          ctx.textAlign = "center"
-
-          // Position the text below the QR code
-          const qrCodeCenterX = 380 + 75 // QR code X position + half width
-          const textY = 810 // Position below the QR code
-
-          // Capitalize the product name
-          const capitalizedName = product.name
-            .split(" ")
-            .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-            .join(" ")
-
-          // Wrap text for longer product names
-          const maxWidth = 150 // Same width as QR code
-          const words = capitalizedName.split(" ")
-          let line = ""
-          let y = textY
-          let lineCount = 0
-          const maxLines = 3 // Maximum number of lines to display
-
-          for (let i = 0; i < words.length; i++) {
-            // If we've reached the maximum number of lines, add ellipsis and break
-            if (lineCount >= maxLines - 1 && i < words.length - 1) {
-              ctx.fillText(line + "...", qrCodeCenterX, y)
-              break
-            }
-
-            const testLine = line + words[i] + " "
-            const metrics = ctx.measureText(testLine)
-            const testWidth = metrics.width
-
-            if (testWidth > maxWidth && i > 0) {
-              ctx.fillText(line, qrCodeCenterX, y)
-              line = words[i] + " "
-              y += 20 // Line height
-              lineCount++
-            } else {
-              line = testLine
-            }
-          }
-
-          // Draw the last line if we haven't reached the maximum
-          if (lineCount < maxLines) {
-            ctx.fillText(line, qrCodeCenterX, y)
-          }
-
-          // Convert canvas to data URL and download
-          const dataUrl = canvas.toDataURL("image/png")
-          const link = document.createElement("a")
-          link.href = dataUrl
-          link.download = `evershine-product-${product.postId}.png`
-          document.body.appendChild(link)
-          link.click()
-          document.body.removeChild(link)
-
-          // Clean up
-          setGeneratingQR((prev) => ({ ...prev, [product.postId]: false }))
-        }
-
-        qrCode.onerror = () => {
-          setGeneratingQR((prev) => ({ ...prev, [product.postId]: false }))
-          toast.error("Failed to generate QR code")
-        }
-
-        qrCode.src = qrCodeDataUrl
+      if (product.category) {
+        ctx.font = "20px Arial"
+        ctx.fillText(`Category: ${product.category}`, canvas.width / 2, 190)
       }
 
-      templateImage.onerror = () => {
+      if (product.thickness) {
+        ctx.font = "20px Arial"
+        ctx.fillText(`Thickness: ${product.thickness}`, canvas.width / 2, 230)
+      }
+
+      if (product.size) {
+        ctx.font = "20px Arial"
+        ctx.fillText(`Size: ${product.size} ${product.sizeUnit || ""}`, canvas.width / 2, 270)
+      }
+
+      if (product.finishes) {
+        ctx.font = "20px Arial"
+        ctx.fillText(`Finishes: ${product.finishes}`, canvas.width / 2, 310)
+      }
+
+      // Add price
+      ctx.fillStyle = "#194a95"
+      ctx.font = "bold 28px Arial"
+      ctx.fillText(`₹${product.price}/sqft`, canvas.width / 2, 370)
+
+      // Add a note about scanning
+      ctx.fillStyle = "#555555"
+      ctx.font = "italic 16px Arial"
+      ctx.fillText("Scan QR code for product details", canvas.width / 2, 620)
+
+      // Add "For authorized personnel only" text
+      ctx.fillStyle = "#ff0000"
+      ctx.font = "bold 14px Arial"
+      ctx.fillText("For authorized personnel only", canvas.width / 2, 640)
+
+      // Load and draw the QR code
+      const qrCode = new Image()
+      qrCode.crossOrigin = "anonymous"
+
+      qrCode.onload = () => {
+        // Draw QR code in the center bottom area
+        const qrSize = 200
+        const qrX = (canvas.width - qrSize) / 2
+        const qrY = 420
+        ctx.drawImage(qrCode, qrX, qrY, qrSize, qrSize)
+
+        // Add product ID below the QR code
+        ctx.fillStyle = "#666666"
+        ctx.font = "14px Arial"
+        ctx.fillText(`Product ID: ${product.postId}`, canvas.width / 2, 650)
+
+        // Convert canvas to data URL and download
+        const dataUrl = canvas.toDataURL("image/png")
+        const link = document.createElement("a")
+        link.href = dataUrl
+        link.download = `evershine-product-${product.postId}.png`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+
+        // Clean up
         setGeneratingQR((prev) => ({ ...prev, [product.postId]: false }))
-        toast.error("Failed to load template image")
       }
 
-      templateImage.src = "/assets/qr-template.png"
+      qrCode.onerror = () => {
+        setGeneratingQR((prev) => ({ ...prev, [product.postId]: false }))
+        toast.error("Failed to generate QR code")
+      }
+
+      qrCode.src = qrCodeDataUrl
     } catch (error) {
       console.error("Error generating QR code:", error)
       toast.error("Failed to generate QR code")
@@ -311,11 +310,10 @@ export default function AllQR() {
             Add New Product
           </button>
         </div>
-          {/* Products Count */}
-          <p className="text-gray-600 mb-6">
+        {/* Products Count */}
+        <p className="text-gray-600 mb-6">
           Showing {filteredProducts.length} of {products.length} products
         </p>
-
 
         {/* Products Table */}
         <div className="overflow-x-auto">
