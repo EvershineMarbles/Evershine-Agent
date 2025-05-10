@@ -36,8 +36,14 @@ export default function GlobalCommissionSettings() {
     const fetchSettings = async () => {
       try {
         setLoading(true)
-        // Get the token from localStorage or wherever you store it
-        const token = localStorage.getItem("token") || sessionStorage.getItem("token")
+        // Get the admin token - try different possible storage keys
+        const token =
+          localStorage.getItem("adminToken") ||
+          localStorage.getItem("accessToken") ||
+          sessionStorage.getItem("adminToken") ||
+          localStorage.getItem("token")
+
+        console.log("Using token:", token ? `${token.substring(0, 10)}...` : "No token found")
 
         const response = await axios.get(`${API_URL}/api/admin/settings/commission`, {
           headers: {
@@ -70,8 +76,14 @@ export default function GlobalCommissionSettings() {
       setSaving(true)
       setFeedback(null)
 
-      // Get the token from localStorage or wherever you store it
-      const token = localStorage.getItem("token") || sessionStorage.getItem("token")
+      // Get the admin token - try different possible storage keys
+      const token =
+        localStorage.getItem("adminToken") ||
+        localStorage.getItem("accessToken") ||
+        sessionStorage.getItem("adminToken") ||
+        localStorage.getItem("token")
+
+      console.log("Using token for update:", token ? `${token.substring(0, 10)}...` : "No token found")
 
       const response = await axios.put(
         `${API_URL}/api/admin/settings/commission`,
