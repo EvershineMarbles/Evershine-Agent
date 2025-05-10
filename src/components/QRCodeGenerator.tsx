@@ -12,6 +12,16 @@ interface QRCodeGeneratorProps {
   category?: string
   thickness?: string
   size?: string
+  sizeUnit?: string
+  finishes?: string
+}
+
+// Helper function to capitalize each word in a string
+const capitalizeWords = (str: string): string => {
+  return str
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ")
 }
 
 export default function QRCodeGenerator({
@@ -20,6 +30,8 @@ export default function QRCodeGenerator({
   category = "",
   thickness = "",
   size = "",
+  sizeUnit = "inches",
+  finishes = "",
 }: QRCodeGeneratorProps) {
   const [qrCodeUrl, setQrCodeUrl] = useState<string>("")
   const [isGenerating, setIsGenerating] = useState(true)
@@ -34,10 +46,8 @@ export default function QRCodeGenerator({
     try {
       setIsGenerating(true)
 
-      // Generate QR code with a special format that includes encryption marker
-      // Format: ev://product/{productId}
-      // This special format will be recognized by our scanner
-      const productUrl = `ev://product/${productId}`
+      // Generate QR code for the product URL
+      const productUrl = `${window.location.origin}/product/${productId}`
       const qrCodeDataUrl = await QRCode.toDataURL(productUrl, {
         width: 200,
         margin: 1,
@@ -73,6 +83,52 @@ export default function QRCodeGenerator({
         qrCode.onload = () => {
           // Draw QR code in the white space at bottom right - adjusted position
           ctx.drawImage(qrCode, 380, 640, 150, 150)
+
+          // Add product name directly below the QR code in the white area
+          ctx.font = "bold 16px Arial"
+          ctx.fillStyle = "#000000"
+          ctx.textAlign = "center"
+
+          // Position the text below the QR code in the white area
+          const qrCodeCenterX = 380 + 75 // QR code X position + half width
+          const textY = 810 // Position below the QR code
+
+          // Capitalize the product name
+          const capitalizedName = capitalizeWords(productName)
+
+          // Wrap text for longer product names
+          const maxWidth = 150 // Same width as QR code
+          const words = capitalizedName.split(" ")
+          let line = ""
+          let y = textY
+          let lineCount = 0
+          const maxLines = 3 // Maximum number of lines to display
+
+          for (let i = 0; i < words.length; i++) {
+            // If we've reached the maximum number of lines, add ellipsis and break
+            if (lineCount >= maxLines - 1 && i < words.length - 1) {
+              ctx.fillText(line + "...", qrCodeCenterX, y)
+              break
+            }
+
+            const testLine = line + words[i] + " "
+            const metrics = ctx.measureText(testLine)
+            const testWidth = metrics.width
+
+            if (testWidth > maxWidth && i > 0) {
+              ctx.fillText(line, qrCodeCenterX, y)
+              line = words[i] + " "
+              y += 20 // Line height
+              lineCount++
+            } else {
+              line = testLine
+            }
+          }
+
+          // Draw the last line if we haven't reached the maximum
+          if (lineCount < maxLines) {
+            ctx.fillText(line, qrCodeCenterX, y)
+          }
 
           // Convert canvas to data URL
           const dataUrl = canvas.toDataURL("image/png")
