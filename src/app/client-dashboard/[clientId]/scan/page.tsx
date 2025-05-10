@@ -2,144 +2,247 @@
 
 import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
-import { Html5Qrcode } from "html5-qrcode"
-import { ArrowLeft, Camera } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { ArrowLeft, Camera, Loader2, AlertCircle } from "lucide-react"
+import Link from "next/link"
 import { toast } from "sonner"
-import { extractProductId, getRedirectUrl } from "@/lib/qr-utils"
 
-export default function ClientScanQR() {
+export default function ClientScanQRPage() {
   const router = useRouter()
   const params = useParams()
   const clientId = params.clientId as string
 
   const [scanning, setScanning] = useState(false)
-  const [html5QrCode, setHtml5QrCode] = useState<Html5Qrcode | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    // Clean up on unmount
-    return () => {
-      if (html5QrCode && html5QrCode.isScanning) {
-        html5QrCode
-          .stop()
-          .then(() => console.log("QR Code scanning stopped"))
-          .catch((err) => console.error("Failed to stop QR Code scanning:", err))
-      }
-    }
-  }, [html5QrCode])
-
-  const startScanning = () => {
+  // Function to start scanning
+  const startScanning = async () => {
+    setError(null)
     setScanning(true)
+    setLoading(true)
 
-    const config = {
-      fps: 10,
-      qrbox: { width: 250, height: 250 },
-      aspectRatio: 1.0,
-    }
-
-    const qrCodeScanner = new Html5Qrcode("reader")
-    setHtml5QrCode(qrCodeScanner)
-
-    const qrCodeSuccessCallback = (decodedText: string) => {
-      handleQrCodeScan(decodedText, qrCodeScanner)
-    }
-
-    qrCodeScanner.start({ facingMode: "environment" }, config, qrCodeSuccessCallback).catch((err) => {
-      console.error("Error starting QR code scanner:", err)
-      toast.error("Failed to start camera. Please check permissions.")
-      setScanning(false)
-    })
-  }
-
-  const stopScanning = () => {
-    if (html5QrCode && html5QrCode.isScanning) {
-      html5QrCode
-        .stop()
-        .then(() => {
-          console.log("QR Code scanning stopped")
-          setScanning(false)
-        })
-        .catch((err) => {
-          console.error("Failed to stop QR Code scanning:", err)
-        })
-    }
-  }
-
-  const handleQrCodeScan = async (decodedText: string, scanner: Html5Qrcode) => {
     try {
-      // Stop scanning immediately to prevent multiple scans
-      await scanner.stop()
+      // Dynamically import the html5-qrcode library
+      const { Html5Qrcode } = await import("html5-qrcode")
+
+      // Create instance
+      const html5QrCode = new Html5Qrcode("qr-reader")
+      setLoading(false)
+
+      // Start scanning
+      html5QrCode
+        .start(
+          { facingMode: "environment" }, // Use back camera
+          {
+            fps: 10,
+            qrbox: 250,
+          },
+          (decodedText) => {
+            // On successful scan
+            console.log(`QR Code detected: ${decodedText}`)
+
+            // Stop scanning
+            html5QrCode
+              .stop()
+              .then(() => {
+                // Process the QR code
+                processQRCode(decodedText)
+              })
+              .catch((err) => {
+                console.error("Error stopping QR scanner:", err)
+                setScanning(false)
+                setError("Failed to process QR code. Please try again.")
+              })
+          },
+          (errorMessage) => {
+            // On error
+            console.error(`QR Code scanning error: ${errorMessage}`)
+          },
+        )
+        .catch((err) => {
+          console.error("Error starting QR scanner:", err)
+          setScanning(false)
+          setLoading(false)
+          setError("Could not access camera. Please ensure you've granted camera permissions.")
+        })
+    } catch (error) {
+      console.error("Error initializing QR scanner:", error)
       setScanning(false)
+      setLoading(false)
+      setError("Failed to initialize QR scanner. Please try again.")
+    }
+  }
 
-      console.log("QR Code detected:", decodedText)
+  // Process the scanned QR code
+  const processQRCode = (decodedText: string) => {
+    try {
+      // Check if the decoded text is our special format
+      if (decodedText.startsWith("ev://product/")) {
+        // Extract the product ID
+        const productId = decodedText.replace("ev://product/", "")
 
-      // Extract product ID from QR code
-      const productId = extractProductId(decodedText)
-
-      if (!productId) {
-        toast.error("Invalid QR code format")
+        // Navigate to the product page with client context
+        router.push(`/client-dashboard/${clientId}/product/${productId}`)
+        toast.success("Product found! Redirecting...")
         return
       }
 
-      // For client dashboard, always redirect to client product page
-      const redirectUrl = getRedirectUrl(productId, false, clientId)
+      // Handle legacy QR code formats
+      if (decodedText.includes("/product/")) {
+        // Try to extract product ID from URL
+        try {
+          const url = new URL(decodedText)
+          const pathParts = url.pathname.split("/")
+          const productIndex = pathParts.findIndex((part) => part === "product")
 
-      // Navigate to the product page
-      router.push(redirectUrl)
+          if (productIndex !== -1 && pathParts.length > productIndex + 1) {
+            const productId = pathParts[productIndex + 1]
+            router.push(`/client-dashboard/${clientId}/product/${productId}`)
+            toast.success("Product found! Redirecting...")
+            return
+          }
+        } catch (e) {
+          // Not a URL, continue with other checks
+        }
+      }
+
+      // If we get here, we couldn't process the QR code
+      setScanning(false)
+      setError("Invalid QR code. Please scan a valid Evershine product QR code.")
     } catch (error) {
-      console.error("Error handling QR code scan:", error)
-      toast.error("Failed to process QR code")
+      console.error("Error processing QR code:", error)
+      setScanning(false)
+      setError("Failed to process QR code. Please try again.")
+    }
+  }
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      // Try to stop any active scanning when component unmounts
+      if (typeof window !== "undefined") {
+        const element = document.getElementById("qr-reader")
+        if (element) {
+          try {
+            const html5QrCode = new (window as any).Html5Qrcode("qr-reader")
+            html5QrCode.stop().catch(() => {})
+          } catch (error) {
+            // Ignore errors during cleanup
+          }
+        }
+      }
+    }
+  }, [])
+
+  // Function to stop scanning
+  const stopScanning = () => {
+    if (typeof window !== "undefined") {
+      const element = document.getElementById("qr-reader")
+      if (element) {
+        try {
+          const html5QrCode = new (window as any).Html5Qrcode("qr-reader")
+          html5QrCode.stop().catch(() => {})
+          setScanning(false)
+        } catch (error) {
+          console.error("Error stopping scanner:", error)
+        }
+      }
     }
   }
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="max-w-lg mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <div className="container max-w-md mx-auto px-4 py-8">
         <div className="flex items-center mb-6">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => router.push(`/client-dashboard/${clientId}`)}
-            className="mr-2"
-            aria-label="Go back"
+          <Link
+            href={`/client-dashboard/${clientId}`}
+            className="inline-flex items-center text-gray-600 hover:text-gray-900"
           >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-2xl font-bold">Scan Product QR</h1>
+            <ArrowLeft className="mr-2 h-5 w-5" />
+            Back to Dashboard
+          </Link>
         </div>
 
-        <div className="bg-gray-50 rounded-lg p-4 mb-6">
-          <p className="text-gray-600 mb-2">Position the QR code within the camera view to scan it automatically.</p>
-          <p className="text-sm text-green-600">
-            You will be able to view product details and add items to your wishlist.
-          </p>
-        </div>
+        <h1 className="text-2xl font-bold text-center mb-6">Scan Product QR Code</h1>
 
-        <div className="flex flex-col items-center">
-          <div
-            id="reader"
-            className={`w-full max-w-sm h-64 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-6 ${
-              scanning ? "border-solid border-[#194a95]" : ""
-            }`}
-          >
-            {!scanning && (
-              <div className="text-center p-4">
-                <Camera className="h-12 w-12 mx-auto text-gray-400 mb-2" />
-                <p className="text-gray-500">Camera will appear here</p>
+        <Card className="mb-6">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-center text-lg">Scan to View Product</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-4 flex items-start">
+                <AlertCircle className="h-5 w-5 text-red-500 mr-2 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-red-600">{error}</p>
               </div>
             )}
-          </div>
 
-          <Button
-            onClick={scanning ? stopScanning : startScanning}
-            className={`w-full max-w-sm ${
-              scanning ? "bg-red-500 hover:bg-red-600" : "bg-[#194a95] hover:bg-[#0f3a7a]"
-            }`}
-          >
-            {scanning ? "Stop Scanning" : "Start Scanning"}
-          </Button>
+            <div className="flex flex-col items-center">
+              {scanning ? (
+                <div className="w-full mb-4">
+                  {loading ? (
+                    <div className="h-64 flex items-center justify-center bg-gray-100 rounded-lg">
+                      <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
+                      <span className="ml-2 text-gray-600">Initializing camera...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div id="qr-reader" className="w-full h-64 overflow-hidden rounded-lg"></div>
+                      <p className="text-center text-sm text-gray-500 mt-2">
+                        Position the QR code within the frame to scan
+                      </p>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-8 w-full">
+                  <div className="bg-gray-100 rounded-lg p-8 mb-4 flex flex-col items-center">
+                    <Camera className="h-16 w-16 text-gray-400 mb-4" />
+                    <p className="text-gray-600 mb-2">Scan Evershine product QR codes to view product details</p>
+                    <p className="text-sm text-gray-500">You can add products to your wishlist after scanning</p>
+                  </div>
+                </div>
+              )}
+
+              <Button
+                onClick={scanning ? stopScanning : startScanning}
+                className={`w-full ${scanning ? "bg-red-500 hover:bg-red-600" : "bg-blue-600 hover:bg-blue-700"}`}
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Initializing...
+                  </>
+                ) : scanning ? (
+                  "Stop Scanning"
+                ) : (
+                  <>
+                    <Camera className="h-4 w-4 mr-2" />
+                    Start Scanning
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <h3 className="font-medium text-gray-900 mb-2">How to scan:</h3>
+          <ol className="list-decimal pl-5 text-sm text-gray-600 space-y-2">
+            <li>Click the "Start Scanning" button</li>
+            <li>Allow camera access when prompted</li>
+            <li>Point your camera at an Evershine product QR code</li>
+            <li>Hold steady until the QR code is recognized</li>
+            <li>You'll be redirected to the product page automatically</li>
+          </ol>
         </div>
       </div>
+
+      {/* Add script to load html5-qrcode */}
+      <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" async />
     </div>
   )
 }
