@@ -242,12 +242,6 @@ export default function ClientDetails({ clientId }: ClientDetailsProps) {
                   <Separator />
 
                   <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Address</h3>
-                    <p className="text-lg font-medium">{client.address || "-"}</p>
-                  </div>
-                  <Separator />
-
-                  <div>
                     <h3 className="text-sm font-medium text-muted-foreground">Date of Birth</h3>
                     <p className="text-lg font-medium">{client.dateOfBirth ? formatDate(client.dateOfBirth) : "-"}</p>
                   </div>
@@ -258,18 +252,6 @@ export default function ClientDetails({ clientId }: ClientDetailsProps) {
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground">Profession</h3>
                     <p className="text-lg font-medium">{client.profession || "-"}</p>
-                  </div>
-                  <Separator />
-
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Purpose</h3>
-                    <p className="text-lg font-medium">{client.purpose || "-"}</p>
-                  </div>
-                  <Separator />
-
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Quantity Required</h3>
-                    <p className="text-lg font-medium">{client.quantityRequired || "-"}</p>
                   </div>
                   <Separator />
 
@@ -297,31 +279,6 @@ export default function ClientDetails({ clientId }: ClientDetailsProps) {
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground">Project Type</h3>
                   <p className="text-lg font-medium">{client.projectType || "-"}</p>
-                </div>
-                <Separator />
-
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground">Architect Details</h3>
-                  {client.architectDetails?.name ||
-                  client.architectDetails?.contact ||
-                  client.architectDetails?.firm ? (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Name</p>
-                        <p className="font-medium">{client.architectDetails?.name || "-"}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Contact</p>
-                        <p className="font-medium">{client.architectDetails?.contact || "-"}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Firm</p>
-                        <p className="font-medium">{client.architectDetails?.firm || "-"}</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-lg font-medium">-</p>
-                  )}
                 </div>
                 <Separator />
 
