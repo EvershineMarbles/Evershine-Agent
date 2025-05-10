@@ -614,7 +614,6 @@ export default function ProductDetail() {
             Disclaimer: Actual quantity can differ
           </p>
         </div>
-      </div>
     </div>
   )
 }
