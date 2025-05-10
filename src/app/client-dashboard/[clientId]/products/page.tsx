@@ -710,6 +710,8 @@ export default function ProductsPage() {
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Products</h1>
 
+          <div className="flex items-center gap-4">
+           
 
 
             {/* Scan QR Button */}
