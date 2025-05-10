@@ -155,12 +155,13 @@ export default function GlobalCommissionSettings() {
 
   return (
     <div className="container mx-auto px-4 py-6">
-      <Card className="max-w-2xl mx-auto">
+      <Card className="max-w-2xl ml-0">
+        {" "}
+        {/* Changed from mx-auto to ml-0 to align left */}
         <CardHeader className="pb-4">
           <CardTitle>Standard Commission Rate</CardTitle>
           <CardDescription>Set a standard rate that applies to all consultants in the system</CardDescription>
         </CardHeader>
-
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
@@ -224,7 +225,6 @@ export default function GlobalCommissionSettings() {
             </div>
           </form>
         </CardContent>
-
         <CardFooter className="bg-gray-50 border-t text-xs text-gray-600">
           <p>Set a rate to apply to all consultants. Clear the field to use individual consultant rates.</p>
         </CardFooter>
