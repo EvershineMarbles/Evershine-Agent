@@ -41,7 +41,7 @@ export const agentAPI = {
       }
     }
   },
-  egister: async (name: string, email: string, password: string) => {
+  register: async (name: string, email: string, password: string) => {
     try {
       const response = await fetch("https://evershinebackend-2.onrender.com/api/create-agent", {
         method: "POST",
