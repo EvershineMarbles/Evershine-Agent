@@ -1,21 +1,42 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter, useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowLeft, Loader2, AlertCircle } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
-export default function ClientScanQRPage() {
-  const router = useRouter()
-  const params = useParams()
-  const clientId = params.clientId as string
-
+export default function AdminScanQRPage() {
   const [scanning, setScanning] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const router = useRouter()
+
+  // Start scanning utomatically when the component mounts
+  useEffect(() => {
+    // Small delay to ensure DOM is fully loaded
+    const timer = setTimeout(() => {
+      startScanning()
+    }, 1000)
+
+    return () => {
+      clearTimeout(timer)
+      // Clean up on unmount
+      if (typeof window !== "undefined") {
+        const element = document.getElementById("qr-reader")
+        if (element) {
+          try {
+            const html5QrCode = new (window as any).Html5Qrcode("qr-reader")
+            html5QrCode.stop().catch(() => {})
+          } catch (error) {
+            // Ignore errors during cleanup
+          }
+        }
+      }
+    }
+  }, [])
 
   // Function to start scanning
   const startScanning = async () => {
@@ -83,9 +104,9 @@ export default function ClientScanQRPage() {
         // Extract the product ID
         const productId = decodedText.replace("ev://product/", "")
 
-        // Navigate to the product page with client context
-        router.push(`/client-dashboard/${clientId}/product/${productId}`)
-        toast.success("Product found! Redirecting...")
+        // For admin, always redirect to admin product page
+        router.push(`/admin/dashboard/product/${productId}`)
+        toast.success("Product found! Redirecting to admin view...")
         return
       }
 
@@ -99,8 +120,8 @@ export default function ClientScanQRPage() {
 
           if (productIndex !== -1 && pathParts.length > productIndex + 1) {
             const productId = pathParts[productIndex + 1]
-            router.push(`/client-dashboard/${clientId}/product/${productId}`)
-            toast.success("Product found! Redirecting...")
+            router.push(`/admin/dashboard/product/${productId}`)
+            toast.success("Product found! Redirecting to admin view...")
             return
           }
         } catch (e) {
@@ -117,30 +138,6 @@ export default function ClientScanQRPage() {
       setError("Failed to process QR code. Please try again.")
     }
   }
-
-  // Start scanning automatically when the component mounts
-  useEffect(() => {
-    // Small delay to ensure DOM is fully loaded
-    const timer = setTimeout(() => {
-      startScanning()
-    }, 1000)
-
-    return () => {
-      clearTimeout(timer)
-      // Try to stop any active scanning when unmounting
-      if (typeof window !== "undefined") {
-        const element = document.getElementById("qr-reader")
-        if (element) {
-          try {
-            const html5QrCode = new (window as any).Html5Qrcode("qr-reader")
-            html5QrCode.stop().catch(() => {})
-          } catch (error) {
-            // Ignore errors during cleanup
-          }
-        }
-      }
-    }
-  }, []) // Empty dependency array means this runs once on mount
 
   // Function to stop scanning
   const stopScanning = () => {
@@ -167,82 +164,74 @@ export default function ClientScanQRPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <div className="container max-w-md mx-auto px-4 py-8">
-        <div className="flex items-center mb-6">
-          <Link
-            href={`/client-dashboard/${clientId}`}
-            className="inline-flex items-center text-gray-600 hover:text-gray-900"
-          >
-            <ArrowLeft className="mr-2 h-5 w-5" />
-            Back to Dashboard
-          </Link>
-        </div>
+    <div className="min-h-screen p-6 bg-gray-50">
+      <div className="max-w-md mx-auto">
+        <Link href="/admin/dashboard" className="inline-flex items-center text-dark hover:underline mb-6">
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Dashboard
+        </Link>
 
-        <h1 className="text-2xl font-bold text-center mb-6">Scan Product QR Code</h1>
+        <h2 className="text-2xl font-bold mb-6 text-center">Admin QR Scanner</h2>
 
-        <Card className="mb-6">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-center text-lg">Scan to View Product</CardTitle>
+        <Card className="w-full mb-6">
+          <CardHeader>
+            <CardTitle className="text-center">Scan Product QR</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-col items-center justify-center">
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-4 flex items-start">
+              <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-4 w-full flex items-start">
                 <AlertCircle className="h-5 w-5 text-red-500 mr-2 flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-red-600">{error}</p>
               </div>
             )}
 
-            <div className="flex flex-col items-center">
-              <div className="w-full mb-4">
-                {loading ? (
-                  <div className="h-64 flex items-center justify-center bg-gray-100 rounded-lg">
-                    <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
-                    <span className="ml-2 text-gray-600">Initializing camera...</span>
-                  </div>
-                ) : (
-                  <>
-                    <div id="qr-reader" className="w-full h-64 overflow-hidden rounded-lg"></div>
-                    <p className="text-center text-sm text-gray-500 mt-2">
-                      {scanning ? "Position the QR code within the frame to scan" : "Camera is off"}
-                    </p>
-                  </>
-                )}
-              </div>
+            <div className="w-full mb-4">
+              {loading ? (
+                <div className="h-64 flex items-center justify-center bg-gray-100 rounded-lg">
+                  <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
+                  <span className="ml-2 text-gray-600">Initializing camera...</span>
+                </div>
+              ) : (
+                <>
+                  <div id="qr-reader" className="w-full h-64 overflow-hidden rounded-lg"></div>
+                  <p className="text-center text-sm text-muted-foreground mt-2">
+                    {scanning ? "Position the QR code within the frame" : "Camera is off"}
+                  </p>
+                </>
+              )}
+            </div>
 
-              {/* Show buttons for control */}
-              <div className="flex gap-2 w-full">
-                {scanning ? (
-                  <Button onClick={stopScanning} className="w-1/2 bg-red-500 hover:bg-red-600">
-                    Stop Camera
-                  </Button>
-                ) : (
-                  <Button onClick={startScanning} className="w-1/2 bg-blue-600 hover:bg-blue-700" disabled={loading}>
-                    Start Camera
-                  </Button>
-                )}
-
-                <Button
-                  onClick={restartScanning}
-                  className="w-1/2 bg-gray-600 hover:bg-gray-700"
-                  disabled={loading || !scanning}
-                >
-                  Restart Scanner
+            {/* Control buttons */}
+            <div className="flex gap-2 w-full">
+              {scanning ? (
+                <Button onClick={stopScanning} className="w-1/2 bg-red-500 hover:bg-red-600">
+                  Stop Camera
                 </Button>
-              </div>
+              ) : (
+                <Button onClick={startScanning} className="w-1/2 bg-blue-600 hover:bg-blue-700" disabled={loading}>
+                  Start Camera
+                </Button>
+              )}
+
+              <Button
+                onClick={restartScanning}
+                className="w-1/2 bg-gray-600 hover:bg-gray-700"
+                disabled={loading || !scanning}
+              >
+                Restart Scanner
+              </Button>
             </div>
           </CardContent>
         </Card>
 
         <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <h3 className="font-medium text-gray-900 mb-2">How to scan:</h3>
-          <ol className="list-decimal pl-5 text-sm text-gray-600 space-y-2">
-            <li>Camera will start automatically</li>
-            <li>Allow camera access when prompted</li>
-            <li>Point your camera at an Evershine product QR code</li>
-            <li>Hold steady until the QR code is recognized</li>
-            <li>You'll be redirected to the product page automatically</li>
-          </ol>
+          <h3 className="font-medium text-gray-900 mb-2">Admin Scanner Features:</h3>
+          <ul className="list-disc pl-5 text-sm text-gray-600 space-y-2">
+            <li>Automatically redirects to admin product view</li>
+            <li>Works with all Evershine product QR codes</li>
+            <li>Camera starts automatically when page loads</li>
+            <li>Use the restart button if scanning is slow</li>
+          </ul>
         </div>
       </div>
 
