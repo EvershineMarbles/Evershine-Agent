@@ -250,7 +250,7 @@ export default function ClientTable() {
   // Handle client click to view details
   const handleClientClick = (clientId: string) => {
     // Navigate to client details page
-    router.push(`/admin/clients/${clientId}`)
+    router.push(`/dashboard/clients/${clientId}`)
   }
 
   // Handle opening edit modal
@@ -482,22 +482,6 @@ export default function ClientTable() {
                     {client.agentAffiliated && (
                       <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
                         {getAgentName(client.agentAffiliated)}
-                      </Badge>
-                    )}
-                    {client.consultantLevel && (
-                      <Badge
-                        variant="outline"
-                        className={`
-                          ${
-                            client.consultantLevel === "red"
-                              ? "bg-red-50 text-red-700 border-red-200"
-                              : client.consultantLevel === "yellow"
-                                ? "bg-yellow-50 text-yellow-700 border-yellow-200"
-                                : "bg-purple-50 text-purple-700 border-purple-200"
-                          }
-                        `}
-                      >
-                        {client.consultantLevel.charAt(0).toUpperCase() + client.consultantLevel.slice(1)} Level
                       </Badge>
                     )}
                     <div className="flex gap-2">
