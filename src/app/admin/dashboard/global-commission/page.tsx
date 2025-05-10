@@ -36,7 +36,15 @@ export default function GlobalCommissionSettings() {
     const fetchSettings = async () => {
       try {
         setLoading(true)
-        const response = await axios.get(`${API_URL}/api/admin/settings/commission`)
+        // Get the token from localStorage or wherever you store it
+        const token = localStorage.getItem("token") || sessionStorage.getItem("token")
+
+        const response = await axios.get(`${API_URL}/api/admin/settings/commission`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        })
 
         if (response.data.success) {
           setSettings(response.data.data)
@@ -62,10 +70,22 @@ export default function GlobalCommissionSettings() {
       setSaving(true)
       setFeedback(null)
 
-      const response = await axios.put(`${API_URL}/api/admin/settings/commission`, {
-        globalCommissionRate: settings.globalCommissionRate,
-        overrideAgentCommissions: settings.overrideAgentCommissions,
-      })
+      // Get the token from localStorage or wherever you store it
+      const token = localStorage.getItem("token") || sessionStorage.getItem("token")
+
+      const response = await axios.put(
+        `${API_URL}/api/admin/settings/commission`,
+        {
+          globalCommissionRate: settings.globalCommissionRate,
+          overrideAgentCommissions: settings.overrideAgentCommissions,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        },
+      )
 
       if (response.data.success) {
         setSettings({
@@ -187,7 +207,6 @@ export default function GlobalCommissionSettings() {
                 <div className="bg-gray-50 p-4 rounded-md">
                   <div className="flex items-start">
                     <Info className="h-5 w-5 text-blue-500 mt-0.5 mr-2" />
-        
                   </div>
                 </div>
 
