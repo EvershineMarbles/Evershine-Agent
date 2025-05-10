@@ -104,9 +104,9 @@ export default function AdminDashboard() {
             </Button>
           </Link>
 
-          <Link href="/admin/products/pricing" className="w-full">
+          <Link href="/admin/dashboard/global-commission" className="w-full">
             <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-9 text-sm font-normal w-full rounded-md">
-              Change Pricing
+              Change Standard Pricing
             </Button>
           </Link>
 

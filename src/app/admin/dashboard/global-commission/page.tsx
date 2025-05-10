@@ -7,16 +7,14 @@ import { toast } from "react-toastify"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { AlertCircle, Info, Loader2 } from "lucide-react"
+import { AlertCircle, Info, Loader2 } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 interface CommissionSettings {
   globalCommissionRate: number | null
-  overrideAgentCommissions: boolean
   isActive: boolean
   updatedAgentsCount?: number
 }
@@ -26,7 +24,6 @@ export default function GlobalCommissionSettings() {
   const [saving, setSaving] = useState(false)
   const [settings, setSettings] = useState<CommissionSettings>({
     globalCommissionRate: null,
-    overrideAgentCommissions: false,
     isActive: false,
   })
   const [feedback, setFeedback] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null)
@@ -44,8 +41,6 @@ export default function GlobalCommissionSettings() {
           localStorage.getItem("admin_token") ||
           localStorage.getItem("token")
 
-        console.log("Using token:", token ? `${token.substring(0, 10)}...` : "No token found")
-
         const response = await axios.get(`${API_URL}/api/admin/settings/commission`, {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -54,7 +49,11 @@ export default function GlobalCommissionSettings() {
         })
 
         if (response.data.success) {
-          setSettings(response.data.data)
+          // Simplify the data structure - we're always overriding agent commissions
+          setSettings({
+            globalCommissionRate: response.data.data.globalCommissionRate,
+            isActive: response.data.data.globalCommissionRate !== null,
+          })
         } else {
           toast.error("Failed to load commission settings")
         }
@@ -85,31 +84,29 @@ export default function GlobalCommissionSettings() {
         localStorage.getItem("admin_token") ||
         localStorage.getItem("token")
 
-      console.log("Using token for update:", token ? `${token.substring(0, 10)}...` : "No token found")
-
       const response = await axios.put(
         `${API_URL}/api/admin/settings/commission`,
         {
           globalCommissionRate: settings.globalCommissionRate,
-          overrideAgentCommissions: settings.overrideAgentCommissions,
+          overrideAgentCommissions: true // Always override agent commissions
         },
         {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        },
+        }
       )
 
       if (response.data.success) {
         setSettings({
-          ...settings,
-          isActive: settings.globalCommissionRate !== null && settings.overrideAgentCommissions,
+          globalCommissionRate: settings.globalCommissionRate,
+          isActive: settings.globalCommissionRate !== null,
           updatedAgentsCount: response.data.data.updatedAgentsCount,
         })
 
         setFeedback({
-          message: "Commission settings updated successfully",
+          message: "Standard commission rate updated successfully",
           type: "success",
         })
 
@@ -139,11 +136,11 @@ export default function GlobalCommissionSettings() {
 
   // Handle input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target
-
+    const { value } = e.target
     setSettings({
       ...settings,
-      [name]: type === "checkbox" ? checked : value === "" ? null : Number.parseFloat(value),
+      globalCommissionRate: value === "" ? null : Number.parseFloat(value),
+      isActive: value !== "",
     })
   }
 
@@ -159,13 +156,13 @@ export default function GlobalCommissionSettings() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-3xl mx-auto">
-        <h1 className="text-2xl font-bold mb-6">Global Commission Settings</h1>
+        <h1 className="text-2xl font-bold mb-6">Standard Commission Rate</h1>
 
         <Card>
           <CardHeader>
             <CardTitle>Standard Commission Rate</CardTitle>
             <CardDescription>
-              Set a standard commission rate for all agents. This can override individual agent commission rates.
+              Set a standard commission rate that will apply to all agents in the system.
             </CardDescription>
           </CardHeader>
 
@@ -175,7 +172,7 @@ export default function GlobalCommissionSettings() {
                 {/* Commission Rate Input */}
                 <div className="space-y-2">
                   <Label htmlFor="globalCommissionRate" className="text-base">
-                    Global Commission Rate (%)
+                    Standard Commission Rate (%)
                   </Label>
                   <Input
                     id="globalCommissionRate"
@@ -189,29 +186,18 @@ export default function GlobalCommissionSettings() {
                     step="0.1"
                     className="max-w-xs"
                   />
-                  <p className="text-sm text-gray-500">Leave empty to disable global commission rate</p>
-                </div>
-
-                {/* Override Toggle */}
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="overrideAgentCommissions"
-                    name="overrideAgentCommissions"
-                    checked={settings.overrideAgentCommissions}
-                    onCheckedChange={(checked) => setSettings({ ...settings, overrideAgentCommissions: checked })}
-                  />
-                  <Label htmlFor="overrideAgentCommissions" className="text-base">
-                    Override individual agent commission rates
-                  </Label>
+                  <p className="text-sm text-gray-500">
+                    Leave empty to disable standard commission rate and use individual agent rates
+                  </p>
                 </div>
 
                 {/* Warning Alert */}
-                {settings.globalCommissionRate !== null && settings.overrideAgentCommissions && (
-                  <Alert variant="destructive" className="mt-4">
+                {settings.globalCommissionRate !== null && (
+                  <Alert className="mt-4 bg-amber-50 border-amber-200 text-amber-800">
                     <AlertCircle className="h-4 w-4" />
                     <AlertTitle>Important</AlertTitle>
                     <AlertDescription>
-                      Enabling this will override all individual agent commission rates with the global rate of{" "}
+                      Setting a standard commission rate will override all individual agent commission rates with the rate of{" "}
                       {settings.globalCommissionRate}%. This affects pricing calculations for all agents immediately.
                     </AlertDescription>
                   </Alert>
@@ -225,14 +211,9 @@ export default function GlobalCommissionSettings() {
                       <h3 className="font-medium">Current Status</h3>
                       <p className="text-sm text-gray-600 mt-1">
                         {settings.isActive
-                          ? `✅ Global commission rate is active at ${settings.globalCommissionRate}%`
-                          : "❌ Global commission rate is not active"}
+                          ? `✅ Standard commission rate is active at ${settings.globalCommissionRate}%`
+                          : "❌ Standard commission rate is not active (using individual agent rates)"}
                       </p>
-                      {settings.isActive && settings.overrideAgentCommissions && (
-                        <p className="text-sm text-gray-600 mt-1">
-                          Individual agent commission rates are being overridden
-                        </p>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -270,10 +251,9 @@ export default function GlobalCommissionSettings() {
             <div className="text-sm text-gray-600">
               <p className="font-medium">How this works:</p>
               <ul className="list-disc list-inside mt-1 space-y-1">
-                <li>Set a global commission rate to standardize pricing across all agents</li>
-                <li>Enable override to apply this rate to all agents, ignoring their individual rates</li>
-                <li>When active, all product prices will be calculated using this global rate</li>
-                <li>Disable by clearing the rate or turning off the override toggle</li>
+                <li>Set a standard commission rate to apply the same rate to all agents</li>
+                <li>When active, all product prices will be calculated using this standard rate</li>
+                <li>To use individual agent rates again, clear the standard rate field</li>
               </ul>
             </div>
           </CardFooter>
