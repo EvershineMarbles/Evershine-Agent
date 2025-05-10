@@ -49,7 +49,7 @@ export default function GlobalCommissionSettings() {
         })
 
         if (response.data.success) {
-          // Simplify the data structure - we're always overriding advisor commissions
+          // Simplify the data structure - we're always overriding consultant commissions
           setSettings({
             globalCommissionRate: response.data.data.globalCommissionRate,
             isActive: response.data.data.globalCommissionRate !== null,
@@ -88,7 +88,7 @@ export default function GlobalCommissionSettings() {
         `${API_URL}/api/admin/settings/commission`,
         {
           globalCommissionRate: settings.globalCommissionRate,
-          overrideAgentCommissions: true, // Always override advisor commissions
+          overrideAgentCommissions: true, // Always override consultant commissions
         },
         {
           headers: {
@@ -110,10 +110,10 @@ export default function GlobalCommissionSettings() {
           type: "success",
         })
 
-        // Show feedback about affected advisors
+        // Show feedback about affected consultants
         if (response.data.data.updatedAgentsCount > 0) {
           setFeedback({
-            message: `Updated commission rate for ${response.data.data.updatedAgentsCount} advisors`,
+            message: `Updated commission rate for ${response.data.data.updatedAgentsCount} consultants`,
             type: "info",
           })
         }
@@ -158,7 +158,7 @@ export default function GlobalCommissionSettings() {
       <Card className="max-w-2xl mx-auto">
         <CardHeader className="pb-4">
           <CardTitle>Standard Commission Rate</CardTitle>
-          <CardDescription>Set a standard rate that applies to all advisors in the system</CardDescription>
+          <CardDescription>Set a standard rate that applies to all consultants in the system</CardDescription>
         </CardHeader>
 
         <CardContent>
@@ -177,14 +177,14 @@ export default function GlobalCommissionSettings() {
                 step="0.1"
                 className="max-w-xs"
               />
-              <p className="text-sm text-gray-500">Leave empty to use individual advisor rates</p>
+              <p className="text-sm text-gray-500">Leave empty to use individual consultant rates</p>
             </div>
 
             {settings.globalCommissionRate !== null && (
               <Alert className="bg-amber-50 border-amber-200 text-amber-800">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  This will override all individual advisor commission rates with {settings.globalCommissionRate}%
+                  This will override all individual consultant commission rates with {settings.globalCommissionRate}%
                 </AlertDescription>
               </Alert>
             )}
@@ -226,7 +226,7 @@ export default function GlobalCommissionSettings() {
         </CardContent>
 
         <CardFooter className="bg-gray-50 border-t text-xs text-gray-600">
-          <p>Set a rate to apply to all advisors. Clear the field to use individual advisor rates.</p>
+          <p>Set a rate to apply to all consultants. Clear the field to use individual consultant rates.</p>
         </CardFooter>
       </Card>
     </div>
