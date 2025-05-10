@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/components/ui/use-toast"
 import { Loader2, Save } from "lucide-react"
 
+// Update the ClientSettings interface to include consultantLevel
 interface ClientSettings {
   name: string
   email: string
@@ -30,6 +31,7 @@ interface ClientSettings {
   businessName: string
   gstNumber: string
   projectType: string
+  consultantLevel: string // Add this field
 }
 
 export default function SettingsPage() {
@@ -38,6 +40,7 @@ export default function SettingsPage() {
   const { toast } = useToast()
   const clientId = params.clientId as string
 
+  // Update the initial state to include consultantLevel
   const [settings, setSettings] = useState<ClientSettings>({
     name: "",
     email: "",
@@ -53,6 +56,7 @@ export default function SettingsPage() {
     businessName: "",
     gstNumber: "",
     projectType: "",
+    consultantLevel: "red", // Default to red
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -115,6 +119,7 @@ export default function SettingsPage() {
             businessName: data.data.businessName || "",
             gstNumber: data.data.gstNumber || "",
             projectType: data.data.projectType || "",
+            consultantLevel: data.data.consultantLevel || "red",
             // Add any additional fields that might be in the client data
             // This ensures we don't lose any data when updating
             ...data.data,
@@ -142,6 +147,11 @@ export default function SettingsPage() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     setSettings((prev) => ({ ...prev, [name]: value }))
+  }
+
+  // Add this function to handle consultant level changes
+  const handleConsultantLevelChange = (level: string) => {
+    setSettings((prev) => ({ ...prev, consultantLevel: level }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -418,6 +428,40 @@ export default function SettingsPage() {
                       disabled={saving}
                     />
                   </div>
+                  <div className="space-y-2 col-span-1 md:col-span-2">
+                    <Label htmlFor="consultantLevel" className="text-base font-medium">
+                      Consultant Level
+                    </Label>
+                    <div className="flex items-center gap-6 mt-2">
+                      <button
+                        type="button"
+                        onClick={() => handleConsultantLevelChange("red")}
+                        className={`w-8 h-8 rounded-full bg-red-500 transition-all ${
+                          settings.consultantLevel === "red" ? "ring-4 ring-red-200 scale-110" : "hover:scale-105"
+                        }`}
+                        aria-label="Red consultant level (+5%)"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleConsultantLevelChange("yellow")}
+                        className={`w-8 h-8 rounded-full bg-yellow-500 transition-all ${
+                          settings.consultantLevel === "yellow" ? "ring-4 ring-yellow-200 scale-110" : "hover:scale-105"
+                        }`}
+                        aria-label="Yellow consultant level (+10%)"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleConsultantLevelChange("purple")}
+                        className={`w-8 h-8 rounded-full bg-purple-600 transition-all ${
+                          settings.consultantLevel === "purple" ? "ring-4 ring-purple-200 scale-110" : "hover:scale-105"
+                        }`}
+                        aria-label="Purple consultant level (+15%)"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Select a consultant level to determine commission rates for product pricing
+                    </p>
+                  </div>
                 </div>
 
                 <Separator />
@@ -438,14 +482,6 @@ export default function SettingsPage() {
                   </Button>
                 </div>
               </form>
-              <div className="mt-8 pt-4 border-t">
-                <details className="text-sm">
-                  <summary className="cursor-pointer text-muted-foreground font-medium">Debug: All Client Data</summary>
-                  <pre className="mt-2 p-4 bg-muted rounded-md overflow-auto max-h-96 text-xs">
-                    {JSON.stringify(settings, null, 2)}
-                  </pre>
-                </details>
-              </div>
             </CardContent>
           </Card>
         </TabsContent>
