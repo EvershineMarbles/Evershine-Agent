@@ -126,11 +126,12 @@ export default function AllQR() {
   const generateAndDownloadQR = async (product: Product) => {
     try {
       setGeneratingQR((prev) => ({ ...prev, [product.postId]: true }))
+      toast.info("Generating QR code...")
 
       // Generate QR code with our special format for role-based access
       const productData = `ev://product/${product.postId}`
       const qrCodeDataUrl = await QRCode.toDataURL(productData, {
-        width: 200,
+        width: 300,
         margin: 1,
         color: {
           dark: "#000000",
@@ -138,110 +139,23 @@ export default function AllQR() {
         },
       })
 
-      // Create a canvas element
-      const canvas = document.createElement("canvas")
-      const ctx = canvas.getContext("2d")
-      if (!ctx) throw new Error("Could not get canvas context")
+      // Create a simple image with just the QR code
+      // This simplifies the process and avoids canvas issues
+      const link = document.createElement("a")
+      link.href = qrCodeDataUrl
+      link.download = `evershine-product-${product.postId}.png`
+      document.body.appendChild(link)
 
-      // Set canvas dimensions
-      canvas.width = 600
-      canvas.height = 900
+      // Trigger the download
+      link.click()
 
-      // Create a simple template directly on canvas instead of loading an external image
-      // This avoids the template image loading issue
-      ctx.fillStyle = "#ffffff"
-      ctx.fillRect(0, 0, canvas.width, canvas.height)
-
-      // Add a border
-      ctx.strokeStyle = "#194a95"
-      ctx.lineWidth = 10
-      ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20)
-
-      // Add company logo/name at the top
-      ctx.fillStyle = "#194a95"
-      ctx.font = "bold 40px Arial"
-      ctx.textAlign = "center"
-      ctx.fillText("EVERSHINE", canvas.width / 2, 80)
-
-      // Add product details
-      ctx.fillStyle = "#000000"
-      ctx.font = "bold 24px Arial"
-      ctx.textAlign = "center"
-      ctx.fillText(product.name, canvas.width / 2, 150)
-
-      if (product.category) {
-        ctx.font = "20px Arial"
-        ctx.fillText(`Category: ${product.category}`, canvas.width / 2, 190)
-      }
-
-      if (product.thickness) {
-        ctx.font = "20px Arial"
-        ctx.fillText(`Thickness: ${product.thickness}`, canvas.width / 2, 230)
-      }
-
-      if (product.size) {
-        ctx.font = "20px Arial"
-        ctx.fillText(`Size: ${product.size} ${product.sizeUnit || ""}`, canvas.width / 2, 270)
-      }
-
-      if (product.finishes) {
-        ctx.font = "20px Arial"
-        ctx.fillText(`Finishes: ${product.finishes}`, canvas.width / 2, 310)
-      }
-
-      // Add price
-      ctx.fillStyle = "#194a95"
-      ctx.font = "bold 28px Arial"
-      ctx.fillText(`₹${product.price}/sqft`, canvas.width / 2, 370)
-
-      // Add a note about scanning
-      ctx.fillStyle = "#555555"
-      ctx.font = "italic 16px Arial"
-      ctx.fillText("Scan QR code for product details", canvas.width / 2, 620)
-
-      // Add "For authorized personnel only" text
-      ctx.fillStyle = "#ff0000"
-      ctx.font = "bold 14px Arial"
-      ctx.fillText("For authorized personnel only", canvas.width / 2, 640)
-
-      // Load and draw the QR code
-      const qrCode = new Image()
-      qrCode.crossOrigin = "anonymous"
-
-      qrCode.onload = () => {
-        // Draw QR code in the center bottom area
-        const qrSize = 200
-        const qrX = (canvas.width - qrSize) / 2
-        const qrY = 420
-        ctx.drawImage(qrCode, qrX, qrY, qrSize, qrSize)
-
-        // Add product ID below the QR code
-        ctx.fillStyle = "#666666"
-        ctx.font = "14px Arial"
-        ctx.fillText(`Product ID: ${product.postId}`, canvas.width / 2, 650)
-
-        // Convert canvas to data URL and download
-        const dataUrl = canvas.toDataURL("image/png")
-        const link = document.createElement("a")
-        link.href = dataUrl
-        link.download = `evershine-product-${product.postId}.png`
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-
-        // Clean up
-        setGeneratingQR((prev) => ({ ...prev, [product.postId]: false }))
-      }
-
-      qrCode.onerror = () => {
-        setGeneratingQR((prev) => ({ ...prev, [product.postId]: false }))
-        toast.error("Failed to generate QR code")
-      }
-
-      qrCode.src = qrCodeDataUrl
+      // Clean up
+      document.body.removeChild(link)
+      setGeneratingQR((prev) => ({ ...prev, [product.postId]: false }))
+      toast.success("QR code downloaded successfully")
     } catch (error) {
       console.error("Error generating QR code:", error)
-      toast.error("Failed to generate QR code")
+      toast.error("Failed to generate QR code: " + (error instanceof Error ? error.message : "Unknown error"))
       setGeneratingQR((prev) => ({ ...prev, [product.postId]: false }))
     }
   }
