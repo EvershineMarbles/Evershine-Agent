@@ -8,8 +8,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { AlertCircle, Info, Loader2 } from 'lucide-react'
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { AlertCircle, Info, Loader2 } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
@@ -49,7 +49,7 @@ export default function GlobalCommissionSettings() {
         })
 
         if (response.data.success) {
-          // Simplify the data structure - we're always overriding agent commissions
+          // Simplify the data structure - we're always overriding advisor commissions
           setSettings({
             globalCommissionRate: response.data.data.globalCommissionRate,
             isActive: response.data.data.globalCommissionRate !== null,
@@ -88,14 +88,14 @@ export default function GlobalCommissionSettings() {
         `${API_URL}/api/admin/settings/commission`,
         {
           globalCommissionRate: settings.globalCommissionRate,
-          overrideAgentCommissions: true // Always override agent commissions
+          overrideAgentCommissions: true, // Always override advisor commissions
         },
         {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       )
 
       if (response.data.success) {
@@ -110,10 +110,10 @@ export default function GlobalCommissionSettings() {
           type: "success",
         })
 
-        // Show feedback about affected agents
+        // Show feedback about affected advisors
         if (response.data.data.updatedAgentsCount > 0) {
           setFeedback({
-            message: `Updated commission rate for ${response.data.data.updatedAgentsCount} agents`,
+            message: `Updated commission rate for ${response.data.data.updatedAgentsCount} advisors`,
             type: "info",
           })
         }
@@ -146,119 +146,89 @@ export default function GlobalCommissionSettings() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-[#194a95]" />
-        <span className="ml-2">Loading commission settings...</span>
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-6 w-6 animate-spin text-[#194a95]" />
+        <span className="ml-2">Loading...</span>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="max-w-3xl mx-auto">
-        <h1 className="text-2xl font-bold mb-6">Standard Commission Rate</h1>
+    <div className="container mx-auto px-4 py-6">
+      <Card className="max-w-2xl mx-auto">
+        <CardHeader className="pb-4">
+          <CardTitle>Standard Commission Rate</CardTitle>
+          <CardDescription>Set a standard rate that applies to all advisors in the system</CardDescription>
+        </CardHeader>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Standard Commission Rate</CardTitle>
-            <CardDescription>
-              Set a standard commission rate that will apply to all agents in the system.
-            </CardDescription>
-          </CardHeader>
-
-          <CardContent>
-            <form onSubmit={handleSubmit}>
-              <div className="space-y-6">
-                {/* Commission Rate Input */}
-                <div className="space-y-2">
-                  <Label htmlFor="globalCommissionRate" className="text-base">
-                    Standard Commission Rate (%)
-                  </Label>
-                  <Input
-                    id="globalCommissionRate"
-                    name="globalCommissionRate"
-                    type="number"
-                    placeholder="Enter commission rate (e.g., 10)"
-                    value={settings.globalCommissionRate === null ? "" : settings.globalCommissionRate}
-                    onChange={handleInputChange}
-                    min="0"
-                    max="100"
-                    step="0.1"
-                    className="max-w-xs"
-                  />
-                  <p className="text-sm text-gray-500">
-                    Leave empty to disable standard commission rate and use individual agent rates
-                  </p>
-                </div>
-
-                {/* Warning Alert */}
-                {settings.globalCommissionRate !== null && (
-                  <Alert className="mt-4 bg-amber-50 border-amber-200 text-amber-800">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Important</AlertTitle>
-                    <AlertDescription>
-                      Setting a standard commission rate will override all individual agent commission rates with the rate of{" "}
-                      {settings.globalCommissionRate}%. This affects pricing calculations for all agents immediately.
-                    </AlertDescription>
-                  </Alert>
-                )}
-
-                {/* Status Indicator */}
-                <div className="bg-gray-50 p-4 rounded-md">
-                  <div className="flex items-start">
-                    <Info className="h-5 w-5 text-blue-500 mt-0.5 mr-2" />
-                    <div>
-                      <h3 className="font-medium">Current Status</h3>
-                      <p className="text-sm text-gray-600 mt-1">
-                        {settings.isActive
-                          ? `✅ Standard commission rate is active at ${settings.globalCommissionRate}%`
-                          : "❌ Standard commission rate is not active (using individual agent rates)"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Feedback Message */}
-                {feedback && (
-                  <Alert
-                    variant={
-                      feedback.type === "error" ? "destructive" : feedback.type === "success" ? "default" : "default"
-                    }
-                    className={feedback.type === "info" ? "bg-blue-50 text-blue-800 border-blue-200" : ""}
-                  >
-                    <AlertDescription>{feedback.message}</AlertDescription>
-                  </Alert>
-                )}
-
-                {/* Submit Button */}
-                <div className="flex justify-end">
-                  <Button type="submit" disabled={saving} className="bg-[#194a95] hover:bg-[#0f3a7a]">
-                    {saving ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      "Save Changes"
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </form>
-          </CardContent>
-
-          <CardFooter className="bg-gray-50 border-t">
-            <div className="text-sm text-gray-600">
-              <p className="font-medium">How this works:</p>
-              <ul className="list-disc list-inside mt-1 space-y-1">
-                <li>Set a standard commission rate to apply the same rate to all agents</li>
-                <li>When active, all product prices will be calculated using this standard rate</li>
-                <li>To use individual agent rates again, clear the standard rate field</li>
-              </ul>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="globalCommissionRate">Commission Rate (%)</Label>
+              <Input
+                id="globalCommissionRate"
+                name="globalCommissionRate"
+                type="number"
+                placeholder="Enter rate (e.g., 10)"
+                value={settings.globalCommissionRate === null ? "" : settings.globalCommissionRate}
+                onChange={handleInputChange}
+                min="0"
+                max="100"
+                step="0.1"
+                className="max-w-xs"
+              />
+              <p className="text-sm text-gray-500">Leave empty to use individual advisor rates</p>
             </div>
-          </CardFooter>
-        </Card>
-      </div>
+
+            {settings.globalCommissionRate !== null && (
+              <Alert className="bg-amber-50 border-amber-200 text-amber-800">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  This will override all individual advisor commission rates with {settings.globalCommissionRate}%
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <div className="bg-gray-50 p-3 rounded-md text-sm">
+              <div className="flex items-center">
+                <Info className="h-4 w-4 text-blue-500 mr-2" />
+                <span className="font-medium">Status:</span>
+                <span className="ml-2">
+                  {settings.isActive
+                    ? `Active at ${settings.globalCommissionRate}%`
+                    : "Not active (using individual rates)"}
+                </span>
+              </div>
+            </div>
+
+            {feedback && (
+              <Alert
+                variant={feedback.type === "error" ? "destructive" : "default"}
+                className={feedback.type === "info" ? "bg-blue-50 text-blue-800 border-blue-200" : ""}
+              >
+                <AlertDescription>{feedback.message}</AlertDescription>
+              </Alert>
+            )}
+
+            <div className="flex justify-end pt-2">
+              <Button type="submit" disabled={saving} className="bg-[#194a95] hover:bg-[#0f3a7a]">
+                {saving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Changes"
+                )}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+
+        <CardFooter className="bg-gray-50 border-t text-xs text-gray-600">
+          <p>Set a rate to apply to all advisors. Clear the field to use individual advisor rates.</p>
+        </CardFooter>
+      </Card>
     </div>
   )
 }
