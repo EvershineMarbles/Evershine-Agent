@@ -24,6 +24,17 @@ interface ClientDetails {
   agentAffiliated?: string
   createdAt: string
   updatedAt: string
+  businessName?: string
+  gstNumber?: string
+  projectType?: string
+  dateOfBirth?: string
+  address?: string
+  consultantLevel?: string
+  architectDetails?: {
+    name?: string
+    contact?: string
+    firm?: string
+  }
 }
 
 interface Order {
@@ -136,6 +147,20 @@ export default function ClientDetails({ clientId }: ClientDetailsProps) {
     }
   }
 
+  // Get consultant level color
+  const getConsultantLevelColor = (level?: string) => {
+    switch (level) {
+      case "red":
+        return "bg-red-500"
+      case "yellow":
+        return "bg-yellow-500"
+      case "purple":
+        return "bg-purple-600"
+      default:
+        return "bg-gray-300"
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[400px]">
@@ -215,6 +240,18 @@ export default function ClientDetails({ clientId }: ClientDetailsProps) {
                     <p className="text-lg font-medium">{client.city || "-"}</p>
                   </div>
                   <Separator />
+
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground">Address</h3>
+                    <p className="text-lg font-medium">{client.address || "-"}</p>
+                  </div>
+                  <Separator />
+
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground">Date of Birth</h3>
+                    <p className="text-lg font-medium">{client.dateOfBirth ? formatDate(client.dateOfBirth) : "-"}</p>
+                  </div>
+                  <Separator />
                 </div>
 
                 <div className="space-y-4">
@@ -241,12 +278,87 @@ export default function ClientDetails({ clientId }: ClientDetailsProps) {
                     <p className="text-lg font-medium">{client.agentAffiliated || "-"}</p>
                   </div>
                   <Separator />
+
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground">Business Name</h3>
+                    <p className="text-lg font-medium">{client.businessName || "-"}</p>
+                  </div>
+                  <Separator />
+
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground">GST Number</h3>
+                    <p className="text-lg font-medium">{client.gstNumber || "-"}</p>
+                  </div>
+                  <Separator />
                 </div>
               </div>
 
-              <div className="mt-6">
-                <h3 className="text-sm font-medium text-muted-foreground">Registration Date</h3>
-                <p className="text-lg font-medium">{formatDate(client.createdAt)}</p>
+              <div className="mt-6 space-y-4">
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground">Project Type</h3>
+                  <p className="text-lg font-medium">{client.projectType || "-"}</p>
+                </div>
+                <Separator />
+
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground">Architect Details</h3>
+                  {client.architectDetails?.name ||
+                  client.architectDetails?.contact ||
+                  client.architectDetails?.firm ? (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Name</p>
+                        <p className="font-medium">{client.architectDetails?.name || "-"}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Contact</p>
+                        <p className="font-medium">{client.architectDetails?.contact || "-"}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Firm</p>
+                        <p className="font-medium">{client.architectDetails?.firm || "-"}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-lg font-medium">-</p>
+                  )}
+                </div>
+                <Separator />
+
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground">Consultant Level</h3>
+                  <div className="flex items-center mt-2">
+                    <div
+                      className={`w-6 h-6 rounded-full ${getConsultantLevelColor(client.consultantLevel)} mr-2`}
+                    ></div>
+                    <p className="text-lg font-medium capitalize">
+                      {client.consultantLevel || "Not Set"}
+                      {client.consultantLevel && (
+                        <span className="text-sm text-muted-foreground ml-2">
+                          (
+                          {client.consultantLevel === "red"
+                            ? "+5%"
+                            : client.consultantLevel === "yellow"
+                              ? "+10%"
+                              : "+15%"}
+                          )
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <Separator />
+
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground">Registration Date</h3>
+                  <p className="text-lg font-medium">{formatDate(client.createdAt)}</p>
+                </div>
+                <Separator />
+
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground">Last Updated</h3>
+                  <p className="text-lg font-medium">{formatDate(client.updatedAt)}</p>
+                </div>
               </div>
             </CardContent>
           </Card>
