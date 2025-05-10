@@ -5,14 +5,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowLeft, Camera, AlertCircle } from "lucide-react"
 import Link from "next/link"
-import { useRouter, useParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
-export default function ClientScanQRPage() {
+export default function AdminScanQRPage() {
   const router = useRouter()
-  const params = useParams()
-  const clientId = params.clientId as string
-
   const [error, setError] = useState<string | null>(null)
   const scannerRef = useRef<any>(null)
   const [cameraActive, setCameraActive] = useState(false)
@@ -155,7 +152,7 @@ export default function ClientScanQRPage() {
     })
 
     // Navigate immediately without waiting
-    router.push(`/client-dashboard/${clientId}/product/${productId}`)
+    router.push(`/admin/dashboard/product/${productId}`)
   }
 
   const restartScanner = () => {
@@ -167,19 +164,16 @@ export default function ClientScanQRPage() {
   return (
     <div className="min-h-screen p-4 bg-gray-50">
       <div className="max-w-md mx-auto">
-        <Link
-          href={`/client-dashboard/${clientId}`}
-          className="inline-flex items-center text-dark hover:underline mb-4"
-        >
+        <Link href="/admin/dashboard" className="inline-flex items-center text-dark hover:underline mb-4">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Dashboard
         </Link>
 
-        <h2 className="text-2xl font-bold mb-4 text-center">Scan Product QR</h2>
+        <h2 className="text-2xl font-bold mb-4 text-center">Admin QR Scanner</h2>
 
         <Card className="w-full mb-4">
           <CardHeader className="pb-2">
-            <CardTitle className="text-center">Scan to View Product</CardTitle>
+            <CardTitle className="text-center">Scan Product QR</CardTitle>
           </CardHeader>
           <CardContent>
             {error && (
