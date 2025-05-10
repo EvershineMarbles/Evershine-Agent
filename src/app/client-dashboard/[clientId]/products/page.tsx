@@ -49,9 +49,6 @@ interface WishlistItem {
 }
 
 export default function ProductsPage() {
-  console.log("ProductsPage rendering")
-
-  // Use the useParams hook to get the clientId
   const params = useParams()
   const router = useRouter()
   const clientId = params.clientId as string
@@ -104,19 +101,7 @@ export default function ProductsPage() {
   // Handle commission rate change
   const handleCommissionRateChange = (rate: number | null) => {
     setOverrideCommissionRate(rate)
-    console.log(`Setting commission rate for client ${clientId} to ${rate}`)
   }
-
-  // Debug scroll event
-  useEffect(() => {
-    console.log("Setting up scroll debug in ProductsPage")
-    const logScroll = () => {
-      console.log("Scroll event detected in ProductsPage, window.scrollY:", window.scrollY)
-    }
-
-    window.addEventListener("scroll", logScroll)
-    return () => window.removeEventListener("scroll", logScroll)
-  }, [])
 
   // Fetch wishlist from backend
   const fetchWishlist = useCallback(async () => {
@@ -125,7 +110,6 @@ export default function ProductsPage() {
       const token = localStorage.getItem("clientImpersonationToken")
 
       if (!token) {
-        console.warn("No token found for fetching wishlist")
         return
       }
 
@@ -145,27 +129,22 @@ export default function ProductsPage() {
       if (data.success && data.data && Array.isArray(data.data.items)) {
         // Extract just the postIds from the wishlist items
         const wishlistIds = data.data.items.map((item: WishlistItem) => item.postId)
-        console.log("Fetched wishlist from backend:", wishlistIds)
         setWishlist(wishlistIds)
 
         // Update localStorage for optimistic UI updates
         localStorage.setItem(`wishlist-${clientId}`, JSON.stringify(wishlistIds))
       } else {
-        console.log("No wishlist items found or invalid response format")
         setWishlist([])
         localStorage.setItem(`wishlist-${clientId}`, JSON.stringify([]))
       }
     } catch (error) {
-      console.error("Error fetching wishlist:", error)
       // Fallback to localStorage if API fails
       try {
         const savedWishlist = localStorage.getItem(`wishlist-${clientId}`)
         if (savedWishlist) {
           setWishlist(JSON.parse(savedWishlist))
         }
-      } catch (e) {
-        console.error("Error loading wishlist from localStorage:", e)
-      }
+      } catch (e) {}
     } finally {
       setWishlistLoading(false)
     }
@@ -179,9 +158,7 @@ export default function ProductsPage() {
         if (savedCart) {
           setCart(JSON.parse(savedCart))
         }
-      } catch (e) {
-        console.error("Error loading cart from localStorage:", e)
-      }
+      } catch (e) {}
     }
   }, [clientId])
 
@@ -222,7 +199,6 @@ export default function ProductsPage() {
       }
       return null
     } catch (error) {
-      console.error("Error fetching commission data:", error)
       return null
     } finally {
       setCommissionLoading(false)
@@ -268,7 +244,6 @@ export default function ProductsPage() {
 
       // Use environment variable if available, otherwise use a default URL
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
-      console.log("Fetching products from:", `${apiUrl}/api/getAllProducts`)
 
       const token = localStorage.getItem("clientImpersonationToken")
       const headers: Record<string, string> = {
@@ -293,15 +268,12 @@ export default function ProductsPage() {
       const data = await response.json()
 
       if (data.success && Array.isArray(data.data)) {
-        console.log("Products fetched successfully:", data.data)
-
         // Filter out products with missing or invalid postId
         const validProducts = data.data.filter(
           (product: Product) => product.postId && typeof product.postId === "string",
         )
 
         if (validProducts.length < data.data.length) {
-          console.warn(`Filtered out ${data.data.length - validProducts.length} products with invalid postId`)
         }
 
         // Process the image URLs to ensure they're valid
@@ -321,7 +293,6 @@ export default function ProductsPage() {
       }
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : "Failed to load products"
-      console.error("Error fetching products:", error)
       setError(errorMessage)
 
       // Show error toast
@@ -438,11 +409,6 @@ export default function ProductsPage() {
             }),
           })
 
-          // Add console log to debug the price being sent
-          console.log(
-            `Adding to wishlist: Product ${productId} with price ${adjustedPrice} (commission rate: ${overrideCommissionRate !== null ? overrideCommissionRate : "default"})`,
-          )
-
           if (!response.ok) {
             throw new Error(`API error: ${response.status} ${response.statusText}`)
           }
@@ -474,8 +440,6 @@ export default function ProductsPage() {
           }
         }
       } catch (error: any) {
-        console.error("Error updating wishlist:", error)
-
         // Revert the optimistic update
         if (wishlist.includes(productId)) {
           // We were trying to remove, but failed, so add it back
@@ -569,7 +533,6 @@ export default function ProductsPage() {
       // If there was an error, revert the cart state
       setCart((prev) => prev.filter((id) => id !== productId))
 
-      console.error("Error adding to cart:", error)
       toast({
         title: "Error adding to cart",
         description: error.message || "Failed to add item to cart. Please try again.",
@@ -599,7 +562,6 @@ export default function ProductsPage() {
 
   // Handle image loading errors
   const handleImageError = useCallback((productId: string) => {
-    console.log("Image error for product:", productId)
     setImageError((prev) => ({ ...prev, [productId]: true }))
   }, [])
 
@@ -630,7 +592,6 @@ export default function ProductsPage() {
             // Set commission rate based on consultant level color
             if (data.data.consultantLevel) {
               const consultantLevel = data.data.consultantLevel
-              console.log("Client consultant level:", consultantLevel)
 
               // Map color to commission rate
               let commissionRate = null
@@ -650,7 +611,6 @@ export default function ProductsPage() {
 
               // Set the override commission rate
               setOverrideCommissionRate(commissionRate)
-              console.log(`Setting commission rate to ${commissionRate}% based on consultant level ${consultantLevel}`)
             }
           }
         }
@@ -664,14 +624,9 @@ export default function ProductsPage() {
 
   useEffect(() => {
     if (clientData?.consultantLevel && overrideCommissionRate !== null) {
-      // toast({
-      //   title: "Commission Rate Applied",
-      //   description: `${overrideCommissionRate}% commission rate applied based on client's consultant level`,
-      //   duration: 3000,
-      // });
     }
-  }, [clientData?.consultantLevel, overrideCommissionRate, toast]);
-  
+  }, [clientData?.consultantLevel, overrideCommissionRate, toast])
+
   // Loading state
   if (loading) {
     return (
@@ -699,7 +654,6 @@ export default function ProductsPage() {
   return (
     <ErrorBoundary>
       <div className="p-6 md:p-8">
-       
         {error && (
           <Alert variant="destructive" className="mb-4">
             <AlertCircle className="h-4 w-4" />
