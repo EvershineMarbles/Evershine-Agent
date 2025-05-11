@@ -372,13 +372,13 @@ export default function AllQR() {
             </button>
           </div>
           <button
-            onClick={() => router.push("/add-product")}
+            onClick={() => router.push("/admin/dashboard/add-product")}
             className="px-6 py-3 rounded-lg bg-[#194a95] text-white w-full md:w-auto justify-center
                      hover:bg-[#0f3a7a] transition-colors active:transform active:scale-95"
           >
             Add New Product
           </button>
-        </div>
+        </div>/
         {/* Products Count */}
         <p className="text-gray-600 mb-6">
           Showing {filteredProducts.length} of {products.length} products
@@ -419,7 +419,7 @@ export default function AllQR() {
                       </Link>
                       <div className="ml-2">
                         <Link
-                          href={`/product/${product.postId}`}
+                          href={`/admin/dashboard/product/${product.postId}`}
                           className="text-sm font-medium text-gray-900 hover:text-[#194a95] transition-colors cursor-pointer"
                         >
                           {product.name}
