@@ -80,45 +80,16 @@ const getAllAgents = async () => {
   }
 }
 
-// Add this function to fetch all products
-const getAllProducts = async () => {
-  try {
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"}/api/getAllProducts`,
-    )
-
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status}`)
-    }
-
-    const data = await response.json()
-
-    if (data.success) {
-      return {
-        success: true,
-        products: data.data || [],
-      }
-    } else {
-      throw new Error(data.message || "Failed to fetch products")
-    }
-  } catch (error: any) {
-    console.error("Error fetching products:", error)
-    return {
-      success: false,
-      message: error.message || "An error occurred while fetching products",
-      products: [],
-    }
-  }
-}
-
 export default function AdminDashboard() {
   // State for stats with loading indicators
   const [stats, setStats] = useState({
     clients: { value: 0, loading: true },
     agents: { value: 0, loading: true },
-    products: { value: 0, loading: true },
+    products: 172,
     followups: 200,
   })
+
+  const [products, setProducts] = useState<any[]>([])
 
   // Fetch data on component mount
   useEffect(() => {
@@ -161,10 +132,16 @@ export default function AdminDashboard() {
         // Fetch products
         const productsResponse = await getAllProducts()
         if (productsResponse.success) {
+          setProducts(productsResponse.products)
+        }
+
+        // Fetch products count
+        const productsCountResponse = await getAllProducts()
+        if (productsCountResponse.success) {
           setStats((prev) => ({
             ...prev,
             products: {
-              value: productsResponse.products.length,
+              value: productsCountResponse.products.length,
               loading: false,
             },
           }))
@@ -188,6 +165,7 @@ export default function AdminDashboard() {
 
     fetchData()
   }, [])
+
 
   return (
     <div className="flex-1 bg-white">
@@ -257,18 +235,6 @@ export default function AdminDashboard() {
               </CardContent>
             </Card>
           </Link>
-
-          <Link href="/admin/dashboard/followups">
-            <Card className="border rounded-xl overflow-hidden cursor-pointer hover:shadow-md hover:border-[#1e4b9a] transition-all h-full">
-              <CardContent className="p-3 flex flex-col items-center justify-center">
-                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center mb-1">
-                  <Clock className="h-5 w-5 text-[#1e4b9a]" />
-                </div>
-                <h2 className="text-sm font-semibold text-center">Follow-ups</h2>
-                <p className="text-xl font-bold text-[#1e4b9a]">{stats.followups}</p>
-              </CardContent>
-            </Card>
-          </Link>
         </div>
 
         {/* Action Buttons - Made bigger */}
@@ -287,10 +253,19 @@ export default function AdminDashboard() {
             </div>
           </Link>
 
-          <Link href="/scan-qr" className="w-full">
+          <Link href="/admin/dashboard/scan-qr" className="w-full">
             <div className="h-auto py-8 bg-[#1e4b9a] text-white border-none hover:bg-[#1e4b9a]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg transition-colors">
               <QrCode className="h-8 w-8" />
               <span className="text-lg font-medium">Scan QR Code</span>
+            </div>
+          </Link>
+
+        
+
+          <Link href="/admin/dashboard/global-commission" className="w-full">
+            <div className="h-auto py-8 bg-[#1e4b9a] text-white border-none hover:bg-[#1e4b9a]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg transition-colors">
+              <Settings className="h-8 w-8" />
+              <span className="text-lg font-medium">Standard Pricing</span>
             </div>
           </Link>
 
@@ -301,28 +276,21 @@ export default function AdminDashboard() {
             </div>
           </Link>
 
-          <Link href="/admin/dashboard/global-commission" className="w-full">
-            <div className="h-auto py-8 bg-[#1e4b9a] text-white border-none hover:bg-[#1e4b9a]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg transition-colors">
-              <Settings className="h-8 w-8" />
-              <span className="text-lg font-medium">Standard Pricing</span>
-            </div>
-          </Link>
-
-          <Link href="../register-client" className="w-full">
-            <div className="h-auto py-8 bg-[#1e4b9a] text-white border-none hover:bg-[#1e4b9a]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg transition-colors">
-              <UserPlus className="h-8 w-8" />
-              <span className="text-lg font-medium">New Client</span>
+          <Link href="/admin/dashboard" className="w-full">
+            <div className="h-auto py-8 bg-red-700 text-white border-none hover:bg-[#1e4b9a]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg transition-colors">
+              <Trash2 className="h-8 w-8" />
+              <span className="text-lg font-medium">Erase All Data</span>
             </div>
           </Link>
         </div>
 
-        {/* Erase All Data Button - Made bigger */}
-        <div className="flex justify-center mt-4">
+        {/* Erase All Data Button - Made bigger  <div className="flex justify-center mt-4">
           <div className="bg-red-600 hover:bg-red-700 text-white py-8 w-full max-w-md rounded-lg flex flex-col items-center gap-3 cursor-pointer transition-colors">
             <Trash2 className="h-8 w-8" />
             <span className="text-lg font-medium">Erase All Data</span>
           </div>
-        </div>
+        </div> */}
+      
       </main>
     </div>
   )
