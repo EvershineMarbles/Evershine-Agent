@@ -257,8 +257,8 @@ export default function AdminDashboard() {
 
           <Link href="/admin/dashboard/followups" className="w-full">
             <div className="h-auto py-8 bg-[#1e4b9a] text-white border-none hover:bg-[#1e4b9a]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg transition-colors">
-              <Bell className="h-8 w-8" />
-              <span className="text-lg font-medium">FErase All Data</span>
+              <Trash2 className="h-8 w-8" />
+              <span className="text-lg font-medium">Erase All Data</span>
             </div>
           </Link>
         </div>
