@@ -1,18 +1,132 @@
 "use client"
+
+import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Search, Users, Package, UserCheck, Clock } from "lucide-react"
+import { Search, Users, Package, UserCheck, Clock, Loader2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import Link from "next/link"
+import { fetchWithAdminAuth } from "@/lib/admin-auth"
+
+// Function to fetch all clients
+const getAllClients = async () => {
+  try {
+    const response = await fetchWithAdminAuth("/api/admin/clients")
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.message || `API error: ${response.status}`)
+    }
+
+    const data = await response.json()
+
+    if (data.success && data.data) {
+      return {
+        success: true,
+        clients: data.data.clients || [],
+      }
+    } else {
+      throw new Error(data.message || "Failed to fetch clients")
+    }
+  } catch (error: any) {
+    console.error("Error fetching clients:", error)
+    return {
+      success: false,
+      message: error.message || "An error occurred while fetching clients",
+      clients: [],
+    }
+  }
+}
+
+// Function to fetch all agents
+const getAllAgents = async () => {
+  try {
+    const response = await fetchWithAdminAuth("/api/admin/agents")
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.message || `API error: ${response.status}`)
+    }
+
+    const data = await response.json()
+
+    if (data.success && data.data) {
+      return {
+        success: true,
+        agents: data.data.agents || [],
+      }
+    } else {
+      throw new Error(data.message || "Failed to fetch agents")
+    }
+  } catch (error: any) {
+    console.error("Error fetching agents:", error)
+    return {
+      success: false,
+      message: error.message || "An error occurred while fetching agents",
+      agents: [],
+    }
+  }
+}
 
 export default function AdminDashboard() {
-  // Static data - no API calls
-  const stats = {
-    clients: 5,
-    agents: 4,
+  // State for stats with loading indicators
+  const [stats, setStats] = useState({
+    clients: { value: 0, loading: true },
+    agents: { value: 0, loading: true },
     products: 172,
     followups: 200,
-  }
+  })
+
+  // Fetch data on component mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch clients
+        const clientsResponse = await getAllClients()
+        if (clientsResponse.success) {
+          setStats((prev) => ({
+            ...prev,
+            clients: {
+              value: clientsResponse.clients.length,
+              loading: false,
+            },
+          }))
+        } else {
+          setStats((prev) => ({
+            ...prev,
+            clients: { value: 0, loading: false },
+          }))
+        }
+
+        // Fetch agents
+        const agentsResponse = await getAllAgents()
+        if (agentsResponse.success) {
+          setStats((prev) => ({
+            ...prev,
+            agents: {
+              value: agentsResponse.agents.length,
+              loading: false,
+            },
+          }))
+        } else {
+          setStats((prev) => ({
+            ...prev,
+            agents: { value: 0, loading: false },
+          }))
+        }
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error)
+        // Set loading to false even if there's an error
+        setStats((prev) => ({
+          ...prev,
+          clients: { value: 0, loading: false },
+          agents: { value: 0, loading: false },
+        }))
+      }
+    }
+
+    fetchData()
+  }, [])
 
   return (
     <div className="flex-1 bg-white">
@@ -36,7 +150,13 @@ export default function AdminDashboard() {
                   <Users className="h-5 w-5 text-[#1e4b9a]" />
                 </div>
                 <h2 className="text-sm font-semibold text-center">Total Clients</h2>
-                <p className="text-xl font-bold text-[#1e4b9a]">{stats.clients}</p>
+                {stats.clients.loading ? (
+                  <div className="flex items-center justify-center h-[28px]">
+                    <Loader2 className="h-5 w-5 animate-spin text-[#1e4b9a]" />
+                  </div>
+                ) : (
+                  <p className="text-xl font-bold text-[#1e4b9a]">{stats.clients.value}</p>
+                )}
               </CardContent>
             </Card>
           </Link>
@@ -48,7 +168,13 @@ export default function AdminDashboard() {
                   <UserCheck className="h-5 w-5 text-[#1e4b9a]" />
                 </div>
                 <h2 className="text-sm font-semibold text-center">Active Agents</h2>
-                <p className="text-xl font-bold text-[#1e4b9a]">{stats.agents}</p>
+                {stats.agents.loading ? (
+                  <div className="flex items-center justify-center h-[28px]">
+                    <Loader2 className="h-5 w-5 animate-spin text-[#1e4b9a]" />
+                  </div>
+                ) : (
+                  <p className="text-xl font-bold text-[#1e4b9a]">{stats.agents.value}</p>
+                )}
               </CardContent>
             </Card>
           </Link>
