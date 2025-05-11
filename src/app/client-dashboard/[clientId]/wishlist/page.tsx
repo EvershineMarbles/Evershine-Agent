@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowLeft, Trash2, Loader2, Heart, ShoppingCart, RefreshCw } from "lucide-react"
+import { ArrowLeft, Trash2, Loader2, Heart, ShoppingCart, RefreshCw } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
 import { Input } from "@/components/ui/input"
@@ -85,7 +85,7 @@ export default function WishlistPage() {
         items.forEach((item: WishlistItem) => {
           const itemId = item.postId || item._id
           initialState[itemId] = { removing: false, addingToCart: false }
-          initialQuantities[itemId] = 1 // Default quantity is 1
+          initialQuantities[itemId] = 1000 // Default quantity is now 1000
         })
 
         setActionLoading(initialState)
@@ -214,11 +214,17 @@ export default function WishlistPage() {
       if (!token) return
 
       const apiUrl = getApiUrl()
+      
+      // Get the quantity for this product
+      const quantity = quantities[productId] || 1000
 
-      // Try with axios
+      // Try with axios - now sending the quantity
       const response = await axios.post(
         `${apiUrl}/api/addToCart`,
-        { productId },
+        { 
+          productId,
+          quantity // Send the quantity to the API
+        },
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -241,7 +247,7 @@ export default function WishlistPage() {
 
         toast({
           title: "Added to cart",
-          description: `Item has been added to your cart`,
+          description: `Item has been added to your cart with quantity: ${quantity}`,
           action: (
             <Button variant="outline" size="sm" onClick={() => router.push(`/client-dashboard/${clientId}/cart`)}>
               View Cart
@@ -387,7 +393,7 @@ export default function WishlistPage() {
                       <Input
                         type="number"
                         min="1"
-                        value={quantities[itemId] || 1}
+                        value={quantities[itemId] || 1000}
                         onChange={(e) => handleQuantityChange(itemId, e.target.value)}
                         className="h-9 w-24 text-center"
                       />
