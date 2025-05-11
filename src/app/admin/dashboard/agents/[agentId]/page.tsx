@@ -148,20 +148,80 @@ export default function AgentDetailsPage() {
     if (!agentDetails) return
 
     setIsSubmitting(true)
+    setError(null)
 
     try {
-      // First update the general agent info
-      const response = await fetchWithAdminAuth(`/api/admin/agents/${agentId}`, {
-        method: "PUT",
+      console.log("Updating agent with data:", {
+        name: editFormData.name,
+        email: editFormData.email,
+        commissionRate: editFormData.commissionRate,
+      })
+
+      // Try updating all fields in a single request first
+      try {
+        const combinedResponse = await fetchWithAdminAuth(`/api/admin/agents/${agentId}`, {
+          method: "PUT",
+          body: JSON.stringify({
+            name: editFormData.name,
+            email: editFormData.email,
+            commissionRate: editFormData.commissionRate,
+          }),
+        })
+
+        const responseData = await combinedResponse.json()
+        console.log("Combined update response:", responseData)
+
+        if (!combinedResponse.ok) {
+          console.warn("Combined update failed, falling back to separate updates")
+          throw new Error("Combined update failed")
+        } else {
+          // If combined update worked, we're done
+          console.log("Combined update successful")
+
+          // Update the agent details in the local state
+          setAgentDetails({
+            ...agentDetails,
+            name: editFormData.name,
+            email: editFormData.email,
+            commissionRate: editFormData.commissionRate,
+          })
+
+          setIsEditModalOpen(false)
+          return
+        }
+      } catch (combinedError) {
+        console.log("Falling back to separate updates due to:", combinedError)
+        // Continue with separate updates below
+      }
+
+      // Fallback: Update name and email separately first
+      const nameUpdateResponse = await fetchWithAdminAuth(`/api/admin/agents/${agentId}/update-name`, {
+        method: "PATCH",
         body: JSON.stringify({
           name: editFormData.name,
+        }),
+      })
+
+      const nameResponseData = await nameUpdateResponse.json()
+      console.log("Name update response:", nameResponseData)
+
+      if (!nameUpdateResponse.ok) {
+        throw new Error(nameResponseData.message || "Failed to update agent name")
+      }
+
+      // Then update email separately
+      const emailUpdateResponse = await fetchWithAdminAuth(`/api/admin/agents/${agentId}/update-email`, {
+        method: "PATCH",
+        body: JSON.stringify({
           email: editFormData.email,
         }),
       })
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || "Failed to update agent")
+      const emailResponseData = await emailUpdateResponse.json()
+      console.log("Email update response:", emailResponseData)
+
+      if (!emailUpdateResponse.ok) {
+        throw new Error(emailResponseData.message || "Failed to update agent email")
       }
 
       // Then update the commission rate separately
@@ -172,9 +232,11 @@ export default function AgentDetailsPage() {
         }),
       })
 
+      const commissionResponseData = await commissionResponse.json()
+      console.log("Commission update response:", commissionResponseData)
+
       if (!commissionResponse.ok) {
-        const errorData = await commissionResponse.json()
-        throw new Error(errorData.message || "Failed to update commission rate")
+        throw new Error(commissionResponseData.message || "Failed to update commission rate")
       }
 
       // Update the agent details in the local state
@@ -184,6 +246,16 @@ export default function AgentDetailsPage() {
         email: editFormData.email,
         commissionRate: editFormData.commissionRate,
       })
+
+      // Refresh the data from the server to ensure we have the latest
+      const refreshResponse = await fetchWithAdminAuth(`/api/admin/agents/${agentId}`)
+      if (refreshResponse.ok) {
+        const refreshData = await refreshResponse.json()
+        if (refreshData.success && refreshData.data) {
+          setAgentDetails(refreshData.data)
+          console.log("Refreshed agent data:", refreshData.data)
+        }
+      }
 
       setIsEditModalOpen(false)
     } catch (err: any) {
