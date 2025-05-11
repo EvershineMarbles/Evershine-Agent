@@ -3,21 +3,65 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, RefreshCw } from "lucide-react"
+import { ArrowLeft, Loader2, RefreshCw } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { extractProductId, isAdmin, isAgent, getCurrentClientId } from "@/lib/qr-utils"
 
-export default function PublicScanQRPage() {
-  const router = useRouter()
-  const [error, setError] = useState<string | null>(null)
+// Create a separate component for the QR scanner to better control its lifecycle
+const QRScanner = ({ onScan, onError }) => {
   const [loading, setLoading] = useState(true)
-  const [scannerInitialized, setScannerInitialized] = useState(false)
 
-  // Load the QR code library as soon as possible
   useEffect(() => {
-    // Add the script to the head to load it early
+    // Create a style element to force the camera to stay in position
+    const styleElement = document.createElement("style")
+    styleElement.textContent = `
+      #public-qr-reader {
+        position: relative !important;
+        height: 300px !important;
+        width: 100% !important;
+        overflow: hidden !important;
+      }
+      
+      #public-qr-reader video {
+        object-fit: cover !important;
+        width: 100% !important;
+        height: 100% !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+      }
+      
+      #public-qr-reader canvas {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+      }
+      
+      #public-qr-reader__scan_region {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+      }
+      
+      #public-qr-reader__dashboard {
+        position: absolute !important;
+        bottom: 0 !important;
+        width: 100% !important;
+        background: rgba(0, 0, 0, 0.5) !important;
+        color: white !important;
+        padding: 5px !important;
+        z-index: 10 !important;
+      }
+    `
+    document.head.appendChild(styleElement)
+
+    // Load the QR code library
     const script = document.createElement("script")
     script.src = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"
     script.async = true
@@ -25,72 +69,50 @@ export default function PublicScanQRPage() {
 
     script.onload = () => {
       console.log("QR code library loaded")
-      // Wait a moment for the DOM to be fully ready
-      setTimeout(() => {
-        // Create a clean container for the QR reader
-        const qrContainer = document.getElementById("qr-container")
-        if (qrContainer) {
-          // Clear any existing content
-          qrContainer.innerHTML = '<div id="public-qr-reader" style="width: 100%; height: 300px;"></div>'
-          initializeScanner()
-        }
-      }, 1000)
+      setTimeout(initializeScanner, 500)
     }
 
     script.onerror = () => {
       console.error("Failed to load QR code library")
-      setError("Failed to load scanner. Please refresh the page.")
+      onError("Failed to load scanner. Please refresh the page.")
       setLoading(false)
     }
 
     return () => {
       // Clean up
-      if (window.Html5Qrcode) {
-        try {
+      try {
+        if (window.Html5Qrcode) {
           const scanner = new window.Html5Qrcode("public-qr-reader")
           if (scanner.isScanning) {
             scanner.stop().catch(console.error)
           }
-        } catch (error) {
-          console.error("Error cleaning up scanner:", error)
         }
+      } catch (error) {
+        console.error("Error cleaning up scanner:", error)
       }
+
+      // Remove the style element
+      document.head.removeChild(styleElement)
     }
-  }, [])
+  }, [onScan, onError])
 
   const initializeScanner = () => {
-    // First, check if the library is available
-    if (typeof window === "undefined" || !window.Html5Qrcode) {
+    if (!window.Html5Qrcode) {
       console.error("Html5Qrcode not available")
-      setError("Scanner library not available. Please refresh the page.")
+      onError("Scanner library not available. Please refresh the page.")
       setLoading(false)
       return
     }
 
-    // Make sure the container exists before proceeding
-    const qrContainer = document.getElementById("public-qr-reader")
-    if (!qrContainer) {
-      console.error("QR reader container not found, will retry")
-      setError("Scanner element not found. Please refresh the page.")
-      setLoading(false)
-      return
-    }
-
-    // Start the scanner
-    startScanner()
-  }
-
-  // Add this new function to handle the actual scanner initialization
-  const startScanner = () => {
     try {
       const html5QrCode = new window.Html5Qrcode("public-qr-reader")
 
-      // Configure scanner with more reliable settings
+      // Configure scanner
       const config = {
         fps: 10,
         qrbox: { width: 250, height: 250 },
         aspectRatio: 1.0,
-        formatsToSupport: [0], // QR_CODE only for better performance
+        formatsToSupport: [0], // QR_CODE only
       }
 
       // Start scanning
@@ -101,42 +123,64 @@ export default function PublicScanQRPage() {
           (decodedText) => {
             // On successful scan
             console.log("QR Code detected:", decodedText)
-            processQrCode(decodedText, html5QrCode)
+            onScan(decodedText, html5QrCode)
           },
           (errorMessage) => {
-            // Just for debugging, don't show to user
+            // Just for debugging
             console.debug("QR scanning message:", errorMessage)
           },
         )
         .then(() => {
           console.log("Scanner started successfully")
-          setScannerInitialized(true)
           setLoading(false)
         })
         .catch((err) => {
           console.error("Error starting scanner:", err)
 
-          // More user-friendly error message
+          // User-friendly error message
           if (err.toString().includes("NotAllowedError")) {
-            setError("Camera access denied. Please check your browser settings and permissions.")
+            onError("Camera access denied. Please check your browser settings and permissions.")
           } else if (err.toString().includes("NotFoundError")) {
-            setError("No camera found. Please make sure your device has a working camera.")
+            onError("No camera found. Please make sure your device has a working camera.")
           } else if (err.toString().includes("NotReadableError")) {
-            setError("Camera is in use by another application. Please close other apps using the camera.")
+            onError("Camera is in use by another application. Please close other apps using the camera.")
           } else {
-            setError("Failed to start camera. Please try again or use a different device.")
+            onError("Failed to start camera. Please try again or use a different device.")
           }
 
           setLoading(false)
         })
     } catch (error) {
       console.error("Error in startScanner:", error)
-      setError("Failed to initialize scanner. Please refresh and try again.")
+      onError("Failed to initialize scanner. Please refresh and try again.")
       setLoading(false)
     }
   }
 
-  const processQrCode = (decodedText: string, scanner: any) => {
+  return (
+    <div className="relative w-full h-64 bg-gray-100 rounded-lg overflow-hidden">
+      {loading ? (
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <Loader2 className="h-8 w-8 text-blue-500 animate-spin mb-2" />
+          <span className="text-gray-600">Starting camera...</span>
+        </div>
+      ) : null}
+      <div id="public-qr-reader" className="w-full h-full"></div>
+    </div>
+  )
+}
+
+export default function PublicScanQRPage() {
+  const router = useRouter()
+  const [error, setError] = useState<string | null>(null)
+  const [showScanner, setShowScanner] = useState(true) // Start with scanner visible
+
+  // Ensure scanner is shown on component mount
+  useEffect(() => {
+    setShowScanner(true)
+  }, [])
+
+  const handleScan = (decodedText: string, scanner: any) => {
     try {
       // Stop scanning immediately
       if (scanner && scanner.isScanning) {
@@ -181,31 +225,22 @@ export default function PublicScanQRPage() {
     }
   }
 
-  const restartScanner = () => {
-    setLoading(true)
+  const handleError = (errorMessage: string) => {
+    setError(errorMessage)
+
+    // Only hide scanner for critical errors
+    if (
+      errorMessage.includes("Camera access denied") ||
+      errorMessage.includes("No camera found") ||
+      errorMessage.includes("Failed to load scanner")
+    ) {
+      setShowScanner(false)
+    }
+  }
+
+  const startScanner = () => {
     setError(null)
-    setScannerInitialized(false)
-
-    // Clean up existing scanner
-    if (window.Html5Qrcode) {
-      try {
-        const scanner = new window.Html5Qrcode("public-qr-reader")
-        if (scanner.isScanning) {
-          scanner.stop().catch(console.error)
-        }
-      } catch (error) {
-        console.error("Error stopping scanner:", error)
-      }
-    }
-
-    // Clear and recreate the container
-    const qrContainer = document.getElementById("qr-container")
-    if (qrContainer) {
-      qrContainer.innerHTML = '<div id="public-qr-reader" style="width: 100%; height: 300px;"></div>'
-    }
-
-    // Reinitialize after a short delay
-    setTimeout(initializeScanner, 500)
+    setShowScanner(true)
   }
 
   return (
@@ -216,8 +251,6 @@ export default function PublicScanQRPage() {
           Back to Home
         </Link>
 
-        <h2 className="text-2xl font-bold mb-4 text-center">Scan Product QR</h2>
-
         <Card className="w-full mb-4">
           <CardHeader className="pb-2">
             <CardTitle className="text-center">Scan QR Code</CardTitle>
@@ -226,30 +259,23 @@ export default function PublicScanQRPage() {
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-3 w-full">
                 <p className="text-sm text-red-600">{error}</p>
-                <Button onClick={restartScanner} variant="outline" size="sm" className="mt-2 w-full">
+                <Button onClick={startScanner} variant="outline" size="sm" className="mt-2 w-full">
                   Try Again
                 </Button>
               </div>
             )}
 
-            <Button
-              onClick={restartScanner}
-              className="w-full bg-[#194a95] hover:bg-[#0f3a7a] flex items-center justify-center mb-4"
-              disabled={loading}
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Scan QR
-            </Button>
+            {!showScanner && (
+              <Button
+                onClick={startScanner}
+                className="w-full bg-[#194a95] hover:bg-[#0f3a7a] flex items-center justify-center mb-4"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Scan QR
+              </Button>
+            )}
 
-            {/* Fixed container for QR scanner */}
-            <div id="qr-container" className="w-full rounded-lg overflow-hidden">
-              {loading && (
-                <div className="h-[300px] flex flex-col items-center justify-center bg-gray-100">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mb-2"></div>
-                  <span className="text-gray-600">Starting camera...</span>
-                </div>
-              )}
-            </div>
+            {showScanner && <QRScanner onScan={handleScan} onError={handleError} />}
           </CardContent>
         </Card>
 
@@ -259,7 +285,7 @@ export default function PublicScanQRPage() {
             <li>Make sure the QR code is well-lit and not blurry</li>
             <li>Hold your device steady while scanning</li>
             <li>Position the QR code within the scanning area</li>
-            <li>If scanning fails, try the "Scan QR" button</li>
+            <li>If scanning fails, use the "Try Again" button</li>
             <li>Ensure camera permissions are granted in your browser</li>
           </ul>
         </div>
