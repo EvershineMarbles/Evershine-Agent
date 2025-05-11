@@ -359,7 +359,7 @@ export default function AllQR() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div className="flex items-center gap-2 border rounded-lg overflow-hidden">
             <button
-              onClick={() => router.push("admin/dashboard/products")}
+              onClick={() => router.push("/admin/dashboard/products")}
               className="flex items-center gap-1 px-4 py-2 text-gray-600 hover:bg-gray-100"
               aria-label="Grid view"
             >

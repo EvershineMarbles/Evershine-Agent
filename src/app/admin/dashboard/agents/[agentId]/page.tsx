@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Trash2, ArrowLeft } from "lucide-react"
+import { Trash2, ArrowLeft, Loader2 } from "lucide-react"
 import { fetchWithAdminAuth } from "@/lib/admin-auth"
 import { Separator } from "@/components/ui/separator"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
@@ -16,6 +16,7 @@ interface Agent {
   mobile?: string
   agentId: string
   createdAt: string
+  commissionRate?: number // Added commissionRate to the interface
 }
 
 export default function AgentDetailsPage() {
@@ -129,6 +130,9 @@ export default function AgentDetailsPage() {
           <div className="animate-pulse">
             <div className="h-10 bg-gray-200 rounded w-1/4 mb-6"></div>
             <div className="h-8 bg-gray-200 rounded w-1/2 mb-4"></div>
+            <div className="flex items-center justify-center h-40">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
           </div>
         ) : (
           agentDetails && (
@@ -171,7 +175,9 @@ export default function AgentDetailsPage() {
                 <div>
                   <div className="flex flex-col sm:flex-row sm:items-baseline">
                     <span className="text-lg md:text-xl font-medium">Commission Rate - </span>
-                    <span className="text-lg md:text-xl font-bold sm:ml-2">10%</span>
+                    <span className="text-lg md:text-xl font-bold sm:ml-2 text-emerald-600">
+                      {agentDetails.commissionRate !== undefined ? `${agentDetails.commissionRate}%` : "Not set"}
+                    </span>
                   </div>
                   <Separator className="mt-2" />
                 </div>
@@ -179,19 +185,13 @@ export default function AgentDetailsPage() {
 
               {/* Buttons in a single horizontal line */}
               <div className="flex flex-row gap-3 mt-8 pt-4 border-t flex-wrap md:flex-nowrap">
-                <Button className="bg-[#1e4b95] hover:bg-[#1e4b95]/90 text-white px-4 py-2 rounded-md flex-1 whitespace-nowrap">
-                  Edit
-                </Button>
                 <Button
                   className="bg-[#1e4b95] hover:bg-[#1e4b95]/90 text-white px-4 py-2 rounded-md flex-1 whitespace-nowrap"
-                  onClick={() =>
-                    router.push(
-                      `/admin/dashboard/agents/${agentId}/clients?email=${agentDetails?.email}&name=${agentDetails?.name}`,
-                    )
-                  }
+                  onClick={() => router.push(`/admin/dashboard/agents/edit/${agentId}`)}
                 >
-                  Client List
+                  Edit
                 </Button>
+          
                 <Button
                   variant="ghost"
                   className="text-red-500 hover:text-red-700 hover:bg-red-50 flex-1 flex items-center justify-center gap-2 whitespace-nowrap"

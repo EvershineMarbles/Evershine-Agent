@@ -164,6 +164,20 @@ export default function AgentTable() {
         return
       }
 
+      // If the value starts with '0' and has more than 1 digit, remove the leading zero
+      if (value.length > 1 && value.startsWith("0") && value[1] !== ".") {
+        const newValue = value.substring(1)
+        const numValue = Number.parseFloat(newValue)
+        if (!isNaN(numValue)) {
+          const clampedValue = Math.min(Math.max(numValue, 0), 100)
+          setEditFormData((prev) => ({
+            ...prev,
+            [name]: clampedValue,
+          }))
+          return
+        }
+      }
+
       const numValue = Number.parseFloat(value)
       if (isNaN(numValue)) return
 
@@ -316,6 +330,20 @@ export default function AgentTable() {
           [name]: 0,
         }))
         return
+      }
+
+      // If the value starts with '0' and has more than 1 digit, remove the leading zero
+      if (value.length > 1 && value.startsWith("0") && value[1] !== ".") {
+        const newValue = value.substring(1)
+        const numValue = Number.parseFloat(newValue)
+        if (!isNaN(numValue)) {
+          const clampedValue = Math.min(Math.max(numValue, 0), 100)
+          setCreateFormData((prev) => ({
+            ...prev,
+            [name]: clampedValue,
+          }))
+          return
+        }
       }
 
       const numValue = Number.parseFloat(value)
