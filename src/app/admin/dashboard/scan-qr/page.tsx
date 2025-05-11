@@ -158,7 +158,7 @@ const QRScanner = ({ onScan, onError }) => {
   }
 
   return (
-    <div className="relative w-full h-64 bg-gray-100 rounded-lg overflow-hidden">
+    <div className="relative w-full h-64 overflow-hidden">
       {loading ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <Loader2 className="h-8 w-8 text-blue-500 animate-spin mb-2" />
@@ -233,14 +233,13 @@ export default function AdminScanQRPage() {
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Dashboard
         </Link>
-
         <Card className="w-full mb-4">
           <CardHeader className="pb-2">
             <CardTitle className="text-center">Scan QR Code</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-3 w-full">
+              <div className="bg-red-50 border border-red-200 rounded-md p-3 mx-4 mb-3">
                 <p className="text-sm text-red-600">{error}</p>
                 <Button onClick={startScanner} variant="outline" size="sm" className="mt-2 w-full">
                   Try Again
@@ -249,29 +248,33 @@ export default function AdminScanQRPage() {
             )}
 
             {!showScanner && (
-              <Button
-                onClick={startScanner}
-                className="w-full bg-[#194a95] hover:bg-[#0f3a7a] flex items-center justify-center mb-4"
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Scan QR
-              </Button>
+              <div className="px-4 pb-4">
+                <Button
+                  onClick={startScanner}
+                  className="w-full bg-[#194a95] hover:bg-[#0f3a7a] flex items-center justify-center"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Scan QR
+                </Button>
+              </div>
             )}
 
             {showScanner && <QRScanner onScan={handleScan} onError={handleError} />}
           </CardContent>
         </Card>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <h3 className="font-medium text-gray-900 mb-2">Scanning Tips:</h3>
-          <ul className="list-disc pl-5 text-sm text-gray-600 space-y-1">
-            <li>Make sure the QR code is well-lit and not blurry</li>
-            <li>Hold your device steady while scanning</li>
-            <li>Position the QR code within the scanning area</li>
-            <li>If scanning fails, use the "Try Again" button</li>
-            <li>Ensure camera permissions are granted in your browser</li>
-          </ul>
-        </div>
+        <Card className="w-full">
+          <CardContent className="p-4">
+            <h3 className="font-medium text-gray-900 mb-2">Scanning Tips:</h3>
+            <ul className="list-disc pl-5 text-sm text-gray-600 space-y-1">
+              <li>Make sure the QR code is well-lit and not blurry</li>
+              <li>Hold your device steady while scanning</li>
+              <li>Position the QR code within the scanning area</li>
+              <li>If scanning fails, use the "Try Again" button</li>
+              <li>Ensure camera permissions are granted in your browser</li>
+            </ul>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
