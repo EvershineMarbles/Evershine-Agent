@@ -378,7 +378,7 @@ export default function AllQR() {
           >
             Add New Product
           </button>
-        </div>/
+        </div>
         {/* Products Count */}
         <p className="text-gray-600 mb-6">
           Showing {filteredProducts.length} of {products.length} products

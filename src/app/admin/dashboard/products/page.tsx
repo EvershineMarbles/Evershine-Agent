@@ -54,7 +54,7 @@ export default function Products() {
       setEditLoading(productId)
       const response = await axios.get(`${API_URL}/api/getPostDataById?id=${productId}`)
       if (response.data.success) {
-        router.push(`/edit-product/${productId}`)
+        router.push(`/admin/dashboard/edit-product/${productId}`)
       } else {
         throw new Error("Product not found")
       }
