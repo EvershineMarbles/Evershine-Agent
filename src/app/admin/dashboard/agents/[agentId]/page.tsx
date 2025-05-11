@@ -162,15 +162,16 @@ export default function AgentDetailsPage() {
 
                 <div>
                   <div className="flex flex-col sm:flex-row sm:items-baseline">
-                    <span className="text-lg md:text-xl font-medium">Commission Rate - </span>
-                    <span className="text-lg md:text-xl font-bold sm:ml-2">10%</span>
+                    <span className="text-lg md:text-xl font-medium">Consultant Email - </span>
+                    <span className="text-lg md:text-xl font-bold sm:ml-2">{agentDetails.email}</span>
                   </div>
                   <Separator className="mt-2" />
                 </div>
 
-                <div className="flex flex-col sm:flex-row sm:items-baseline">
-                    <span className="text-lg md:text-xl font-medium">Consultant Email - </span>
-                    <span className="text-lg md:text-xl font-bold sm:ml-2">{agentDetails.email}</span>
+                <div>
+                  <div className="flex flex-col sm:flex-row sm:items-baseline">
+                    <span className="text-lg md:text-xl font-medium">Commission Rate - </span>
+                    <span className="text-lg md:text-xl font-bold sm:ml-2">10%</span>
                   </div>
                   <Separator className="mt-2" />
                 </div>
