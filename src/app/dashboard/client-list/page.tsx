@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Users, Search, UserPlus, Loader2, Filter, ArrowUpDown } from "lucide-react"
+import { ArrowLeft, Users, Search, UserPlus, Loader2, Filter } from "lucide-react"
 import { agentAPI } from "@/lib/api-utils"
 import { isAgentAuthenticated, storeClientImpersonationToken, clearAllTokens } from "@/lib/auth-utils"
 import { useToast } from "@/components/ui/use-toast"
@@ -30,7 +30,6 @@ export default function ClientList() {
   const [clients, setClients] = useState<Client[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [accessingClient, setAccessingClient] = useState<string | null>(null)
-  const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest") // Default to newest first
 
   // Wrap fetchClients in useCallback to prevent it from being recreated on every render
   const fetchClients = useCallback(async () => {
@@ -97,24 +96,6 @@ export default function ClientList() {
     // Fetch clients
     fetchClients()
   }, [router, fetchClients])
-
-  // Toggle sort order and re-sort clients
-  const toggleSortOrder = () => {
-    const newSortOrder = sortOrder === "newest" ? "oldest" : "newest"
-    setSortOrder(newSortOrder)
-
-    // Re-sort the clients based on the new sort order
-    const sortedClients = [...clients].sort((a, b) => {
-      const compareResult =
-        a.createdAt && b.createdAt
-          ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          : b.clientId.localeCompare(a.clientId)
-
-      return newSortOrder === "newest" ? compareResult : -compareResult
-    })
-
-    setClients(sortedClients)
-  }
 
   const handleClientSelect = async (clientId: string) => {
     try {
@@ -217,14 +198,7 @@ export default function ClientList() {
                 Client List
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={toggleSortOrder}
-                  className="flex items-center gap-1 text-sm text-gray-700 hover:text-[#194a95] transition-colors"
-                >
-                  <span>{sortOrder === "newest" ? "Newest First" : "Oldest First"}</span>
-                  <ArrowUpDown className="h-3.5 w-3.5" />
-                </button>
-                <span className="text-sm text-gray-500 ml-2">
+                <span className="text-sm text-gray-500">
                   {filteredClients.length} of {clients.length} clients
                 </span>
                 <button className="p-1.5 rounded-md hover:bg-gray-100">
@@ -253,16 +227,7 @@ export default function ClientList() {
                   <tbody>
                     {filteredClients.map((client) => (
                       <tr key={client._id || client.clientId} className="border-b hover:bg-gray-50">
-                        <td className="py-3 px-4">
-                          <div className="flex flex-col">
-                            <span>{client.name}</span>
-                            {client.createdAt && (
-                              <span className="text-xs text-gray-500">
-                                Added: {new Date(client.createdAt).toLocaleDateString()}
-                              </span>
-                            )}
-                          </div>
-                        </td>
+                        <td className="py-3 px-4">{client.name}</td>
                         <td className="py-3 px-4">{client.mobile}</td>
                         <td className="py-3 px-4">{client.profession || "-"}</td>
                         <td className="py-3 px-4">{client.city || "-"}</td>
