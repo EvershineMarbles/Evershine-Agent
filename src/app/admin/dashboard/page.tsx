@@ -98,11 +98,7 @@ export default function AdminDashboard() {
             </Button>
           </Link>
 
-          <Link href="/admin/dashboard/followups" className="w-full">
-            <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-10 text-sm font-medium w-full rounded-md">
-              Follow-ups
-            </Button>
-          </Link>
+    
 
           <Link href="/admin/dashboard/global-commission" className="w-full">
             <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-10 text-sm font-medium w-full rounded-md">
@@ -113,6 +109,12 @@ export default function AdminDashboard() {
           <Link href="../register-client" className="w-full">
             <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-10 text-sm font-medium w-full rounded-md">
               New Client
+            </Button>
+          </Link>
+
+          <Link href="/admin/dashboard/followups" className="w-full">
+            <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-10 text-sm font-medium w-full rounded-md">
+              Follow-ups
             </Button>
           </Link>
         </div>

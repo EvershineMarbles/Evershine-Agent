@@ -197,10 +197,7 @@ export default function ClientDetails({ clientId }: ClientDetailsProps) {
           </Button>
           <h1 className="text-3xl font-bold">{client.name}</h1>
         </div>
-        <Button onClick={() => router.push(`/admin/dashboard/clients/${clientId}/edit`)}>
-          <Edit className="h-4 w-4 mr-2" />
-          Edit Client
-        </Button>
+
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">

@@ -494,10 +494,7 @@ export default function ClientTable() {
                       >
                         <Eye size={16} className="mr-1" /> View
                       </Button>
-                      <Button variant="outline" size="sm" onClick={(e) => handleEditClick(e, client)}>
-                        <Edit size={16} className="mr-1" /> Edit
-                      </Button>
-                      <Button
+                   
                         variant="outline"
                         size="sm"
                         className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
