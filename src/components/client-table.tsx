@@ -5,7 +5,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Loader2, Plus, RefreshCw, Search, Eye, Edit, Trash2 } from "lucide-react"
+import { Loader2, Plus, RefreshCw, Search, Eye, Edit, Trash2 } from 'lucide-react'
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -494,7 +494,7 @@ export default function ClientTable() {
                       >
                         <Eye size={16} className="mr-1" /> View
                       </Button>
-                   
+                      <Button
                         variant="outline"
                         size="sm"
                         className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
