@@ -241,7 +241,16 @@ export default function AgentScanQRPage() {
               </div>
             )}
 
-            <div className="w-full mb-3" id="qr-container">
+            <Button
+              onClick={restartScanner}
+              className="w-full bg-[#194a95] hover:bg-[#0f3a7a] flex items-center justify-center mb-4"
+              disabled={loading}
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Scan QR
+            </Button>
+
+            <div className="w-full" id="qr-container">
               {loading ? (
                 <div className="h-64 flex flex-col items-center justify-center bg-gray-100 rounded-lg">
                   <Loader2 className="h-8 w-8 text-blue-500 animate-spin mb-2" />
@@ -251,15 +260,6 @@ export default function AgentScanQRPage() {
                 <div id="agent-qr-reader" className="w-full h-64 overflow-hidden rounded-lg"></div>
               )}
             </div>
-
-            <Button
-              onClick={restartScanner}
-              className="w-full bg-[#194a95] hover:bg-[#0f3a7a] flex items-center justify-center"
-              disabled={loading}
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Restart Camera
-            </Button>
           </CardContent>
         </Card>
 
@@ -269,7 +269,7 @@ export default function AgentScanQRPage() {
             <li>Make sure the QR code is well-lit and not blurry</li>
             <li>Hold your device steady while scanning</li>
             <li>Position the QR code within the scanning area</li>
-            <li>If scanning fails, try the "Restart Camera" button</li>
+            <li>If scanning fails, try the "Scan QR" button</li>
             <li>Ensure camera permissions are granted in your browser</li>
           </ul>
         </div>

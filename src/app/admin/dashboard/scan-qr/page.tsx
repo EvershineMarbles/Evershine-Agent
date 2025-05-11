@@ -1,164 +1,220 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Camera, AlertCircle } from "lucide-react"
+import { ArrowLeft, Loader2, RefreshCw } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { extractProductId } from "@/lib/qr-utils"
 
 export default function AdminScanQRPage() {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
-  const scannerRef = useRef<any>(null)
-  const [cameraActive, setCameraActive] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [scannerInitialized, setScannerInitialized] = useState(false)
 
-  // Immediately load the QR code library when component mounts
+  // Load the QR code library as soon as possible
   useEffect(() => {
-    // Preload the HTML5QrCode library
+    // Create a container for the QR reader if it doesn't exist
+    let qrContainer = document.getElementById("admin-qr-reader")
+    if (!qrContainer) {
+      console.log("Creating QR reader container")
+      qrContainer = document.createElement("div")
+      qrContainer.id = "admin-qr-reader"
+      qrContainer.className = "w-full h-64 overflow-hidden rounded-lg"
+
+      // Find the parent container where it should be inserted
+      const parentContainer = document.getElementById("qr-container")
+      if (parentContainer) {
+        parentContainer.appendChild(qrContainer)
+      }
+    }
+
+    // Add the script to the head to load it early
     const script = document.createElement("script")
     script.src = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"
     script.async = true
-    script.onload = () => {
-      // Start scanner immediately after script loads
-      initializeScanner()
-    }
     document.head.appendChild(script)
 
-    // Cleanup function
+    script.onload = () => {
+      console.log("QR code library loaded")
+      // Wait a moment for the DOM to be fully ready
+      setTimeout(initializeScanner, 1000)
+    }
+
+    script.onerror = () => {
+      console.error("Failed to load QR code library")
+      setError("Failed to load scanner. Please refresh the page.")
+      setLoading(false)
+    }
+
     return () => {
-      stopScanner()
-      if (script.parentNode) {
-        script.parentNode.removeChild(script)
+      // Clean up
+      if (scannerInitialized && window.Html5Qrcode) {
+        try {
+          const scanner = new window.Html5Qrcode("admin-qr-reader")
+          if (scanner.isScanning) {
+            scanner.stop().catch(console.error)
+          }
+        } catch (error) {
+          console.error("Error cleaning up scanner:", error)
+        }
       }
     }
   }, [])
 
   const initializeScanner = () => {
+    // First, check if the library is available
     if (typeof window === "undefined" || !window.Html5Qrcode) {
-      console.error("HTML5QrCode library not loaded")
-      setError("Scanner library failed to load. Please refresh the page.")
+      console.error("Html5Qrcode not available")
+      setError("Scanner library not available. Please refresh the page.")
+      setLoading(false)
       return
     }
 
+    // Make sure the container exists before proceeding
+    const qrContainer = document.getElementById("admin-qr-reader")
+    if (!qrContainer) {
+      console.error("QR reader container not found, will retry")
+
+      // Instead of failing, retry after a short delay
+      setTimeout(() => {
+        const retryContainer = document.getElementById("admin-qr-reader")
+        if (retryContainer) {
+          console.log("QR reader container found on retry")
+          startScanner()
+        } else {
+          console.error("QR reader container still not found after retry")
+          setError("Scanner element not found. Please refresh the page.")
+          setLoading(false)
+        }
+      }, 1000)
+      return
+    }
+
+    // If container exists, start the scanner
+    startScanner()
+  }
+
+  // Add this new function to handle the actual scanner initialization
+  const startScanner = () => {
     try {
-      const qrElement = document.getElementById("qr-reader")
-      if (!qrElement) {
-        console.error("QR reader element not found")
-        setError("Scanner initialization failed. Please refresh the page.")
-        return
+      const html5QrCode = new window.Html5Qrcode("admin-qr-reader")
+
+      // Configure scanner with more reliable settings
+      const config = {
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
+        aspectRatio: 1.0,
+        formatsToSupport: [0], // QR_CODE only for better performance
       }
 
-      // Clear any previous instances
-      if (scannerRef.current && scannerRef.current.isScanning) {
-        scannerRef.current.stop().catch(console.error)
-      }
-
-      // Create new scanner instance
-      const html5QrCode = new window.Html5Qrcode("qr-reader")
-      scannerRef.current = html5QrCode
-
-      // Start scanning immediately
+      // Start scanning
       html5QrCode
         .start(
           { facingMode: "environment" },
-          {
-            fps: 10,
-            qrbox: { width: 250, height: 250 },
-          },
+          config,
           (decodedText) => {
-            processQrCode(decodedText)
+            // On successful scan
+            console.log("QR Code detected:", decodedText)
+            processQrCode(decodedText, html5QrCode)
           },
           (errorMessage) => {
-            // Just log scanning errors, don't display to user unless critical
-            console.log("QR scanning message:", errorMessage)
+            // Just for debugging, don't show to user
+            console.debug("QR scanning message:", errorMessage)
           },
         )
         .then(() => {
-          console.log("QR Scanner started successfully")
-          setCameraActive(true)
+          console.log("Scanner started successfully")
+          setScannerInitialized(true)
+          setLoading(false)
         })
         .catch((err) => {
-          console.error("Failed to start scanner:", err)
-          setError("Camera access denied. Please check your browser permissions.")
-          setCameraActive(false)
+          console.error("Error starting scanner:", err)
+
+          // More user-friendly error message
+          if (err.toString().includes("NotAllowedError")) {
+            setError("Camera access denied. Please check your browser settings and permissions.")
+          } else if (err.toString().includes("NotFoundError")) {
+            setError("No camera found. Please make sure your device has a working camera.")
+          } else if (err.toString().includes("NotReadableError")) {
+            setError("Camera is in use by another application. Please close other apps using the camera.")
+          } else {
+            setError("Failed to start camera. Please try again or use a different device.")
+          }
+
+          setLoading(false)
         })
-    } catch (err) {
-      console.error("Scanner initialization error:", err)
-      setError(`Scanner error: ${err instanceof Error ? err.message : "Unknown error"}`)
+    } catch (error) {
+      console.error("Error in startScanner:", error)
+      setError("Failed to initialize scanner. Please refresh and try again.")
+      setLoading(false)
     }
   }
 
-  const stopScanner = () => {
-    if (scannerRef.current) {
-      try {
-        if (scannerRef.current.isScanning) {
-          scannerRef.current.stop().catch(console.error)
-        }
-      } catch (err) {
-        console.error("Error stopping scanner:", err)
-      }
-      scannerRef.current = null
-      setCameraActive(false)
-    }
-  }
-
-  const processQrCode = (decodedText: string) => {
-    console.log("Processing QR code:", decodedText)
-
-    // Stop scanner immediately to prevent multiple scans
-    if (scannerRef.current && scannerRef.current.isScanning) {
-      // Use stop without waiting for it to complete
-      scannerRef.current.stop().catch(console.error)
-      setCameraActive(false)
-    }
-
+  const processQrCode = (decodedText: string, scanner: any) => {
     try {
-      // Check if it's our special format
-      if (decodedText.startsWith("ev://product/")) {
-        const productId = decodedText.replace("ev://product/", "")
-        redirectToProduct(productId)
+      // Stop scanning immediately
+      if (scanner && scanner.isScanning) {
+        scanner.stop().catch(console.error)
+      }
+
+      // Extract product ID from QR code
+      const productId = extractProductId(decodedText)
+
+      if (!productId) {
+        toast.error("Invalid QR code")
+        setError("Invalid QR code. Please scan a valid Evershine product QR code.")
         return
       }
 
-      // Handle legacy URL formats
-      if (decodedText.includes("/product/")) {
-        const parts = decodedText.split("/product/")
-        if (parts.length > 1) {
-          const productId = parts[1].split("/")[0].split("?")[0]
-          if (productId) {
-            redirectToProduct(productId)
-            return
-          }
-        }
-      }
+      // For admins, redirect to the admin dashboard product page
+      const redirectUrl = `/admin/dashboard/product/${productId}`
 
-      // If we get here, we couldn't process the QR code
-      toast.error("Invalid QR code format. Please scan a valid product QR code.")
-      // Restart scanner after a short delay
-      setTimeout(initializeScanner, 2000)
-    } catch (err) {
-      console.error("Error processing QR code:", err)
-      toast.error("Failed to process QR code")
-      // Restart scanner after a short delay
-      setTimeout(initializeScanner, 2000)
+      // Show success message and redirect
+      toast.success("Product found!")
+      router.push(redirectUrl)
+    } catch (error) {
+      console.error("Error processing QR code:", error)
+      setError("Failed to process QR code. Please try again.")
     }
   }
 
-  const redirectToProduct = (productId: string) => {
-    toast.success("Product found! Redirecting...", {
-      duration: 1500,
-    })
-
-    // Navigate immediately without waiting
-    router.push(`/admin/dashboard/product/${productId}`)
-  }
-
   const restartScanner = () => {
-    stopScanner()
-    // Start again immediately
-    initializeScanner()
+    setLoading(true)
+    setError(null)
+    setScannerInitialized(false)
+
+    // Clean up existing scanner
+    if (window.Html5Qrcode) {
+      try {
+        const scanner = new window.Html5Qrcode("admin-qr-reader")
+        if (scanner.isScanning) {
+          scanner.stop().catch(console.error)
+        }
+      } catch (error) {
+        console.error("Error stopping scanner:", error)
+      }
+    }
+
+    // Make sure the container exists
+    let qrContainer = document.getElementById("admin-qr-reader")
+    if (!qrContainer) {
+      console.log("Recreating QR reader container")
+      qrContainer = document.createElement("div")
+      qrContainer.id = "admin-qr-reader"
+      qrContainer.className = "w-full h-64 overflow-hidden rounded-lg"
+
+      const parentContainer = document.getElementById("qr-container")
+      if (parentContainer) {
+        parentContainer.appendChild(qrContainer)
+      }
+    }
+
+    // Reinitialize after a short delay
+    setTimeout(initializeScanner, 1000)
   }
 
   return (
@@ -169,53 +225,52 @@ export default function AdminScanQRPage() {
           Back to Dashboard
         </Link>
 
-        <h2 className="text-2xl font-bold mb-4 text-center">Admin QR Scanner</h2>
+        <h2 className="text-2xl font-bold mb-4 text-center">Scan Product QR</h2>
 
         <Card className="w-full mb-4">
           <CardHeader className="pb-2">
-            <CardTitle className="text-center">Scan Product QR</CardTitle>
+            <CardTitle className="text-center">Scan QR Code</CardTitle>
           </CardHeader>
           <CardContent>
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-3 w-full">
-                <div className="flex">
-                  <AlertCircle className="h-5 w-5 text-red-500 mr-2 flex-shrink-0" />
-                  <p className="text-sm text-red-600">{error}</p>
-                </div>
+                <p className="text-sm text-red-600">{error}</p>
+                <Button onClick={restartScanner} variant="outline" size="sm" className="mt-2 w-full">
+                  Try Again
+                </Button>
               </div>
             )}
 
-            <div className="w-full mb-3">
-              <div className="relative">
-                {/* This div will be used by the html5-qrcode library */}
-                <div id="qr-reader" className="w-full h-64 overflow-hidden rounded-lg"></div>
-
-                {!cameraActive && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100 bg-opacity-90 rounded-lg">
-                    <Camera className="h-12 w-12 text-gray-400 mb-2" />
-                    <p className="text-gray-500">Initializing camera...</p>
-                  </div>
-                )}
-              </div>
-
-              <p className="text-center text-sm text-gray-500 mt-2">
-                {cameraActive ? "Position the QR code within the frame" : "Camera starting..."}
-              </p>
-            </div>
-
-            <Button onClick={restartScanner} className="w-full bg-blue-600 hover:bg-blue-700">
-              Restart Camera
+            <Button
+              onClick={restartScanner}
+              className="w-full bg-[#194a95] hover:bg-[#0f3a7a] flex items-center justify-center mb-4"
+              disabled={loading}
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Scan QR
             </Button>
+
+            <div className="w-full" id="qr-container">
+              {loading ? (
+                <div className="h-64 flex flex-col items-center justify-center bg-gray-100 rounded-lg">
+                  <Loader2 className="h-8 w-8 text-blue-500 animate-spin mb-2" />
+                  <span className="text-gray-600">Starting camera...</span>
+                </div>
+              ) : (
+                <div id="admin-qr-reader" className="w-full h-64 overflow-hidden rounded-lg"></div>
+              )}
+            </div>
           </CardContent>
         </Card>
 
-        <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-          <h3 className="font-medium text-blue-800 mb-1">Scanner Tips:</h3>
-          <ul className="list-disc pl-4 text-sm text-blue-700 space-y-1">
-            <li>Hold the QR code steady within the frame</li>
-            <li>Ensure adequate lighting for best results</li>
-            <li>If scanning fails, use the "Restart Camera" button</li>
-            <li>Make sure camera permissions are granted</li>
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <h3 className="font-medium text-gray-900 mb-2">Scanning Tips:</h3>
+          <ul className="list-disc pl-5 text-sm text-gray-600 space-y-1">
+            <li>Make sure the QR code is well-lit and not blurry</li>
+            <li>Hold your device steady while scanning</li>
+            <li>Position the QR code within the scanning area</li>
+            <li>If scanning fails, try the "Scan QR" button</li>
+            <li>Ensure camera permissions are granted in your browser</li>
           </ul>
         </div>
       </div>
