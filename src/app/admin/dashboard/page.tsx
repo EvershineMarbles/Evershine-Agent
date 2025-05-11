@@ -232,7 +232,7 @@ export default function AdminDashboard() {
             </div>
           </Link>
 
-          <Link href="/scan-qr" className="w-full">
+          <Link href="/admin/dashboard/scan-qr" className="w-full">
             <div className="h-auto py-8 bg-[#1e4b9a] text-white border-none hover:bg-[#1e4b9a]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg transition-colors">
               <QrCode className="h-8 w-8" />
               <span className="text-lg font-medium">Scan QR Code</span>
