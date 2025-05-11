@@ -254,15 +254,22 @@ export default function AdminDashboard() {
               <span className="text-lg font-medium">Follow-ups</span>
             </div>
           </Link>
+
+          <Link href="/admin/dashboard/followups" className="w-full">
+            <div className="h-auto py-8 bg-[#1e4b9a] text-white border-none hover:bg-[#1e4b9a]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg transition-colors">
+              <Bell className="h-8 w-8" />
+              <span className="text-lg font-medium">FErase All Data</span>
+            </div>
+          </Link>
         </div>
 
-        {/* Erase All Data Button - Made bigger */}
-        <div className="flex justify-center mt-4">
+        {/* Erase All Data Button - Made bigger  <div className="flex justify-center mt-4">
           <div className="bg-red-600 hover:bg-red-700 text-white py-8 w-full max-w-md rounded-lg flex flex-col items-center gap-3 cursor-pointer transition-colors">
             <Trash2 className="h-8 w-8" />
             <span className="text-lg font-medium">Erase All Data</span>
           </div>
-        </div>
+        </div> */}
+      
       </main>
     </div>
   )
