@@ -216,56 +216,56 @@ export default function AdminDashboard() {
           </Link>
         </div>
 
-        {/* Action Buttons - Updated to match the Dashboard style */}
+        {/* Action Buttons - Made bigger */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
           <Link href="/admin/dashboard/agents" className="w-full">
-            <div className="h-auto py-6 bg-[#1e4b9a] text-white border-none hover:bg-[#1e4b9a]/90 hover:text-white flex flex-col items-center gap-2 rounded-lg transition-colors">
-              <UserCheck className="h-6 w-6" />
-              <span className="text-base font-medium">Consultants</span>
+            <div className="h-auto py-8 bg-[#1e4b9a] text-white border-none hover:bg-[#1e4b9a]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg transition-colors">
+              <UserCheck className="h-8 w-8" />
+              <span className="text-lg font-medium">Consultants</span>
             </div>
           </Link>
 
           <Link href="/admin/dashboard/all-clients" className="w-full">
-            <div className="h-auto py-6 bg-[#1e4b9a] text-white border-none hover:bg-[#1e4b9a]/90 hover:text-white flex flex-col items-center gap-2 rounded-lg transition-colors">
-              <List className="h-6 w-6" />
-              <span className="text-base font-medium">Client List</span>
+            <div className="h-auto py-8 bg-[#1e4b9a] text-white border-none hover:bg-[#1e4b9a]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg transition-colors">
+              <List className="h-8 w-8" />
+              <span className="text-lg font-medium">Client List</span>
             </div>
           </Link>
 
           <Link href="/scan-qr" className="w-full">
-            <div className="h-auto py-6 bg-[#1e4b9a] text-white border-none hover:bg-[#1e4b9a]/90 hover:text-white flex flex-col items-center gap-2 rounded-lg transition-colors">
-              <QrCode className="h-6 w-6" />
-              <span className="text-base font-medium">Scan QR Code</span>
+            <div className="h-auto py-8 bg-[#1e4b9a] text-white border-none hover:bg-[#1e4b9a]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg transition-colors">
+              <QrCode className="h-8 w-8" />
+              <span className="text-lg font-medium">Scan QR Code</span>
             </div>
           </Link>
 
           <Link href="/admin/dashboard/followups" className="w-full">
-            <div className="h-auto py-6 bg-[#1e4b9a] text-white border-none hover:bg-[#1e4b9a]/90 hover:text-white flex flex-col items-center gap-2 rounded-lg transition-colors">
-              <Bell className="h-6 w-6" />
-              <span className="text-base font-medium">Follow-ups</span>
+            <div className="h-auto py-8 bg-[#1e4b9a] text-white border-none hover:bg-[#1e4b9a]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg transition-colors">
+              <Bell className="h-8 w-8" />
+              <span className="text-lg font-medium">Follow-ups</span>
             </div>
           </Link>
 
           <Link href="/admin/dashboard/global-commission" className="w-full">
-            <div className="h-auto py-6 bg-[#1e4b9a] text-white border-none hover:bg-[#1e4b9a]/90 hover:text-white flex flex-col items-center gap-2 rounded-lg transition-colors">
-              <Settings className="h-6 w-6" />
-              <span className="text-base font-medium">Standard Pricing</span>
+            <div className="h-auto py-8 bg-[#1e4b9a] text-white border-none hover:bg-[#1e4b9a]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg transition-colors">
+              <Settings className="h-8 w-8" />
+              <span className="text-lg font-medium">Standard Pricing</span>
             </div>
           </Link>
 
           <Link href="../register-client" className="w-full">
-            <div className="h-auto py-6 bg-[#1e4b9a] text-white border-none hover:bg-[#1e4b9a]/90 hover:text-white flex flex-col items-center gap-2 rounded-lg transition-colors">
-              <UserPlus className="h-6 w-6" />
-              <span className="text-base font-medium">New Client</span>
+            <div className="h-auto py-8 bg-[#1e4b9a] text-white border-none hover:bg-[#1e4b9a]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg transition-colors">
+              <UserPlus className="h-8 w-8" />
+              <span className="text-lg font-medium">New Client</span>
             </div>
           </Link>
         </div>
 
-        {/* Erase All Data Button */}
+        {/* Erase All Data Button - Made bigger */}
         <div className="flex justify-center mt-4">
-          <div className="bg-red-600 hover:bg-red-700 text-white py-6 w-full max-w-md rounded-lg flex flex-col items-center gap-2 cursor-pointer transition-colors">
-            <Trash2 className="h-6 w-6" />
-            <span className="text-base font-medium">Erase All Data</span>
+          <div className="bg-red-600 hover:bg-red-700 text-white py-8 w-full max-w-md rounded-lg flex flex-col items-center gap-3 cursor-pointer transition-colors">
+            <Trash2 className="h-8 w-8" />
+            <span className="text-lg font-medium">Erase All Data</span>
           </div>
         </div>
       </main>
