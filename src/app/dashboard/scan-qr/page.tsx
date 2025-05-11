@@ -17,6 +17,21 @@ export default function AgentScanQRPage() {
 
   // Load the QR code library as soon as possible
   useEffect(() => {
+    // Create a container for the QR reader if it doesn't exist
+    let qrContainer = document.getElementById("agent-qr-reader")
+    if (!qrContainer) {
+      console.log("Creating QR reader container")
+      qrContainer = document.createElement("div")
+      qrContainer.id = "agent-qr-reader"
+      qrContainer.className = "w-full h-64 overflow-hidden rounded-lg"
+
+      // Find the parent container where it should be inserted
+      const parentContainer = document.getElementById("qr-container")
+      if (parentContainer) {
+        parentContainer.appendChild(qrContainer)
+      }
+    }
+
     // Add the script to the head to load it early
     const script = document.createElement("script")
     script.src = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"
@@ -26,7 +41,7 @@ export default function AgentScanQRPage() {
     script.onload = () => {
       console.log("QR code library loaded")
       // Wait a moment for the DOM to be fully ready
-      setTimeout(initializeScanner, 500)
+      setTimeout(initializeScanner, 1000)
     }
 
     script.onerror = () => {
@@ -51,24 +66,41 @@ export default function AgentScanQRPage() {
   }, [])
 
   const initializeScanner = () => {
-    if (!window.Html5Qrcode) {
+    // First, check if the library is available
+    if (typeof window === "undefined" || !window.Html5Qrcode) {
       console.error("Html5Qrcode not available")
       setError("Scanner library not available. Please refresh the page.")
       setLoading(false)
       return
     }
 
-    try {
-      // Make sure the element exists
-      const qrContainer = document.getElementById("agent-qr-reader")
-      if (!qrContainer) {
-        console.error("QR reader container not found")
-        setError("Scanner element not found. Please refresh the page.")
-        setLoading(false)
-        return
-      }
+    // Make sure the container exists before proceeding
+    const qrContainer = document.getElementById("agent-qr-reader")
+    if (!qrContainer) {
+      console.error("QR reader container not found, will retry")
 
-      // Create scanner instance
+      // Instead of failing, retry after a short delay
+      setTimeout(() => {
+        const retryContainer = document.getElementById("agent-qr-reader")
+        if (retryContainer) {
+          console.log("QR reader container found on retry")
+          startScanner()
+        } else {
+          console.error("QR reader container still not found after retry")
+          setError("Scanner element not found. Please refresh the page.")
+          setLoading(false)
+        }
+      }, 1000)
+      return
+    }
+
+    // If container exists, start the scanner
+    startScanner()
+  }
+
+  // Add this new function to handle the actual scanner initialization
+  const startScanner = () => {
+    try {
       const html5QrCode = new window.Html5Qrcode("agent-qr-reader")
 
       // Configure scanner with more reliable settings
@@ -77,9 +109,6 @@ export default function AgentScanQRPage() {
         qrbox: { width: 250, height: 250 },
         aspectRatio: 1.0,
         formatsToSupport: [0], // QR_CODE only for better performance
-        experimentalFeatures: {
-          useBarCodeDetectorIfSupported: true, // Use native API if available
-        },
       }
 
       // Start scanning
@@ -119,7 +148,7 @@ export default function AgentScanQRPage() {
           setLoading(false)
         })
     } catch (error) {
-      console.error("Error initializing scanner:", error)
+      console.error("Error in startScanner:", error)
       setError("Failed to initialize scanner. Please refresh and try again.")
       setLoading(false)
     }
@@ -170,8 +199,22 @@ export default function AgentScanQRPage() {
       }
     }
 
+    // Make sure the container exists
+    let qrContainer = document.getElementById("agent-qr-reader")
+    if (!qrContainer) {
+      console.log("Recreating QR reader container")
+      qrContainer = document.createElement("div")
+      qrContainer.id = "agent-qr-reader"
+      qrContainer.className = "w-full h-64 overflow-hidden rounded-lg"
+
+      const parentContainer = document.getElementById("qr-container")
+      if (parentContainer) {
+        parentContainer.appendChild(qrContainer)
+      }
+    }
+
     // Reinitialize after a short delay
-    setTimeout(initializeScanner, 500)
+    setTimeout(initializeScanner, 1000)
   }
 
   return (
@@ -198,7 +241,7 @@ export default function AgentScanQRPage() {
               </div>
             )}
 
-            <div className="w-full mb-3">
+            <div className="w-full mb-3" id="qr-container">
               {loading ? (
                 <div className="h-64 flex flex-col items-center justify-center bg-gray-100 rounded-lg">
                   <Loader2 className="h-8 w-8 text-blue-500 animate-spin mb-2" />
