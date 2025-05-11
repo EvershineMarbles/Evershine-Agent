@@ -80,12 +80,43 @@ const getAllAgents = async () => {
   }
 }
 
+// Function to fetch all products
+const getAllProducts = async () => {
+  try {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"}/api/getAllProducts`,
+    )
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`)
+    }
+
+    const data = await response.json()
+
+    if (data.success) {
+      return {
+        success: true,
+        products: data.data || [],
+      }
+    } else {
+      throw new Error(data.message || "Failed to fetch products")
+    }
+  } catch (error: any) {
+    console.error("Error fetching products:", error)
+    return {
+      success: false,
+      message: error.message || "An error occurred while fetching products",
+      products: [],
+    }
+  }
+}
+
 export default function AdminDashboard() {
   // State for stats with loading indicators
   const [stats, setStats] = useState({
     clients: { value: 0, loading: true },
     agents: { value: 0, loading: true },
-    products: 172,
+    products: { value: 0, loading: true },
     followups: 200,
   })
 
@@ -166,7 +197,6 @@ export default function AdminDashboard() {
     fetchData()
   }, [])
 
-
   return (
     <div className="flex-1 bg-white">
       <header className="p-3 border-b">
@@ -235,10 +265,22 @@ export default function AdminDashboard() {
               </CardContent>
             </Card>
           </Link>
+
+          <Link href="/admin/dashboard/followups">
+            <Card className="border rounded-xl overflow-hidden cursor-pointer hover:shadow-md hover:border-[#1e4b9a] transition-all h-full">
+              <CardContent className="p-3 flex flex-col items-center justify-center">
+                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center mb-1">
+                  <Clock className="h-5 w-5 text-[#1e4b9a]" />
+                </div>
+                <h2 className="text-sm font-semibold text-center">Follow-ups</h2>
+                <p className="text-xl font-bold text-[#1e4b9a]">{stats.followups}</p>
+              </CardContent>
+            </Card>
+          </Link>
         </div>
 
-        {/* Action Buttons - Made bigger */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+     {/* Action Buttons - Made bigger */}
+     <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
           <Link href="/admin/dashboard/agents" className="w-full">
             <div className="h-auto py-8 bg-[#1e4b9a] text-white border-none hover:bg-[#1e4b9a]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg transition-colors">
               <UserCheck className="h-8 w-8" />
