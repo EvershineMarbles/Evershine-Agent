@@ -5,7 +5,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Loader2, Plus, RefreshCw, Search, Eye, Edit, Trash2 } from 'lucide-react'
+import { Loader2, RefreshCw, Search, Eye, Trash2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -435,7 +435,6 @@ export default function ClientTable() {
             <Button variant="outline" size="icon" onClick={fetchData} disabled={loading}>
               <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             </Button>
-           
           </div>
         </CardHeader>
         <CardContent className="p-0">
