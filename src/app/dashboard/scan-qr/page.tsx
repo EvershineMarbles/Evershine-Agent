@@ -173,7 +173,12 @@ const QRScanner = ({ onScan, onError }) => {
 export default function AgentScanQRPage() {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
-  const [showScanner, setShowScanner] = useState(false)
+  const [showScanner, setShowScanner] = useState(true) // Set to true by default to show scanner immediately
+
+  // Start scanner automatically when component mounts
+  useEffect(() => {
+    setShowScanner(true)
+  }, [])
 
   const handleScan = (decodedText: string, scanner: any) => {
     try {
@@ -188,6 +193,7 @@ export default function AgentScanQRPage() {
       if (!productId) {
         toast.error("Invalid QR code")
         setError("Invalid QR code. Please scan a valid Evershine product QR code.")
+        setShowScanner(false) // Hide scanner on error
         return
       }
 
@@ -200,11 +206,16 @@ export default function AgentScanQRPage() {
     } catch (error) {
       console.error("Error processing QR code:", error)
       setError("Failed to process QR code. Please try again.")
+      setShowScanner(false) // Hide scanner on error
     }
   }
 
   const handleError = (errorMessage: string) => {
     setError(errorMessage)
+    // Don't hide scanner on all errors, only on critical ones
+    if (errorMessage.includes("denied") || errorMessage.includes("found") || errorMessage.includes("use")) {
+      setShowScanner(false)
+    }
   }
 
   const startScanner = () => {
@@ -220,7 +231,6 @@ export default function AgentScanQRPage() {
           Back to Dashboard
         </Link>
 
-        <h2 className="text-2xl font-bold mb-4 text-center">Scan Product QR</h2>
 
         <Card className="w-full mb-4">
           <CardHeader className="pb-2">
@@ -236,13 +246,15 @@ export default function AgentScanQRPage() {
               </div>
             )}
 
-            <Button
-              onClick={startScanner}
-              className="w-full bg-[#194a95] hover:bg-[#0f3a7a] flex items-center justify-center mb-4"
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Scan QR
-            </Button>
+            {!showScanner && (
+              <Button
+                onClick={startScanner}
+                className="w-full bg-[#194a95] hover:bg-[#0f3a7a] flex items-center justify-center mb-4"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Scan QR
+              </Button>
+            )}
 
             {showScanner && <QRScanner onScan={handleScan} onError={handleError} />}
           </CardContent>
@@ -254,7 +266,7 @@ export default function AgentScanQRPage() {
             <li>Make sure the QR code is well-lit and not blurry</li>
             <li>Hold your device steady while scanning</li>
             <li>Position the QR code within the scanning area</li>
-            <li>If scanning fails, try the "Scan QR" button</li>
+            <li>If scanning fails, try the "Try Again" button</li>
             <li>Ensure camera permissions are granted in your browser</li>
           </ul>
         </div>
