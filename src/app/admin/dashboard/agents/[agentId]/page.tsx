@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -8,6 +10,8 @@ import { fetchWithAdminAuth } from "@/lib/admin-auth"
 import { Separator } from "@/components/ui/separator"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import AgentClientsTable from "@/components/agent-clients-table"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 
 interface Agent {
   _id: string
@@ -30,6 +34,13 @@ export default function AgentDetailsPage() {
   const [clientCount, setClientCount] = useState(0)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [editFormData, setEditFormData] = useState({
+    name: "",
+    email: "",
+    commissionRate: 0,
+  })
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     const fetchAgentDetails = async () => {
@@ -45,6 +56,15 @@ export default function AgentDetailsPage() {
         const data = await response.json()
         if (data.success && data.data) {
           setAgentDetails(data.data)
+
+          // Initialize edit form data with agent details
+          if (data.data) {
+            setEditFormData({
+              name: data.data.name,
+              email: data.data.email,
+              commissionRate: data.data.commissionRate || 0,
+            })
+          }
         } else {
           throw new Error(data.message || "Failed to fetch agent details")
         }
@@ -77,6 +97,101 @@ export default function AgentDetailsPage() {
       month: "numeric",
       day: "numeric",
     })
+  }
+
+  const handleEditInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
+
+    // Special handling for commission rate to ensure it's a number between 0-100
+    if (name === "commissionRate") {
+      // If the value is empty or just a minus sign, set it to 0
+      if (value === "" || value === "-") {
+        setEditFormData((prev) => ({
+          ...prev,
+          [name]: 0,
+        }))
+        return
+      }
+
+      // If the value starts with '0' and has more than 1 digit, remove the leading zero
+      if (value.length > 1 && value.startsWith("0") && value[1] !== ".") {
+        const newValue = value.substring(1)
+        const numValue = Number.parseFloat(newValue)
+        if (!isNaN(numValue)) {
+          const clampedValue = Math.min(Math.max(numValue, 0), 100)
+          setEditFormData((prev) => ({
+            ...prev,
+            [name]: clampedValue,
+          }))
+          return
+        }
+      }
+
+      const numValue = Number.parseFloat(value)
+      if (isNaN(numValue)) return
+
+      const clampedValue = Math.min(Math.max(numValue, 0), 100)
+      setEditFormData((prev) => ({
+        ...prev,
+        [name]: clampedValue,
+      }))
+    } else {
+      setEditFormData((prev) => ({
+        ...prev,
+        [name]: value,
+      }))
+    }
+  }
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!agentDetails) return
+
+    setIsSubmitting(true)
+
+    try {
+      // First update the general agent info
+      const response = await fetchWithAdminAuth(`/api/admin/agents/${agentId}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          name: editFormData.name,
+          email: editFormData.email,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Failed to update agent")
+      }
+
+      // Then update the commission rate separately
+      const commissionResponse = await fetchWithAdminAuth(`/api/admin/agents/${agentId}/commission`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          commissionRate: editFormData.commissionRate,
+        }),
+      })
+
+      if (!commissionResponse.ok) {
+        const errorData = await commissionResponse.json()
+        throw new Error(errorData.message || "Failed to update commission rate")
+      }
+
+      // Update the agent details in the local state
+      setAgentDetails({
+        ...agentDetails,
+        name: editFormData.name,
+        email: editFormData.email,
+        commissionRate: editFormData.commissionRate,
+      })
+
+      setIsEditModalOpen(false)
+    } catch (err: any) {
+      console.error("Error updating agent:", err)
+      setError(err.message || "Failed to update agent")
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handleDeleteAgent = async () => {
@@ -187,11 +302,11 @@ export default function AgentDetailsPage() {
               <div className="flex flex-row gap-3 mt-8 pt-4 border-t flex-wrap md:flex-nowrap">
                 <Button
                   className="bg-[#1e4b95] hover:bg-[#1e4b95]/90 text-white px-4 py-2 rounded-md flex-1 whitespace-nowrap"
-                  onClick={() => router.push(`/admin/dashboard/agents/edit/${agentId}`)}
+                  onClick={() => setIsEditModalOpen(true)}
                 >
                   Edit
                 </Button>
-          
+
                 <Button
                   variant="ghost"
                   className="text-red-500 hover:text-red-700 hover:bg-red-50 flex-1 flex items-center justify-center gap-2 whitespace-nowrap"
@@ -213,6 +328,74 @@ export default function AgentDetailsPage() {
           )
         )}
       </div>
+
+      {/* Edit Agent Modal */}
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Consultant</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditSubmit}>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="name">Name</Label>
+                <Input id="name" name="name" value={editFormData.name} onChange={handleEditInputChange} required />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  value={editFormData.email}
+                  onChange={handleEditInputChange}
+                  required
+                />
+              </div>
+              {/* Commission Rate field */}
+              <div className="grid gap-2">
+                <Label htmlFor="commissionRate">
+                  Commission Rate (%)
+                  <span className="ml-1 text-sm text-muted-foreground">
+                    - Products will be priced higher by this percentage
+                  </span>
+                </Label>
+                <Input
+                  id="commissionRate"
+                  name="commissionRate"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={editFormData.commissionRate}
+                  onChange={handleEditInputChange}
+                  onKeyDown={(e) => {
+                    // Allow clearing the field with Backspace or Delete
+                    if ((e.key === "Backspace" || e.key === "Delete") && editFormData.commissionRate === 0) {
+                      setEditFormData((prev) => ({ ...prev, commissionRate: 0 }))
+                    }
+                  }}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsEditModalOpen(false)} disabled={isSubmitting}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Changes"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
