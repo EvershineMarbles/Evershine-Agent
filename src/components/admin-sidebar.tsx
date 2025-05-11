@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Home, Users, Package, LogOut, UserCog } from "lucide-react"
+import { Home, Users, Package, LogOut, UserCog, QrCode} from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 export function AdminSidebar() {
@@ -29,6 +29,11 @@ export function AdminSidebar() {
       name: "Products",
       href: "/admin/dashboard/products",
       icon: Package,
+    },
+    {
+      name: "Scan QR",
+      href: "/admin/dashboard/scan-qr",
+      icon: QrCode,
     },
   ]
 
