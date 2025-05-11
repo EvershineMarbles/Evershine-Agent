@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Loader2, RefreshCw } from "lucide-react"
+import { ArrowLeft, Camera, Loader2, AlertCircle } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -11,6 +11,7 @@ import { extractProductId, isAdmin, isAgent, getCurrentClientId } from "@/lib/qr
 
 export default function ScanQRPage() {
   const router = useRouter()
+
   const [scanning, setScanning] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -135,30 +136,26 @@ export default function ScanQRPage() {
       }
 
       // Check user role
-      const adminUser = isAdmin()
-      const agentUser = isAgent()
+      const isAdminUser = isAdmin()
+      const isAgentUser = isAgent()
       const clientId = getCurrentClientId()
 
       // Determine redirect URL based on user role
       let redirectUrl: string
 
-      if (adminUser) {
-        // Admin route
+      if (isAdminUser) {
         redirectUrl = `/admin/dashboard/product/${productId}`
-        toast.success("Redirecting to admin product view...")
-      } else if (agentUser && clientId) {
-        // Agent with client context
+      } else if (isAgentUser && clientId) {
         redirectUrl = `/client-dashboard/${clientId}/product/${productId}`
-        toast.success("Redirecting to client product view...")
-      } else if (agentUser) {
-        // Agent without client context
-        toast.error("Please select a client first")
-        redirectUrl = `/dashboard`
+      } else if (isAgentUser) {
+        // Agent without client context - go to agent product page
+        redirectUrl = `/dashboard/product/${productId}`
       } else {
         // Regular user - public product page
         redirectUrl = `/product/${productId}`
-        toast.success("Product found! Redirecting...")
       }
+
+      toast.success("Product found! Redirecting...")
 
       // Navigate to the product page
       router.push(redirectUrl)
@@ -193,10 +190,10 @@ export default function ScanQRPage() {
       <div className="w-full max-w-md">
         <Link href="/" className="inline-flex items-center text-dark hover:underline mb-6">
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
+          Back to Home
         </Link>
 
-        <h2 className="text-2xl font-bold mb-6 text-center">Scan Product QR Code</h2>
+        <h2 className="text-2xl font-bold mb-6 text-center">Scan Product QR</h2>
 
         <Card className="w-full mb-6">
           <CardHeader>
@@ -205,7 +202,10 @@ export default function ScanQRPage() {
           <CardContent className="flex flex-col items-center justify-center">
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-4 w-full">
-                <p className="text-sm text-red-600">{error}</p>
+                <div className="flex">
+                  <AlertCircle className="h-5 w-5 text-red-500 mr-2 flex-shrink-0" />
+                  <p className="text-sm text-red-600">{error}</p>
+                </div>
               </div>
             )}
 
@@ -226,10 +226,10 @@ export default function ScanQRPage() {
 
             <Button
               onClick={restartScanner}
-              className="w-full bg-gray-600 hover:bg-gray-700 flex items-center justify-center"
+              className="w-full bg-[#194a95] hover:bg-[#0f3a7a] flex items-center justify-center"
               disabled={loading}
             >
-              <RefreshCw className="h-4 w-4 mr-2" />
+              <Camera className="h-4 w-4 mr-2" />
               Restart Camera
             </Button>
           </CardContent>
@@ -239,7 +239,6 @@ export default function ScanQRPage() {
           <h3 className="font-medium text-gray-900 mb-2">How to scan:</h3>
           <ol className="list-decimal pl-5 text-sm text-gray-600 space-y-1">
             <li>Camera starts automatically</li>
-            <li>Allow camera access when prompted</li>
             <li>Point your camera at an Evershine product QR code</li>
             <li>Hold steady until the QR code is recognized</li>
             <li>You'll be redirected to the product page automatically</li>

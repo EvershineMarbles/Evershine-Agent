@@ -53,7 +53,7 @@ export function isAdmin(): boolean {
  */
 export function isAgent(): boolean {
   if (typeof window === "undefined") return false
-  return localStorage.getItem("accessToken") !== null
+  return localStorage.getItem("accessToken") !== null && !isAdmin()
 }
 
 /**
@@ -78,8 +78,8 @@ export function getRedirectUrl(
   } else if (isAgentUser && clientId) {
     return `/client-dashboard/${clientId}/product/${productId}`
   } else if (isAgentUser) {
-    // Agent without client context - should go to dashboard
-    return `/dashboard`
+    // Agent without client context - should go to agent dashboard product page
+    return `/dashboard/product/${productId}`
   } else {
     // Regular user - public product page
     return `/product/${productId}`

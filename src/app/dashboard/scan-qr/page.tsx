@@ -3,14 +3,15 @@
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Loader2, RefreshCw } from "lucide-react"
+import { ArrowLeft, Camera, Loader2, AlertCircle } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { extractProductId } from "@/lib/qr-utils"
 
-export default function AdminScanQRPage() {
+export default function AgentScanQRPage() {
   const router = useRouter()
+
   const [scanning, setScanning] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -67,7 +68,7 @@ export default function AdminScanQRPage() {
 
   const startScanner = () => {
     try {
-      const qrContainer = document.getElementById("admin-qr-reader")
+      const qrContainer = document.getElementById("agent-qr-reader")
       if (!qrContainer) {
         console.error("QR reader container not found")
         setError("Scanner initialization failed. Please refresh the page.")
@@ -76,7 +77,7 @@ export default function AdminScanQRPage() {
       }
 
       // Create scanner instance
-      const html5QrCode = new window.Html5Qrcode("admin-qr-reader")
+      const html5QrCode = new window.Html5Qrcode("agent-qr-reader")
       scannerRef.current = html5QrCode
 
       // Configure scanner
@@ -134,9 +135,10 @@ export default function AdminScanQRPage() {
         return
       }
 
-      // Admin always goes to admin product page
-      const redirectUrl = `/admin/dashboard/product/${productId}`
-      toast.success("Product found! Redirecting to admin view...")
+      // For agents, always redirect to the agent dashboard product page
+      const redirectUrl = `/dashboard/product/${productId}`
+
+      toast.success("Product found! Redirecting...")
 
       // Navigate to the product page
       router.push(redirectUrl)
@@ -169,21 +171,24 @@ export default function AdminScanQRPage() {
   return (
     <div className="min-h-screen p-6 bg-gray-50 flex flex-col items-center">
       <div className="w-full max-w-md">
-        <Link href="/admin/dashboard" className="inline-flex items-center text-dark hover:underline mb-6">
+        <Link href="/dashboard" className="inline-flex items-center text-dark hover:underline mb-6">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Dashboard
         </Link>
 
-        <h2 className="text-2xl font-bold mb-6 text-center">Consultant QR Scanner</h2>
+        <h2 className="text-2xl font-bold mb-6 text-center">Scan Product QR</h2>
 
         <Card className="w-full mb-6">
           <CardHeader>
-            <CardTitle className="text-center">Scan Product QR</CardTitle>
+            <CardTitle className="text-center">Scan QR Code</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col items-center justify-center">
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-4 w-full">
-                <p className="text-sm text-red-600">{error}</p>
+                <div className="flex">
+                  <AlertCircle className="h-5 w-5 text-red-500 mr-2 flex-shrink-0" />
+                  <p className="text-sm text-red-600">{error}</p>
+                </div>
               </div>
             )}
 
@@ -194,7 +199,7 @@ export default function AdminScanQRPage() {
                   <span className="ml-2 text-gray-600">Starting camera...</span>
                 </div>
               ) : (
-                <div id="admin-qr-reader" className="w-full h-64 overflow-hidden rounded-lg"></div>
+                <div id="agent-qr-reader" className="w-full h-64 overflow-hidden rounded-lg"></div>
               )}
 
               <p className="text-center text-sm text-muted-foreground mt-2">
@@ -207,19 +212,20 @@ export default function AdminScanQRPage() {
               className="w-full bg-[#194a95] hover:bg-[#0f3a7a] flex items-center justify-center"
               disabled={loading}
             >
-              <RefreshCw className="h-4 w-4 mr-2" />
+              <Camera className="h-4 w-4 mr-2" />
               Restart Camera
             </Button>
           </CardContent>
         </Card>
 
         <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <h3 className="font-medium text-gray-900 mb-2">Scanner Tips:</h3>
-          <ul className="list-disc pl-5 text-sm text-gray-600 space-y-1">
-            <li>Make sure the QR code is clearly visible</li>
-            <li>Good lighting improves scanning success</li>
-            <li>Hold the camera steady for best results</li>
-          </ul>
+          <h3 className="font-medium text-gray-900 mb-2">How to scan:</h3>
+          <ol className="list-decimal pl-5 text-sm text-gray-600 space-y-1">
+            <li>Camera starts automatically</li>
+            <li>Point your camera at an Evershine product QR code</li>
+            <li>Hold steady until the QR code is recognized</li>
+            <li>You'll be redirected to the product page automatically</li>
+          </ol>
         </div>
       </div>
 

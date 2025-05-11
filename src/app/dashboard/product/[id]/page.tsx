@@ -447,12 +447,7 @@ export default function ProductDetail() {
               <h1 className="text-3xl font-bold mt-1">{product.name}</h1>
             </div>
 
-            {/* Price */}
-            <div className="pb-4 border-b border-gray-200">
-              <p className="text-gray-500">Price (per sqft)</p>
-              <p className="text-xl font-bold mt-1">₹{product.price}/per sqft</p>
-            </div>
-
+         
             {/* Product Category */}
             <div className="pb-4 border-b border-gray-200">
               <p className="text-gray-500">Product Category</p>
@@ -573,73 +568,11 @@ export default function ProductDetail() {
                 )}
               </div>
             </div>
-
-            {/* Action Buttons */}
-            <div className="flex flex-wrap gap-4">
-              <Button
-                onClick={() => router.push(`/edit-product/${product.postId}`)}
-                className="px-8 py-3 bg-[#194a95] hover:bg-[#0f3a7a] text-white rounded-md"
-              >
-                Edit
-              </Button>
-
-              <Button
-                onClick={downloadSimpleQRCode}
-                className="px-8 py-3 bg-[#194a95] hover:bg-[#0f3a7a] text-white rounded-md"
-              >
-                <Download className="mr-2 h-4 w-4" />
-                Download QR
-              </Button>
-
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" className="px-8 py-3" disabled={isDeleting}>
-                    {isDeleting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Deleting...
-                      </>
-                    ) : (
-                      <>
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </>
-                    )}
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent className="bg-white">
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This action cannot be undone. This will permanently delete the product and remove all associated
-                      data.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel className="bg-gray-100 hover:bg-gray-200">Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700 text-white">
-                      Delete
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
             </div>
           </div>
         </div>
 
-        {/* QR Code Section */}
-        <div className="max-w-6xl mx-auto mt-12 border-t pt-8">
-          <h2 className="text-2xl font-bold mb-6">Product QR Code</h2>
-          {product && (
-            <QRCodeGenerator
-              productId={product.postId}
-              productName={product.name}
-              category={product.category}
-              thickness={product.thickness}
-              size={product.size}
-            />
-          )}
-        </div>
+     
         
         {/* Disclaimer */}
         <div className="max-w-6xl mx-auto mt-8 pt-4 border-t">
@@ -648,6 +581,6 @@ export default function ProductDetail() {
           </p>
         </div>
       </div>
-    </div>
+    
   )
 }
