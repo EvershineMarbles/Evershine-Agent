@@ -239,12 +239,7 @@ export default function AdminDashboard() {
             </div>
           </Link>
 
-          <Link href="/admin/dashboard/followups" className="w-full">
-            <div className="h-auto py-8 bg-[#1e4b9a] text-white border-none hover:bg-[#1e4b9a]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg transition-colors">
-              <Bell className="h-8 w-8" />
-              <span className="text-lg font-medium">Follow-ups</span>
-            </div>
-          </Link>
+        
 
           <Link href="/admin/dashboard/global-commission" className="w-full">
             <div className="h-auto py-8 bg-[#1e4b9a] text-white border-none hover:bg-[#1e4b9a]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg transition-colors">
@@ -253,10 +248,10 @@ export default function AdminDashboard() {
             </div>
           </Link>
 
-          <Link href="../register-client" className="w-full">
+          <Link href="/admin/dashboard/followups" className="w-full">
             <div className="h-auto py-8 bg-[#1e4b9a] text-white border-none hover:bg-[#1e4b9a]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg transition-colors">
-              <UserPlus className="h-8 w-8" />
-              <span className="text-lg font-medium">New Client</span>
+              <Bell className="h-8 w-8" />
+              <span className="text-lg font-medium">Follow-ups</span>
             </div>
           </Link>
         </div>
