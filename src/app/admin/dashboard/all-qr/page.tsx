@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import axios from "axios"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Download, Loader2, Search, Grid, List, Check } from "lucide-react"
@@ -33,13 +33,30 @@ export default function AllQR() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
-  // const [previewProduct, setPreviewProduct] = useState<Product | null>(null)
   const [priceValues, setPriceValues] = useState<Record<string, string>>({})
   const [updatingPrice, setUpdatingPrice] = useState<Record<string, boolean>>({})
   const [generatingQR, setGeneratingQR] = useState<Record<string, boolean>>({})
 
+  // Create refs for download links
+  const downloadLinkRef = useRef<HTMLAnchorElement | null>(null)
+
   useEffect(() => {
     fetchProducts()
+
+    // Create a hidden download link element that we'll reuse
+    if (!downloadLinkRef.current) {
+      const link = document.createElement("a")
+      link.style.display = "none"
+      document.body.appendChild(link)
+      downloadLinkRef.current = link
+    }
+
+    // Cleanup function to remove the link when component unmounts
+    return () => {
+      if (downloadLinkRef.current) {
+        document.body.removeChild(downloadLinkRef.current)
+      }
+    }
   }, [])
 
   const fetchProducts = async () => {
@@ -67,14 +84,6 @@ export default function AllQR() {
   const filteredProducts = products.filter((product) => {
     return product.name.toLowerCase().includes(searchQuery.toLowerCase())
   })
-
-  // const handlePreviewQR = (product: Product) => {
-  //   setPreviewProduct(product)
-  // }
-
-  // const closePreview = () => {
-  //   setPreviewProduct(null)
-  // }
 
   const handlePriceChange = (productId: string, value: string) => {
     setPriceValues((prev) => ({
@@ -142,24 +151,49 @@ export default function AllQR() {
       // Create a canvas element
       const canvas = document.createElement("canvas")
       const ctx = canvas.getContext("2d")
-      if (!ctx) throw new Error("Could not get canvas context")
+      if (!ctx) {
+        throw new Error("Could not get canvas context")
+      }
 
       // Set canvas dimensions
       canvas.width = 600
       canvas.height = 900
 
+      // Create a new Image for the QR code
+      const qrCode = new Image()
+      qrCode.crossOrigin = "anonymous"
+      qrCode.src = qrCodeDataUrl
+
+      // Function to directly download the QR code without template
+      const downloadBasicQR = () => {
+        if (downloadLinkRef.current) {
+          downloadLinkRef.current.href = qrCodeDataUrl
+          downloadLinkRef.current.download = `evershine-product-${product.postId}.png`
+          downloadLinkRef.current.click()
+
+          setGeneratingQR((prev) => ({ ...prev, [product.postId]: false }))
+          toast.success("Basic QR code downloaded successfully")
+        }
+      }
+
       // Create a new Image for the template
       const templateImage = new Image()
       templateImage.crossOrigin = "anonymous"
 
+      // Set a timeout to fall back to basic QR if template doesn't load
+      const templateTimeout = setTimeout(() => {
+        if (!templateImage.complete || templateImage.naturalHeight === 0) {
+          console.warn("Template image load timed out, falling back to basic QR")
+          downloadBasicQR()
+        }
+      }, 5000)
+
       // Handle template image loading
       templateImage.onload = () => {
+        clearTimeout(templateTimeout)
+
         // Draw the template image on the canvas
         ctx.drawImage(templateImage, 0, 0, canvas.width, canvas.height)
-
-        // Create a new Image for the QR code
-        const qrCode = new Image()
-        qrCode.crossOrigin = "anonymous"
 
         // Handle QR code image loading
         qrCode.onload = () => {
@@ -215,62 +249,65 @@ export default function AllQR() {
             ctx.fillText(line, qrCodeCenterX, y)
           }
 
-          // Convert canvas to data URL and download
-          const dataUrl = canvas.toDataURL("image/png")
-          const link = document.createElement("a")
-          link.href = dataUrl
-          link.download = `evershine-product-${product.postId}.png`
-          document.body.appendChild(link)
-          link.click()
-          document.body.removeChild(link)
+          try {
+            // Convert canvas to data URL and download
+            const dataUrl = canvas.toDataURL("image/png")
 
-          // Clean up
-          setGeneratingQR((prev) => ({ ...prev, [product.postId]: false }))
-          toast.success("QR code downloaded successfully")
+            // Use the persistent download link
+            if (downloadLinkRef.current) {
+              downloadLinkRef.current.href = dataUrl
+              downloadLinkRef.current.download = `evershine-product-${product.postId}.png`
+              downloadLinkRef.current.click()
+
+              setGeneratingQR((prev) => ({ ...prev, [product.postId]: false }))
+              toast.success("QR code downloaded successfully")
+            } else {
+              // Fallback if ref is not available
+              const tempLink = document.createElement("a")
+              tempLink.href = dataUrl
+              tempLink.download = `evershine-product-${product.postId}.png`
+              document.body.appendChild(tempLink)
+              tempLink.click()
+              document.body.removeChild(tempLink)
+
+              setGeneratingQR((prev) => ({ ...prev, [product.postId]: false }))
+              toast.success("QR code downloaded successfully")
+            }
+          } catch (error) {
+            console.error("Error creating download:", error)
+            downloadBasicQR()
+          }
         }
 
         // Handle QR code loading error
         qrCode.onerror = () => {
+          clearTimeout(templateTimeout)
+          console.error("Failed to load QR code image")
           setGeneratingQR((prev) => ({ ...prev, [product.postId]: false }))
           toast.error("Failed to generate QR code")
-
-          // Fallback to direct QR code download if template fails
-          const link = document.createElement("a")
-          link.href = qrCodeDataUrl
-          link.download = `evershine-product-${product.postId}.png`
-          document.body.appendChild(link)
-          link.click()
-          document.body.removeChild(link)
+          downloadBasicQR()
         }
-
-        // Set QR code source
-        qrCode.src = qrCodeDataUrl
       }
 
       // Handle template image loading error
       templateImage.onerror = () => {
+        clearTimeout(templateTimeout)
         console.error("Failed to load template image")
         setGeneratingQR((prev) => ({ ...prev, [product.postId]: false }))
         toast.error("Failed to load template image, downloading basic QR code instead")
-
-        // Fallback to direct QR code download if template fails
-        const link = document.createElement("a")
-        link.href = qrCodeDataUrl
-        link.download = `evershine-product-${product.postId}.png`
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
+        downloadBasicQR()
       }
 
-      // Set template image source - try both paths
+      // Try to load the template image from public folder
       templateImage.src = "/assets/qr-template.png"
 
-      // If the template image fails to load after 3 seconds, try an alternative path
+      // If the first path fails, try an alternative path after a short delay
       setTimeout(() => {
         if (!templateImage.complete || templateImage.naturalHeight === 0) {
+          console.log("Trying alternative template path...")
           templateImage.src = "/qr-template.png"
         }
-      }, 3000)
+      }, 1000)
     } catch (error) {
       console.error("Error generating QR code:", error)
       toast.error("Failed to generate QR code: " + (error instanceof Error ? error.message : "Unknown error"))
@@ -421,11 +458,6 @@ export default function AllQR() {
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-right">
                     <div className="flex justify-end space-x-2">
-                      <Link href={`/product/${product.postId}`} passHref>
-                        <Button variant="outline" size="sm" className="text-[#194a95] border-[#194a95]">
-                          Preview
-                        </Button>
-                      </Link>
                       <Button
                         onClick={() => generateAndDownloadQR(product)}
                         size="sm"
@@ -455,38 +487,6 @@ export default function AllQR() {
           </div>
         )}
       </div>
-
-      {/* QR Code Preview Modal */}
-      {/* {previewProduct && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium">QR Code Preview</h3>
-              <button onClick={closePreview} className="text-gray-400 hover:text-gray-500">
-                <span className="sr-only">Close</span>
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="flex flex-col items-center">
-              <QRCodeGenerator
-                productId={previewProduct.postId}
-                productName={previewProduct.name}
-                category={previewProduct.category}
-                thickness={previewProduct.thickness}
-                size={previewProduct.size}
-                sizeUnit={previewProduct.sizeUnit}
-                finishes={previewProduct.finishes}
-              />
-              <div className="text-center mt-4">
-                <h4 className="font-medium">{previewProduct.name}</h4>
-                <p className="text-sm text-gray-500">₹{previewProduct.price}/per sqft</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )} */}
     </div>
   )
 }

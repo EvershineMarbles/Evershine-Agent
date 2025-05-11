@@ -22,7 +22,6 @@ import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/use-toast"
 import { ArrowLeft } from "lucide-react"
 
-
 interface Agent {
   _id: string
   name: string
@@ -156,6 +155,15 @@ export default function AgentTable() {
 
     // Special handling for commission rate to ensure it's a number between 0-100
     if (name === "commissionRate") {
+      // If the value is empty or just a minus sign, set it to 0
+      if (value === "" || value === "-") {
+        setEditFormData((prev) => ({
+          ...prev,
+          [name]: 0,
+        }))
+        return
+      }
+
       const numValue = Number.parseFloat(value)
       if (isNaN(numValue)) return
 
@@ -301,6 +309,15 @@ export default function AgentTable() {
 
     // Special handling for commission rate to ensure it's a number between 0-100
     if (name === "commissionRate") {
+      // If the value is empty or just a minus sign, set it to 0
+      if (value === "" || value === "-") {
+        setCreateFormData((prev) => ({
+          ...prev,
+          [name]: 0,
+        }))
+        return
+      }
+
       const numValue = Number.parseFloat(value)
       if (isNaN(numValue)) return
 
@@ -383,7 +400,7 @@ export default function AgentTable() {
       <Card className="shadow-sm border-0">
         <CardHeader className="flex flex-row items-center justify-between p-6">
           <div className="flex items-center gap-2">
-          <Button
+            <Button
               variant="ghost"
               size="icon"
               onClick={() => router.back()}
@@ -496,8 +513,8 @@ export default function AgentTable() {
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Agent</DialogTitle>
-            <DialogDescription>Make changes to the agent's information.</DialogDescription>
+            <DialogTitle>Edit Consultant</DialogTitle>
+            <DialogDescription>Make changes to the consultant's information.</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleEditSubmit}>
             <div className="grid gap-4 py-4">
@@ -533,6 +550,12 @@ export default function AgentTable() {
                   step="0.1"
                   value={editFormData.commissionRate}
                   onChange={handleEditInputChange}
+                  onKeyDown={(e) => {
+                    // Allow clearing the field with Backspace or Delete
+                    if ((e.key === "Backspace" || e.key === "Delete") && editFormData.commissionRate === 0) {
+                      setEditFormData((prev) => ({ ...prev, commissionRate: 0 }))
+                    }
+                  }}
                 />
               </div>
             </div>
@@ -647,6 +670,12 @@ export default function AgentTable() {
                   step="0.1"
                   value={createFormData.commissionRate}
                   onChange={handleCreateInputChange}
+                  onKeyDown={(e) => {
+                    // Allow clearing the field with Backspace or Delete
+                    if ((e.key === "Backspace" || e.key === "Delete") && createFormData.commissionRate === 0) {
+                      setCreateFormData((prev) => ({ ...prev, commissionRate: 0 }))
+                    }
+                  }}
                 />
               </div>
             </div>
