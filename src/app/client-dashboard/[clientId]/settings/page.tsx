@@ -425,9 +425,7 @@ export default function SettingsPage() {
                         aria-label="Purple consultant level (+15%)"
                       />
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Select a consultant level to determine commission rates for product pricing
-                    </p>
+                    
                   </div>
                 </div>
 
