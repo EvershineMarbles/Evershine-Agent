@@ -2,8 +2,20 @@
 
 import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Search, Users, Package, UserCheck, Clock, Loader2 } from "lucide-react"
+import {
+  Search,
+  Users,
+  Package,
+  UserCheck,
+  Clock,
+  Loader2,
+  Settings,
+  QrCode,
+  UserPlus,
+  List,
+  Bell,
+  Trash2,
+} from "lucide-react"
 import { Input } from "@/components/ui/input"
 import Link from "next/link"
 import { fetchWithAdminAuth } from "@/lib/admin-auth"
@@ -204,50 +216,57 @@ export default function AdminDashboard() {
           </Link>
         </div>
 
-        {/* Action Buttons - Now in a 2x3 grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-4">
+        {/* Action Buttons - Updated to match the Dashboard style */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
           <Link href="/admin/dashboard/agents" className="w-full">
-            <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-9 text-sm font-normal w-full rounded-md">
-              Consultants
-            </Button>
+            <div className="h-auto py-6 bg-[#1e4b9a] text-white border-none hover:bg-[#1e4b9a]/90 hover:text-white flex flex-col items-center gap-2 rounded-lg transition-colors">
+              <UserCheck className="h-6 w-6" />
+              <span className="text-base font-medium">Consultants</span>
+            </div>
           </Link>
 
           <Link href="/admin/dashboard/all-clients" className="w-full">
-            <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-9 text-sm font-normal w-full rounded-md">
-              Client List
-            </Button>
+            <div className="h-auto py-6 bg-[#1e4b9a] text-white border-none hover:bg-[#1e4b9a]/90 hover:text-white flex flex-col items-center gap-2 rounded-lg transition-colors">
+              <List className="h-6 w-6" />
+              <span className="text-base font-medium">Client List</span>
+            </div>
           </Link>
 
           <Link href="/scan-qr" className="w-full">
-            <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-9 text-sm font-normal w-full rounded-md">
-              Scan QR Code
-            </Button>
+            <div className="h-auto py-6 bg-[#1e4b9a] text-white border-none hover:bg-[#1e4b9a]/90 hover:text-white flex flex-col items-center gap-2 rounded-lg transition-colors">
+              <QrCode className="h-6 w-6" />
+              <span className="text-base font-medium">Scan QR Code</span>
+            </div>
           </Link>
 
           <Link href="/admin/dashboard/followups" className="w-full">
-            <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-9 text-sm font-normal w-full rounded-md">
-              Follow-ups
-            </Button>
+            <div className="h-auto py-6 bg-[#1e4b9a] text-white border-none hover:bg-[#1e4b9a]/90 hover:text-white flex flex-col items-center gap-2 rounded-lg transition-colors">
+              <Bell className="h-6 w-6" />
+              <span className="text-base font-medium">Follow-ups</span>
+            </div>
           </Link>
 
           <Link href="/admin/dashboard/global-commission" className="w-full">
-            <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-9 text-sm font-normal w-full rounded-md">
-              Change Standard Pricing
-            </Button>
+            <div className="h-auto py-6 bg-[#1e4b9a] text-white border-none hover:bg-[#1e4b9a]/90 hover:text-white flex flex-col items-center gap-2 rounded-lg transition-colors">
+              <Settings className="h-6 w-6" />
+              <span className="text-base font-medium">Standard Pricing</span>
+            </div>
           </Link>
 
           <Link href="../register-client" className="w-full">
-            <Button className="bg-[#1e4b9a] hover:bg-[#1e4b9a]/90 text-white h-9 text-sm font-normal w-full rounded-md">
-              New Client
-            </Button>
+            <div className="h-auto py-6 bg-[#1e4b9a] text-white border-none hover:bg-[#1e4b9a]/90 hover:text-white flex flex-col items-center gap-2 rounded-lg transition-colors">
+              <UserPlus className="h-6 w-6" />
+              <span className="text-base font-medium">New Client</span>
+            </div>
           </Link>
         </div>
 
         {/* Erase All Data Button */}
-        <div className="flex justify-center">
-          <Button className="bg-red-600 hover:bg-red-700 text-white h-9 w-full max-w-md text-sm font-normal rounded-md">
-            Erase All Data
-          </Button>
+        <div className="flex justify-center mt-4">
+          <div className="bg-red-600 hover:bg-red-700 text-white py-6 w-full max-w-md rounded-lg flex flex-col items-center gap-2 cursor-pointer transition-colors">
+            <Trash2 className="h-6 w-6" />
+            <span className="text-base font-medium">Erase All Data</span>
+          </div>
         </div>
       </main>
     </div>
