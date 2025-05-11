@@ -133,7 +133,7 @@ export default function Dashboard() {
 
         <button
           className="h-auto py-8 bg-[#194a95] text-white border-none hover:bg-[#194a95]/90 hover:text-white flex flex-col items-center gap-3 rounded-lg transition-colors"
-          onClick={() => router.push("/scan-qr")}
+          onClick={() => router.push("/dashboard/scan-qr")}
         >
           <QrCode className="h-6 w-6" />
           <span className="text-base font-medium">Scan QR</span>
