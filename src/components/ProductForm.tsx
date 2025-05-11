@@ -421,7 +421,8 @@ export default function ProductForm({ mode = "create", initialData }: ProductFor
           setPreviews([])
           setNewImageCount(0)
         } else {
-          setTimeout(() => router.push("/products"), 1500)
+          setTimeout(() => router.push("/admin/dashboard/products"), 1500)
+        
         }
       } else {
         throw new Error(response.data.msg || `Failed to ${mode} product`)

@@ -526,7 +526,7 @@ export default function AgentTable() {
                         className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
                         onClick={(e) => handleDeleteClick(e, agent)}
                       >
-                        <Trash2 size={16} className="mr-1" /> Delete
+                        <Trash2 size={16} className="mr-1" /> Suspend
                       </Button>
                     </div>
                   </div>

@@ -198,7 +198,7 @@ export default function AdminDashboard() {
                   <Package className="h-5 w-5 text-[#1e4b9a]" />
                 </div>
                 <h2 className="text-sm font-semibold text-center">Products</h2>
-                <p className="text-xl font-bold text-[#1e4b9a]">{stats.products}</p>
+                <p className="text-xl font-bold text-[#1e4b9a]">{stats.products.value}</p>
               </CardContent>
             </Card>
           </Link>
