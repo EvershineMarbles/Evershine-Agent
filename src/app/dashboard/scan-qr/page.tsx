@@ -3,36 +3,108 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, RefreshCw } from "lucide-react"
+import { ArrowLeft, Loader2, RefreshCw } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { extractProductId } from "@/lib/qr-utils"
 
-export default function AgentScanQRPage() {
-  const router = useRouter()
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [scannerInitialized, setScannerInitialized] = useState(false)
+// Create a separate component for the QR scanner to better control its lifecycle
+const QRScanner = ({ onScan, onError }) => {
+  const [loading, setLoading] = useState(true)
 
-  // Initialize scanner when button is clicked
+  useEffect(() => {
+    // Create a style element to force the camera to stay in position
+    const styleElement = document.createElement("style")
+    styleElement.textContent = `
+      #agent-qr-reader {
+        position: relative !important;
+        height: 300px !important;
+        width: 100% !important;
+        overflow: hidden !important;
+      }
+      
+      #agent-qr-reader video {
+        object-fit: cover !important;
+        width: 100% !important;
+        height: 100% !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+      }
+      
+      #agent-qr-reader canvas {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+      }
+      
+      #agent-qr-reader__scan_region {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+      }
+      
+      #agent-qr-reader__dashboard {
+        position: absolute !important;
+        bottom: 0 !important;
+        width: 100% !important;
+        background: rgba(0, 0, 0, 0.5) !important;
+        color: white !important;
+        padding: 5px !important;
+        z-index: 10 !important;
+      }
+    `
+    document.head.appendChild(styleElement)
+
+    // Load the QR code library
+    const script = document.createElement("script")
+    script.src = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"
+    script.async = true
+    document.head.appendChild(script)
+
+    script.onload = () => {
+      console.log("QR code library loaded")
+      setTimeout(initializeScanner, 500)
+    }
+
+    script.onerror = () => {
+      console.error("Failed to load QR code library")
+      onError("Failed to load scanner. Please refresh the page.")
+      setLoading(false)
+    }
+
+    return () => {
+      // Clean up
+      try {
+        if (window.Html5Qrcode) {
+          const scanner = new window.Html5Qrcode("agent-qr-reader")
+          if (scanner.isScanning) {
+            scanner.stop().catch(console.error)
+          }
+        }
+      } catch (error) {
+        console.error("Error cleaning up scanner:", error)
+      }
+
+      // Remove the style element
+      document.head.removeChild(styleElement)
+    }
+  }, [onScan, onError])
+
   const initializeScanner = () => {
-    if (typeof window === "undefined" || !window.Html5Qrcode) {
-      loadQrLibrary()
+    if (!window.Html5Qrcode) {
+      console.error("Html5Qrcode not available")
+      onError("Scanner library not available. Please refresh the page.")
+      setLoading(false)
       return
     }
 
-    setLoading(true)
-    setError(null)
-
     try {
-      // Clear previous scanner if exists
-      const qrContainer = document.getElementById("agent-qr-reader")
-      if (qrContainer) {
-        qrContainer.innerHTML = ""
-      }
-
-      // Create scanner instance
       const html5QrCode = new window.Html5Qrcode("agent-qr-reader")
 
       // Configure scanner
@@ -51,7 +123,7 @@ export default function AgentScanQRPage() {
           (decodedText) => {
             // On successful scan
             console.log("QR Code detected:", decodedText)
-            processQrCode(decodedText, html5QrCode)
+            onScan(decodedText, html5QrCode)
           },
           (errorMessage) => {
             // Just for debugging
@@ -60,7 +132,6 @@ export default function AgentScanQRPage() {
         )
         .then(() => {
           console.log("Scanner started successfully")
-          setScannerInitialized(true)
           setLoading(false)
         })
         .catch((err) => {
@@ -68,44 +139,43 @@ export default function AgentScanQRPage() {
 
           // User-friendly error message
           if (err.toString().includes("NotAllowedError")) {
-            setError("Camera access denied. Please check your browser settings and permissions.")
+            onError("Camera access denied. Please check your browser settings and permissions.")
           } else if (err.toString().includes("NotFoundError")) {
-            setError("No camera found. Please make sure your device has a working camera.")
+            onError("No camera found. Please make sure your device has a working camera.")
           } else if (err.toString().includes("NotReadableError")) {
-            setError("Camera is in use by another application. Please close other apps using the camera.")
+            onError("Camera is in use by another application. Please close other apps using the camera.")
           } else {
-            setError("Failed to start camera. Please try again or use a different device.")
+            onError("Failed to start camera. Please try again or use a different device.")
           }
 
           setLoading(false)
         })
     } catch (error) {
-      console.error("Error initializing scanner:", error)
-      setError("Failed to initialize scanner. Please refresh and try again.")
+      console.error("Error in startScanner:", error)
+      onError("Failed to initialize scanner. Please refresh and try again.")
       setLoading(false)
     }
   }
 
-  const loadQrLibrary = () => {
-    // Add the script to the head
-    const script = document.createElement("script")
-    script.src = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"
-    script.async = true
-    document.head.appendChild(script)
+  return (
+    <div className="relative w-full h-64 bg-gray-100 rounded-lg overflow-hidden">
+      {loading ? (
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <Loader2 className="h-8 w-8 text-blue-500 animate-spin mb-2" />
+          <span className="text-gray-600">Starting camera...</span>
+        </div>
+      ) : null}
+      <div id="agent-qr-reader" className="w-full h-full"></div>
+    </div>
+  )
+}
 
-    script.onload = () => {
-      console.log("QR code library loaded")
-      initializeScanner()
-    }
+export default function AgentScanQRPage() {
+  const router = useRouter()
+  const [error, setError] = useState<string | null>(null)
+  const [showScanner, setShowScanner] = useState(false)
 
-    script.onerror = () => {
-      console.error("Failed to load QR code library")
-      setError("Failed to load scanner. Please refresh the page.")
-      setLoading(false)
-    }
-  }
-
-  const processQrCode = (decodedText: string, scanner: any) => {
+  const handleScan = (decodedText: string, scanner: any) => {
     try {
       // Stop scanning immediately
       if (scanner && scanner.isScanning) {
@@ -133,21 +203,14 @@ export default function AgentScanQRPage() {
     }
   }
 
-  // Clean up on unmount
-  useEffect(() => {
-    return () => {
-      if (scannerInitialized && window.Html5Qrcode) {
-        try {
-          const scanner = new window.Html5Qrcode("agent-qr-reader")
-          if (scanner.isScanning) {
-            scanner.stop().catch(console.error)
-          }
-        } catch (error) {
-          console.error("Error cleaning up scanner:", error)
-        }
-      }
-    }
-  }, [scannerInitialized])
+  const handleError = (errorMessage: string) => {
+    setError(errorMessage)
+  }
+
+  const startScanner = () => {
+    setError(null)
+    setShowScanner(true)
+  }
 
   return (
     <div className="min-h-screen p-4 bg-gray-50">
@@ -167,41 +230,21 @@ export default function AgentScanQRPage() {
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-3 w-full">
                 <p className="text-sm text-red-600">{error}</p>
+                <Button onClick={startScanner} variant="outline" size="sm" className="mt-2 w-full">
+                  Try Again
+                </Button>
               </div>
             )}
 
             <Button
-              onClick={initializeScanner}
+              onClick={startScanner}
               className="w-full bg-[#194a95] hover:bg-[#0f3a7a] flex items-center justify-center mb-4"
-              disabled={loading}
             >
               <RefreshCw className="h-4 w-4 mr-2" />
               Scan QR
             </Button>
 
-            {/* Fixed position for the QR reader */}
-            <div
-              id="agent-qr-reader"
-              className="w-full h-64 overflow-hidden rounded-lg bg-gray-100"
-              style={{
-                position: "relative",
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              {!scannerInitialized && !loading && (
-                <div className="text-center text-gray-500">
-                  <p>Click "Scan QR" to start camera</p>
-                </div>
-              )}
-              {loading && (
-                <div className="text-center text-gray-500">
-                  <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"></div>
-                  <p>Starting camera...</p>
-                </div>
-              )}
-            </div>
+            {showScanner && <QRScanner onScan={handleScan} onError={handleError} />}
           </CardContent>
         </Card>
 
@@ -211,7 +254,7 @@ export default function AgentScanQRPage() {
             <li>Make sure the QR code is well-lit and not blurry</li>
             <li>Hold your device steady while scanning</li>
             <li>Position the QR code within the scanning area</li>
-            <li>If scanning fails, try the "Scan QR" button again</li>
+            <li>If scanning fails, try the "Scan QR" button</li>
             <li>Ensure camera permissions are granted in your browser</li>
           </ul>
         </div>
