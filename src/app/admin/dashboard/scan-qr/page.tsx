@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Loader2, RefreshCw } from "lucide-react"
+import { ArrowLeft, RefreshCw } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -17,21 +17,6 @@ export default function AdminScanQRPage() {
 
   // Load the QR code library as soon as possible
   useEffect(() => {
-    // Create a container for the QR reader if it doesn't exist
-    let qrContainer = document.getElementById("admin-qr-reader")
-    if (!qrContainer) {
-      console.log("Creating QR reader container")
-      qrContainer = document.createElement("div")
-      qrContainer.id = "admin-qr-reader"
-      qrContainer.className = "w-full h-64 overflow-hidden rounded-lg"
-
-      // Find the parent container where it should be inserted
-      const parentContainer = document.getElementById("qr-container")
-      if (parentContainer) {
-        parentContainer.appendChild(qrContainer)
-      }
-    }
-
     // Add the script to the head to load it early
     const script = document.createElement("script")
     script.src = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"
@@ -41,7 +26,15 @@ export default function AdminScanQRPage() {
     script.onload = () => {
       console.log("QR code library loaded")
       // Wait a moment for the DOM to be fully ready
-      setTimeout(initializeScanner, 1000)
+      setTimeout(() => {
+        // Create a clean container for the QR reader
+        const qrContainer = document.getElementById("qr-container")
+        if (qrContainer) {
+          // Clear any existing content
+          qrContainer.innerHTML = '<div id="admin-qr-reader" style="width: 100%; height: 300px;"></div>'
+          initializeScanner()
+        }
+      }, 1000)
     }
 
     script.onerror = () => {
@@ -52,7 +45,7 @@ export default function AdminScanQRPage() {
 
     return () => {
       // Clean up
-      if (scannerInitialized && window.Html5Qrcode) {
+      if (window.Html5Qrcode) {
         try {
           const scanner = new window.Html5Qrcode("admin-qr-reader")
           if (scanner.isScanning) {
@@ -78,23 +71,12 @@ export default function AdminScanQRPage() {
     const qrContainer = document.getElementById("admin-qr-reader")
     if (!qrContainer) {
       console.error("QR reader container not found, will retry")
-
-      // Instead of failing, retry after a short delay
-      setTimeout(() => {
-        const retryContainer = document.getElementById("admin-qr-reader")
-        if (retryContainer) {
-          console.log("QR reader container found on retry")
-          startScanner()
-        } else {
-          console.error("QR reader container still not found after retry")
-          setError("Scanner element not found. Please refresh the page.")
-          setLoading(false)
-        }
-      }, 1000)
+      setError("Scanner element not found. Please refresh the page.")
+      setLoading(false)
       return
     }
 
-    // If container exists, start the scanner
+    // Start the scanner
     startScanner()
   }
 
@@ -170,7 +152,7 @@ export default function AdminScanQRPage() {
         return
       }
 
-      // For admins, redirect to the admin dashboard product page
+      // For admins, redirect to the admin product page
       const redirectUrl = `/admin/dashboard/product/${productId}`
 
       // Show success message and redirect
@@ -199,22 +181,14 @@ export default function AdminScanQRPage() {
       }
     }
 
-    // Make sure the container exists
-    let qrContainer = document.getElementById("admin-qr-reader")
-    if (!qrContainer) {
-      console.log("Recreating QR reader container")
-      qrContainer = document.createElement("div")
-      qrContainer.id = "admin-qr-reader"
-      qrContainer.className = "w-full h-64 overflow-hidden rounded-lg"
-
-      const parentContainer = document.getElementById("qr-container")
-      if (parentContainer) {
-        parentContainer.appendChild(qrContainer)
-      }
+    // Clear and recreate the container
+    const qrContainer = document.getElementById("qr-container")
+    if (qrContainer) {
+      qrContainer.innerHTML = '<div id="admin-qr-reader" style="width: 100%; height: 300px;"></div>'
     }
 
     // Reinitialize after a short delay
-    setTimeout(initializeScanner, 1000)
+    setTimeout(initializeScanner, 500)
   }
 
   return (
@@ -250,14 +224,13 @@ export default function AdminScanQRPage() {
               Scan QR
             </Button>
 
-            <div className="w-full" id="qr-container">
-              {loading ? (
-                <div className="h-64 flex flex-col items-center justify-center bg-gray-100 rounded-lg">
-                  <Loader2 className="h-8 w-8 text-blue-500 animate-spin mb-2" />
+            {/* Fixed container for QR scanner */}
+            <div id="qr-container" className="w-full rounded-lg overflow-hidden">
+              {loading && (
+                <div className="h-[300px] flex flex-col items-center justify-center bg-gray-100">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mb-2"></div>
                   <span className="text-gray-600">Starting camera...</span>
                 </div>
-              ) : (
-                <div id="admin-qr-reader" className="w-full h-64 overflow-hidden rounded-lg"></div>
               )}
             </div>
           </CardContent>

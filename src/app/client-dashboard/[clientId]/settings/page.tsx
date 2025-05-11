@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/components/ui/use-toast"
-import { Loader2, Save } from 'lucide-react'
+import { Loader2, Save } from "lucide-react"
 
 // Update the ClientSettings interface to include consultantLevel
 interface ClientSettings {
@@ -115,7 +115,7 @@ export default function SettingsPage() {
             createdAt: data.data.createdAt || "",
             updatedAt: data.data.updatedAt || "",
             address: data.data.address || "",
-            dateOfBirth: data.data.dateOfBirth || "",
+            dateOfBirth: data.data.dateOfBirth ? data.data.dateOfBirth.split("T")[0] : "",
             businessName: data.data.businessName || "",
             gstNumber: data.data.gstNumber || "",
             projectType: data.data.projectType || "",
@@ -356,9 +356,10 @@ export default function SettingsPage() {
                       id="dateOfBirth"
                       name="dateOfBirth"
                       type="date"
-                      value={settings.dateOfBirth}
+                      value={settings.dateOfBirth ? settings.dateOfBirth.split("T")[0] : ""}
                       onChange={handleChange}
                       disabled={saving}
+                      className="w-full"
                     />
                   </div>
 
