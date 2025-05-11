@@ -148,166 +148,140 @@ export default function AllQR() {
         },
       })
 
-      // Create a canvas element
-      const canvas = document.createElement("canvas")
-      const ctx = canvas.getContext("2d")
-      if (!ctx) {
-        throw new Error("Could not get canvas context")
-      }
-
-      // Set canvas dimensions
-      canvas.width = 600
-      canvas.height = 900
-
-      // Create a new Image for the QR code
-      const qrCode = new Image()
-      qrCode.crossOrigin = "anonymous"
-      qrCode.src = qrCodeDataUrl
-
-      // Function to directly download the QR code without template
+      // Simple direct download function that will work as a fallback
       const downloadBasicQR = () => {
-        if (downloadLinkRef.current) {
-          downloadLinkRef.current.href = qrCodeDataUrl
-          downloadLinkRef.current.download = `evershine-product-${product.postId}.png`
-          downloadLinkRef.current.click()
+        console.log("Falling back to basic QR download")
+        // Create a temporary link element
+        const tempLink = document.createElement("a")
+        tempLink.href = qrCodeDataUrl
+        tempLink.download = `evershine-product-${product.postId}.png`
+        document.body.appendChild(tempLink)
+        tempLink.click()
+        document.body.removeChild(tempLink)
 
-          setGeneratingQR((prev) => ({ ...prev, [product.postId]: false }))
-          toast.success("Basic QR code downloaded successfully")
-        }
+        setGeneratingQR((prev) => ({ ...prev, [product.postId]: false }))
+        toast.success("QR code downloaded successfully")
       }
 
-      // Create a new Image for the template
-      const templateImage = new Image()
-      templateImage.crossOrigin = "anonymous"
-
-      // Set a timeout to fall back to basic QR if template doesn't load
-      const templateTimeout = setTimeout(() => {
-        if (!templateImage.complete || templateImage.naturalHeight === 0) {
-          console.warn("Template image load timed out, falling back to basic QR")
-          downloadBasicQR()
+      // Try to create a fancy QR with template, but fall back to basic if needed
+      try {
+        // Create a canvas element
+        const canvas = document.createElement("canvas")
+        const ctx = canvas.getContext("2d")
+        if (!ctx) {
+          throw new Error("Could not get canvas context")
         }
-      }, 5000)
 
-      // Handle template image loading
-      templateImage.onload = () => {
-        clearTimeout(templateTimeout)
+        // Set canvas dimensions
+        canvas.width = 600
+        canvas.height = 900
+
+        // Create a new Image for the QR code
+        const qrCode = new Image()
+        qrCode.crossOrigin = "anonymous"
+        qrCode.src = qrCodeDataUrl
+
+        // Create a new Image for the template
+        const templateImage = new Image()
+        templateImage.crossOrigin = "anonymous"
+
+        // Promise-based image loading to handle both success and failure cases
+        const loadImage = (img: HTMLImageElement, src: string) => {
+          return new Promise<HTMLImageElement>((resolve, reject) => {
+            img.onload = () => resolve(img)
+            img.onerror = () => reject(new Error(`Failed to load image from ${src}`))
+            img.src = src
+          })
+        }
+
+        // Try to load the template image
+        try {
+          await loadImage(templateImage, "/assets/qr-template.png")
+        } catch (error) {
+          console.log("First template path failed, trying alternative...")
+          try {
+            await loadImage(templateImage, "/qr-template.png")
+          } catch (error) {
+            console.error("All template paths failed, falling back to basic QR")
+            downloadBasicQR()
+            return
+          }
+        }
 
         // Draw the template image on the canvas
         ctx.drawImage(templateImage, 0, 0, canvas.width, canvas.height)
 
-        // Handle QR code image loading
-        qrCode.onload = () => {
-          // Draw QR code in the white space
-          ctx.drawImage(qrCode, 380, 640, 150, 150)
+        // Load and draw the QR code
+        await loadImage(qrCode, qrCodeDataUrl)
+        ctx.drawImage(qrCode, 380, 640, 150, 150)
 
-          // Add product name below the QR code
-          ctx.font = "bold 16px Arial"
-          ctx.fillStyle = "#000000"
-          ctx.textAlign = "center"
+        // Add product name below the QR code
+        ctx.font = "bold 16px Arial"
+        ctx.fillStyle = "#000000"
+        ctx.textAlign = "center"
 
-          // Position the text below the QR code
-          const qrCodeCenterX = 380 + 75 // QR code X position + half width
-          const textY = 810 // Position below the QR code
+        // Position the text below the QR code
+        const qrCodeCenterX = 380 + 75 // QR code X position + half width
+        const textY = 810 // Position below the QR code
 
-          // Capitalize the product name
-          const capitalizedName = product.name
-            .split(" ")
-            .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-            .join(" ")
+        // Capitalize the product name
+        const capitalizedName = product.name
+          .split(" ")
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+          .join(" ")
 
-          // Wrap text for longer product names
-          const maxWidth = 150 // Same width as QR code
-          const words = capitalizedName.split(" ")
-          let line = ""
-          let y = textY
-          let lineCount = 0
-          const maxLines = 3 // Maximum number of lines to display
+        // Wrap text for longer product names
+        const maxWidth = 150 // Same width as QR code
+        const words = capitalizedName.split(" ")
+        let line = ""
+        let y = textY
+        let lineCount = 0
+        const maxLines = 3 // Maximum number of lines to display
 
-          for (let i = 0; i < words.length; i++) {
-            // If we've reached the maximum number of lines, add ellipsis and break
-            if (lineCount >= maxLines - 1 && i < words.length - 1) {
-              ctx.fillText(line + "...", qrCodeCenterX, y)
-              break
-            }
-
-            const testLine = line + words[i] + " "
-            const metrics = ctx.measureText(testLine)
-            const testWidth = metrics.width
-
-            if (testWidth > maxWidth && i > 0) {
-              ctx.fillText(line, qrCodeCenterX, y)
-              line = words[i] + " "
-              y += 20 // Line height
-              lineCount++
-            } else {
-              line = testLine
-            }
+        for (let i = 0; i < words.length; i++) {
+          // If we've reached the maximum number of lines, add ellipsis and break
+          if (lineCount >= maxLines - 1 && i < words.length - 1) {
+            ctx.fillText(line + "...", qrCodeCenterX, y)
+            break
           }
 
-          // Draw the last line if we haven't reached the maximum
-          if (lineCount < maxLines) {
+          const testLine = line + words[i] + " "
+          const metrics = ctx.measureText(testLine)
+          const testWidth = metrics.width
+
+          if (testWidth > maxWidth && i > 0) {
             ctx.fillText(line, qrCodeCenterX, y)
-          }
-
-          try {
-            // Convert canvas to data URL and download
-            const dataUrl = canvas.toDataURL("image/png")
-
-            // Use the persistent download link
-            if (downloadLinkRef.current) {
-              downloadLinkRef.current.href = dataUrl
-              downloadLinkRef.current.download = `evershine-product-${product.postId}.png`
-              downloadLinkRef.current.click()
-
-              setGeneratingQR((prev) => ({ ...prev, [product.postId]: false }))
-              toast.success("QR code downloaded successfully")
-            } else {
-              // Fallback if ref is not available
-              const tempLink = document.createElement("a")
-              tempLink.href = dataUrl
-              tempLink.download = `evershine-product-${product.postId}.png`
-              document.body.appendChild(tempLink)
-              tempLink.click()
-              document.body.removeChild(tempLink)
-
-              setGeneratingQR((prev) => ({ ...prev, [product.postId]: false }))
-              toast.success("QR code downloaded successfully")
-            }
-          } catch (error) {
-            console.error("Error creating download:", error)
-            downloadBasicQR()
+            line = words[i] + " "
+            y += 20 // Line height
+            lineCount++
+          } else {
+            line = testLine
           }
         }
 
-        // Handle QR code loading error
-        qrCode.onerror = () => {
-          clearTimeout(templateTimeout)
-          console.error("Failed to load QR code image")
-          setGeneratingQR((prev) => ({ ...prev, [product.postId]: false }))
-          toast.error("Failed to generate QR code")
-          downloadBasicQR()
+        // Draw the last line if we haven't reached the maximum
+        if (lineCount < maxLines) {
+          ctx.fillText(line, qrCodeCenterX, y)
         }
-      }
 
-      // Handle template image loading error
-      templateImage.onerror = () => {
-        clearTimeout(templateTimeout)
-        console.error("Failed to load template image")
+        // Convert canvas to data URL and download
+        const dataUrl = canvas.toDataURL("image/png")
+
+        // Use direct download approach which is more reliable
+        const link = document.createElement("a")
+        link.href = dataUrl
+        link.download = `evershine-product-${product.postId}.png`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+
         setGeneratingQR((prev) => ({ ...prev, [product.postId]: false }))
-        toast.error("Failed to load template image, downloading basic QR code instead")
+        toast.success("QR code downloaded successfully")
+      } catch (error) {
+        console.error("Error in fancy QR generation:", error)
+        // Fall back to basic QR download
         downloadBasicQR()
       }
-
-      // Try to load the template image from public folder
-      templateImage.src = "/assets/qr-template.png"
-
-      // If the first path fails, try an alternative path after a short delay
-      setTimeout(() => {
-        if (!templateImage.complete || templateImage.naturalHeight === 0) {
-          console.log("Trying alternative template path...")
-          templateImage.src = "/qr-template.png"
-        }
-      }, 1000)
     } catch (error) {
       console.error("Error generating QR code:", error)
       toast.error("Failed to generate QR code: " + (error instanceof Error ? error.message : "Unknown error"))
@@ -359,7 +333,7 @@ export default function AllQR() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div className="flex items-center gap-2 border rounded-lg overflow-hidden">
             <button
-              onClick={() => router.push("/admin/dashboard/products")}
+              onClick={() => router.push("admin/dashboard/products")}
               className="flex items-center gap-1 px-4 py-2 text-gray-600 hover:bg-gray-100"
               aria-label="Grid view"
             >
@@ -372,7 +346,7 @@ export default function AllQR() {
             </button>
           </div>
           <button
-            onClick={() => router.push("/admin/dashboard/add-product")}
+            onClick={() => router.push("/add-product")}
             className="px-6 py-3 rounded-lg bg-[#194a95] text-white w-full md:w-auto justify-center
                      hover:bg-[#0f3a7a] transition-colors active:transform active:scale-95"
           >
@@ -419,7 +393,7 @@ export default function AllQR() {
                       </Link>
                       <div className="ml-2">
                         <Link
-                          href={`/admin/dashboard/product/${product.postId}`}
+                          href={`/product/${product.postId}`}
                           className="text-sm font-medium text-gray-900 hover:text-[#194a95] transition-colors cursor-pointer"
                         >
                           {product.name}
