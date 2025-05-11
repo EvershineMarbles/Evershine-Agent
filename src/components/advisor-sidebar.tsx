@@ -66,7 +66,7 @@ export function AdvisorSidebar() {
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Link href="/login" className="sidebar-icon">
+              <Link href="/agent-login" className="sidebar-icon">
                 <LogOut size={24} />
                 <span className="sidebar-tooltip">Logout</span>
               </Link>

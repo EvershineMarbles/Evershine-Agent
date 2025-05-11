@@ -65,7 +65,7 @@ export function AdminSidebar() {
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Link href="/login" className="sidebar-icon">
+              <Link href="/admin/login" className="sidebar-icon">
                 <LogOut size={24} />
                 <span className="sidebar-tooltip">Logout</span>
               </Link>
