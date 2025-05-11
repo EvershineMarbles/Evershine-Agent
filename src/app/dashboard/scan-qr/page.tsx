@@ -17,6 +17,26 @@ export default function AgentScanQRPage() {
 
   // Load the QR code library as soon as possible
   useEffect(() => {
+    // Add custom CSS to control the scanner position
+    const style = document.createElement("style")
+    style.innerHTML = `
+      #agent-qr-reader video, #agent-qr-reader canvas {
+        max-height: 100% !important;
+        position: relative !important;
+      }
+      #agent-qr-reader {
+        position: relative !important;
+        min-height: 300px !important;
+      }
+      #agent-qr-reader div {
+        position: relative !important;
+      }
+      #agent-qr-reader__dashboard {
+        position: relative !important;
+      }
+    `
+    document.head.appendChild(style)
+
     // Create a container for the QR reader if it doesn't exist
     let qrContainer = document.getElementById("agent-qr-reader")
     if (!qrContainer) {
@@ -128,6 +148,26 @@ export default function AgentScanQRPage() {
         )
         .then(() => {
           console.log("Scanner started successfully")
+
+          // Fix positioning after scanner starts
+          setTimeout(() => {
+            const scannerElement = document.getElementById("agent-qr-reader")
+            if (scannerElement) {
+              const videoElements = scannerElement.querySelectorAll("video")
+              const canvasElements = scannerElement.querySelectorAll("canvas")
+
+              videoElements.forEach((video) => {
+                video.style.maxHeight = "100%"
+                video.style.position = "relative"
+              })
+
+              canvasElements.forEach((canvas) => {
+                canvas.style.maxHeight = "100%"
+                canvas.style.position = "relative"
+              })
+            }
+          }, 500)
+
           setScannerInitialized(true)
           setLoading(false)
         })
