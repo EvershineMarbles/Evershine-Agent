@@ -133,7 +133,7 @@ export default function Products() {
             </button>
           </div>
           <button
-            onClick={() => router.push("/add-product")}
+            onClick={() => router.push("/admin/dashboard/add-product")}
             className="px-6 py-3 rounded-lg bg-[#194a95] text-white w-full md:w-auto justify-center
                      hover:bg-[#0f3a7a] transition-colors active:transform active:scale-95"
           >
