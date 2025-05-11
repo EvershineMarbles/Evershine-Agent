@@ -736,9 +736,6 @@ export default function RegisterClient() {
                       aria-label="Purple consultant level (+15%)"
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Select a consultant level to determine commission rates for product pricing
-                  </p>
                 </div>
 
                 <div className="flex items-center space-x-2 mt-4">
