@@ -174,7 +174,7 @@ export default function AdminScanQRPage() {
           Back to Dashboard
         </Link>
 
-        <h2 className="text-2xl font-bold mb-6 text-center">Admin QR Scanner</h2>
+        <h2 className="text-2xl font-bold mb-6 text-center">Consultant QR Scanner</h2>
 
         <Card className="w-full mb-6">
           <CardHeader>
@@ -214,9 +214,8 @@ export default function AdminScanQRPage() {
         </Card>
 
         <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <h3 className="font-medium text-gray-900 mb-2">Admin Scanner Tips:</h3>
+          <h3 className="font-medium text-gray-900 mb-2">Scanner Tips:</h3>
           <ul className="list-disc pl-5 text-sm text-gray-600 space-y-1">
-            <li>You will be redirected to the admin product view</li>
             <li>Make sure the QR code is clearly visible</li>
             <li>Good lighting improves scanning success</li>
             <li>Hold the camera steady for best results</li>
