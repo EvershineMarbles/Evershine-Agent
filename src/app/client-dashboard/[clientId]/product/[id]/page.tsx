@@ -27,6 +27,15 @@ interface Product {
   size?: string
   numberOfPieces?: number | null
   thickness?: string
+  basePrice?: number
+}
+
+interface CommissionData {
+  agentId: string
+  name: string
+  email: string
+  commissionRate: number
+  categoryCommissions?: Record<string, number>
 }
 
 interface ApiResponse {
@@ -48,6 +57,76 @@ export default function ProductDetail() {
   const [wishlistLoading, setWishlistLoading] = useState(false)
   const [inWishlist, setInWishlist] = useState(false)
   const clientId = params.clientId as string
+  const [commissionData, setCommissionData] = useState<CommissionData | null>(null)
+  const [overrideCommissionRate, setOverrideCommissionRate] = useState<number | null>(null)
+  const [commissionLoading, setCommissionLoading] = useState(false)
+  const [basePrice, setBasePrice] = useState<number | null>(null)
+
+  // Load saved commission rate from localStorage on component mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      // Use a client-specific key for commission rate
+      const savedRate = localStorage.getItem(`commission-override-${clientId}`)
+      if (savedRate) {
+        setOverrideCommissionRate(Number(savedRate))
+      } else {
+        // Reset to null if no saved rate for this client
+        setOverrideCommissionRate(null)
+      }
+    }
+  }, [clientId])
+
+  // Add fetchCommissionData function
+  const fetchCommissionData = async () => {
+    try {
+      setCommissionLoading(true)
+      const token = localStorage.getItem("clientImpersonationToken")
+      if (!token) {
+        return null
+      }
+
+      const response = await fetch(`${API_URL}/api/client/agent-commission`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (!response.ok) {
+        return null
+      }
+
+      const data = await response.json()
+      if (data.success && data.data) {
+        setCommissionData(data.data)
+        return data.data
+      }
+      return null
+    } catch (error) {
+      console.error("Error fetching commission data:", error)
+      return null
+    } finally {
+      setCommissionLoading(false)
+    }
+  }
+
+  // Add calculateAdjustedPrice function with override support
+  const calculateAdjustedPrice = (price: number, category: string) => {
+    // Use the base price if available
+    const productBasePrice = basePrice || price
+
+    // Get the default commission rate (from agent or category-specific)
+    let defaultRate = commissionData?.commissionRate || 10
+
+    // Check for category-specific commission
+    if (commissionData?.categoryCommissions && category && commissionData.categoryCommissions[category]) {
+      defaultRate = commissionData.categoryCommissions[category]
+    }
+
+    // Add the override rate to the default rate if an override is set
+    const finalRate = overrideCommissionRate !== null ? defaultRate + overrideCommissionRate : defaultRate
+
+    // Calculate adjusted price based on the original basePrice
+    const adjustedPrice = productBasePrice * (1 + finalRate / 100)
+    return Math.round(adjustedPrice * 100) / 100 // Round to 2 decimal places
+  }
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -59,12 +138,18 @@ export default function ProductDetail() {
           throw new Error("Product ID is missing")
         }
 
+        // First fetch commission data
+        await fetchCommissionData()
+
         const response = await axios.get<ApiResponse>(`${API_URL}/api/getPostDataById`, {
           params: { id: params.id },
         })
 
         if (response.data.success && response.data.data?.[0]) {
           const productData = response.data.data[0]
+
+          // Store the base price
+          setBasePrice(productData.basePrice || productData.price)
 
           // Add missing fields if they don't exist
           const processedProduct = {
@@ -223,6 +308,8 @@ export default function ProductDetail() {
           },
           body: JSON.stringify({
             productId: product.postId,
+            // Include the current price with commission applied
+            price: calculateAdjustedPrice(product.price, product.category),
           }),
         })
 
@@ -403,7 +490,9 @@ export default function ProductDetail() {
             {/* Price */}
             <div className="pb-4 border-b border-gray-200">
               <p className="text-gray-500">Price (per sqft)</p>
-              <p className="text-xl font-bold mt-1">₹{product.price}/per sqft</p>
+              <p className="text-xl font-bold mt-1">
+                ₹{product && calculateAdjustedPrice(product.price, product.category)}/per sqft
+              </p>
             </div>
 
             {/* Product Category */}
