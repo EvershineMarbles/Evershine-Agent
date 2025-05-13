@@ -181,28 +181,6 @@ export default function ProductDetail() {
     fetchProduct()
   }, [params.id])
 
-  const handleDelete = async () => {
-    try {
-      setIsDeleting(true)
-      const response = await axios.delete(`${API_URL}/api/deleteProduct/${product?.postId}`)
-
-      if (response.data.success) {
-        router.push("/products")
-      } else {
-        throw new Error(response.data.msg || "Failed to delete product")
-      }
-    } catch (error) {
-      let errorMessage = "Error deleting product"
-      if (error instanceof AxiosError) {
-        errorMessage = error.response?.data?.msg || error.message
-      } else if (error instanceof Error) {
-        errorMessage = error.message
-      }
-      setError(errorMessage)
-    } finally {
-      setIsDeleting(false)
-    }
-  }
 
   const handleThumbnailClick = (index: number) => {
     setCurrentImageIndex(index)
@@ -570,38 +548,7 @@ export default function ProductDetail() {
 
            
 
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" className="px-8 py-3" disabled={isDeleting}>
-                    {isDeleting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Deleting...
-                      </>
-                    ) : (
-                      <>
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </>
-                    )}
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent className="bg-white">
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This action cannot be undone. This will permanently delete the product and remove all associated
-                      data.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel className="bg-gray-100 hover:bg-gray-200">Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700 text-white">
-                      Delete
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+           
             </div>
           </div>
         </div>
