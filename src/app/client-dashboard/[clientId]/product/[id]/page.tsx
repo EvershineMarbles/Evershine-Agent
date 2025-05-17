@@ -661,7 +661,7 @@ export default function ProductDetail() {
             </div>
           {/* Product Visualizer Section */}
           {showVisualizer && product.image.length > 0 && (
-            <div className="max-w-6xl mx-auto mt-6 pt-4">
+            <div>
               <ProductVisualizer productImage={product.image[0]} productName={product.name}  />
             </div>
           )}
