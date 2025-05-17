@@ -649,7 +649,11 @@ export default function ProductDetail() {
               </Button>
             </div>
             
-              {/* Visualizer Button */}
+          
+
+          </div>
+        </div>
+            {/* Visualizer Button */}
             <div className="pb-4 border-b border-gray-200 mt-4">
               <Button
                 onClick={() => setShowVisualizer(!showVisualizer)}
@@ -665,9 +669,6 @@ export default function ProductDetail() {
             </div>
           )}
 
-
-          </div>
-        </div>
       </div>
 
       {/* Image Gallery Modal */}
