@@ -643,12 +643,7 @@ export default function ProductDetail() {
           </div>
         </div>
       )}
-        {/* Disclaimer */}
-        <div className="max-w-6xl mx-auto mt-8 pt-4 border-t">
-          <p className="text-gray-500 text-sm italic text-center">
-            Disclaimer: Actual quantity can differ
-          </p>
-        </div>
+   
     </div>
   )
 }
