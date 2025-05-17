@@ -149,18 +149,6 @@ export default function AgentClientsTable({ agentEmail, agentName }: AgentClient
                       >
                         <Eye className="h-4 w-4 mr-1" /> View
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="mr-2"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          // Navigate to edit page
-                          router.push(`/admin/dashboard/clients/${client.clientId}/edit`)
-                        }}
-                      >
-                        <Edit className="h-4 w-4 mr-1" /> Edit
-                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}

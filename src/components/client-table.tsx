@@ -422,7 +422,7 @@ export default function ClientTable() {
           <Button
               variant="ghost"
               size="icon"
-              onClick={() => router.back()}
+              onClick={() => router.back(/admin/dashboard)}
               className="mr-2 hover:bg-gray-100"
               aria-label="Go back"
             >
