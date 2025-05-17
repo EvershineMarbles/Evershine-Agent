@@ -548,6 +548,23 @@ export default function ProductDetail() {
         </div>
       </div>
 
+         {/* Visualizer Button */}
+         <div className="pb-4 border-b border-gray-200 mt-4">
+              <Button
+                onClick={() => setShowVisualizer(!showVisualizer)}
+                className="w-full bg-[#194a95] hover:bg-[#0f3a7a] py-3 text-white"
+              >
+                {showVisualizer ? "Hide Visualizer" : "Show Product Visualizer"}
+              </Button>
+            </div>
+            {/* Product Visualizer Section */}
+            {showVisualizer && product.image.length > 0 && (
+              <div className="mt-4">
+                <ProductVisualizer productImage={product.image[0]} productName={product.name}  />
+              </div>
+            )}
+        
+
       {/* Disclaimer */}
       <div className="max-w-6xl mx-auto mt-8 pt-4 border-t">
         <p className="text-gray-500 text-sm italic text-center">Disclaimer: Actual quantity can differ</p>
@@ -581,22 +598,7 @@ export default function ProductDetail() {
               />
             </div>
 
-              {/* Visualizer Button */}
-              <div className="pb-4 border-b border-gray-200 mt-4">
-              <Button
-                onClick={() => setShowVisualizer(!showVisualizer)}
-                className="w-full bg-[#194a95] hover:bg-[#0f3a7a] py-3 text-white"
-              >
-                {showVisualizer ? "Hide Visualizer" : "Show Product Visualizer"}
-              </Button>
-            </div>
-            {/* Product Visualizer Section */}
-            {showVisualizer && product.image.length > 0 && (
-              <div className="mt-4">
-                <ProductVisualizer productImage={product.image[0]} productName={product.name}  />
-              </div>
-            )}
-        
+           
 
             {/* Gallery navigation */}
             {product.image.length > 1 && (
