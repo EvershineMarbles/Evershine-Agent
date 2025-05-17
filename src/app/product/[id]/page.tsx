@@ -20,6 +20,8 @@ import {
 import { Badge } from "@/components/ui/badge"
 import QRCodeGenerator from "@/components/QRCodeGenerator"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import ProductVisualizer from "@/components/ProductVisualizer"
+
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
@@ -114,6 +116,8 @@ export default function ProductDetail() {
   const [qrCodeUrl, setQrCodeUrl] = useState<string>("")
   const [showFullDescription, setShowFullDescription] = useState(false)
   const [quantityFormula, setQuantityFormula] = useState<string | null>(null)
+  const [showVisualizer, setShowVisualizer] = useState(false)
+
 
   // Update the useEffect to use this enhanced debugging
   useEffect(() => {
@@ -544,16 +548,30 @@ export default function ProductDetail() {
                   </button>
                 )}
               </div>
+            </div>     
             </div>
 
-           
-
-           
+              {/* Visualizer Button */}
+              <div className="pb-4 border-b border-gray-200 mt-4">
+              <Button
+                onClick={() => setShowVisualizer(!showVisualizer)}
+                className="w-full bg-[#194a95] hover:bg-[#0f3a7a] py-3 text-white"
+              >
+                {showVisualizer ? "Hide Visualizer" : "Show Product Visualizer"}
+              </Button>
             </div>
+          {/* Product Visualizer Section */}
+          {showVisualizer && product.image.length > 0 && (
+            <div className="mt-4">
+              <ProductVisualizer productImage={product.image[0]} productName={product.name}  />
+            </div>
+          )}
+      
+
+
+
           </div>
         </div>
-
-    
         
         {/* Disclaimer */}
         <div className="max-w-6xl mx-auto mt-8 pt-4 border-t">
