@@ -659,9 +659,9 @@ export default function ProductDetail() {
                 {showVisualizer ? "Hide Visualizer" : "Show Product Visualizer"}
               </Button>
             </div>
-                {/* Product Visualizer Section */}
+          {/* Product Visualizer Section */}
           {showVisualizer && product.image.length > 0 && (
-            <div className="max-w-6xl mx-auto mt-12 border-t pt-8">
+            <div className="max-w-6xl mx-auto mt-6 pt-4">
               <ProductVisualizer productImage={product.image[0]} productName={product.name}  />
             </div>
           )}
