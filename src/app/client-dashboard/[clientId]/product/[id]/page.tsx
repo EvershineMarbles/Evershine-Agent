@@ -5,7 +5,7 @@ import type React from "react"
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import axios, { AxiosError } from "axios"
-import { ArrowLeft, ChevronLeft, ChevronRight, Heart } from "lucide-react"
+import { ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Heart } from "lucide-react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -61,6 +61,8 @@ export default function ProductDetail() {
   const [overrideCommissionRate, setOverrideCommissionRate] = useState<number | null>(null)
   const [commissionLoading, setCommissionLoading] = useState(false)
   const [basePrice, setBasePrice] = useState<number | null>(null)
+  const [showFullDescription, setShowFullDescription] = useState(false)
+
 
   // Load saved commission rate from localStorage on component mount
   useEffect(() => {
@@ -552,7 +554,29 @@ export default function ProductDetail() {
             {/* About Product */}
             <div className="pb-4 border-b border-gray-200">
               <p className="text-gray-500">About Product</p>
-              <p className="text-xl font-bold mt-1">{product.description || "Product mainly used for countertop"}</p>
+              <div className="mt-1">
+                <p
+                  className={`text-xl font-normal ${!showFullDescription ? "line-clamp-2" : ""} transition-all duration-200`}
+                >
+                  {product.description || "Product mainly used for countertop"}
+                </p>
+                {(product.description?.length || 0) > 80 && (
+                  <button
+                    onClick={() => setShowFullDescription(!showFullDescription)}
+                    className="text-[#194a95] hover:text-[#0f3a7a] mt-1 text-sm flex items-center"
+                  >
+                    {showFullDescription ? (
+                      <>
+                        Show less <ChevronUp className="ml-1 h-4 w-4" />
+                      </>
+                    ) : (
+                      <>
+                        View more <ChevronDown className="ml-1 h-4 w-4" />
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Action Buttons */}
