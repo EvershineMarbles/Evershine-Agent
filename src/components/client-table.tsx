@@ -420,14 +420,14 @@ export default function ClientTable() {
         <CardHeader className="flex flex-row items-center justify-between p-6">
           <div className="flex items-center gap-2">
           <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => router.back()}
-              className="mr-2 hover:bg-gray-100"
-              aria-label="Go back"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
+            variant="ghost"
+            size="icon"
+            onClick={() => router.push("/admin/dashboard")}
+            className="mr-2 hover:bg-gray-100"
+            aria-label="Go back"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
             <h2 className="text-xl font-bold">Clients</h2>
             <Badge variant="outline" className="ml-2 bg-primary/10 text-primary">
               {clients.length}

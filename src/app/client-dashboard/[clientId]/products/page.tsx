@@ -670,8 +670,8 @@ export default function ProductsPage() {
       //   duration: 3000,
       // });
     }
-  }, [clientData?.consultantLevel, overrideCommissionRate, toast]);
-  
+  }, [clientData?.consultantLevel, overrideCommissionRate, toast])
+
   // Loading state
   if (loading) {
     return (
@@ -699,7 +699,6 @@ export default function ProductsPage() {
   return (
     <ErrorBoundary>
       <div className="p-6 md:p-8">
-       
         {error && (
           <Alert variant="destructive" className="mb-4">
             <AlertCircle className="h-4 w-4" />
@@ -711,9 +710,6 @@ export default function ProductsPage() {
           <h1 className="text-3xl font-bold">Products</h1>
 
           <div className="flex items-center gap-4">
-           
-
-
             {/* Scan QR Button */}
             <button
               onClick={handleScanQR}
@@ -723,7 +719,10 @@ export default function ProductsPage() {
               <QrCode className="h-6 w-6 text-gray-600" />
             </button>
 
-            <Link href={`/client-dashboard/${clientId}/wishlist`} className="relative">
+            <Link
+              href={`/client-dashboard/${clientId}/wishlist`}
+              className="relative p-2 rounded-full hover:bg-gray-100 transition-colors"
+            >
               <Heart className="h-6 w-6 text-gray-600" />
               {wishlist.length > 0 && (
                 <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
@@ -732,7 +731,10 @@ export default function ProductsPage() {
               )}
             </Link>
 
-            <Link href={`/client-dashboard/${clientId}/cart`} className="relative">
+            <Link
+              href={`/client-dashboard/${clientId}/cart`}
+              className="relative p-2 rounded-full hover:bg-gray-100 transition-colors"
+            >
               <ShoppingCart className="h-6 w-6 text-gray-600" />
               {cart.length > 0 && (
                 <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
