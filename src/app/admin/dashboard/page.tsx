@@ -236,7 +236,7 @@ export default function AdminDashboard() {
                 <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center mb-1">
                   <UserCheck className="h-5 w-5 text-[#1e4b9a]" />
                 </div>
-                <h2 className="text-sm font-semibold text-center">Active Agents</h2>
+                <h2 className="text-sm font-semibold text-center">Active Consultants</h2>
                 {stats.agents.loading ? (
                   <div className="flex items-center justify-center h-[28px]">
                     <Loader2 className="h-5 w-5 animate-spin text-[#1e4b9a]" />
