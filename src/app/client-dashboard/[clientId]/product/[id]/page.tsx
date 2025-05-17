@@ -648,9 +648,8 @@ export default function ProductDetail() {
                 {wishlistLoading ? "Processing..." : "Add to Wishlist"}
               </Button>
             </div>
-          </div>
-
-           {/* Visualizer Button */}
+            
+              {/* Visualizer Button */}
             <div className="pb-4 border-b border-gray-200 mt-4">
               <Button
                 onClick={() => setShowVisualizer(!showVisualizer)}
@@ -665,6 +664,9 @@ export default function ProductDetail() {
               <ProductVisualizer productImage={product.image[0]} productName={product.name}  />
             </div>
           )}
+
+
+          </div>
         </div>
       </div>
 

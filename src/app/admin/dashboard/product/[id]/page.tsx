@@ -643,19 +643,6 @@ export default function ProductDetail() {
           </div>
         </div>
 
-        {/* QR Code Section */}
-        <div className="max-w-6xl mx-auto mt-12 border-t pt-8">
-          <h2 className="text-2xl font-bold mb-6">Product QR Code</h2>
-          {product && (
-            <QRCodeGenerator
-              productId={product.postId}
-              productName={product.name}
-              category={product.category}
-              thickness={product.thickness}
-              size={product.size}
-            />
-          )}
-        </div>
 
         {/* Visualizer Button */}
         <div className="pb-4 border-b border-gray-200 mt-4">
@@ -672,6 +659,21 @@ export default function ProductDetail() {
               <ProductVisualizer productImage={product.image[0]} productName={product.name}  />
             </div>
           )}
+
+        {/* QR Code Section */}
+        <div className="max-w-6xl mx-auto mt-12 border-t pt-8">
+          <h2 className="text-2xl font-bold mb-6">Product QR Code</h2>
+          {product && (
+            <QRCodeGenerator
+              productId={product.postId}
+              productName={product.name}
+              category={product.category}
+              thickness={product.thickness}
+              size={product.size}
+            />
+          )}
+        </div>
+
 
         {/* Disclaimer */}
         <div className="max-w-6xl mx-auto mt-8 pt-4 border-t">
