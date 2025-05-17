@@ -5,12 +5,14 @@ import type React from "react"
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import axios, { AxiosError } from "axios"
-import { ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Heart } from "lucide-react"
+import { ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Heart, X } from "lucide-react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/components/ui/use-toast"
 import { ToastAction } from "@/components/ui/toast"
+import ProductVisualizer from "@/components/ProductVisualizer"
+
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
 
@@ -62,6 +64,9 @@ export default function ProductDetail() {
   const [commissionLoading, setCommissionLoading] = useState(false)
   const [basePrice, setBasePrice] = useState<number | null>(null)
   const [showFullDescription, setShowFullDescription] = useState(false)
+  // Gallery state
+  const [galleryOpen, setGalleryOpen] = useState(false)
+  const [showVisualizer, setShowVisualizer] = useState(false)
 
 
   // Load saved commission rate from localStorage on component mount
@@ -252,6 +257,44 @@ export default function ProductDetail() {
     }
   }
 
+  // Open gallery when main image is clicked
+  const openGallery = () => {
+    setGalleryOpen(true)
+    // Prevent body scrolling when gallery is open
+    if (typeof document !== "undefined") {
+      document.body.style.overflow = "hidden"
+    }
+  }
+
+  // Close gallery
+  const closeGallery = () => {
+    setGalleryOpen(false)
+    // Restore body scrolling
+    if (typeof document !== "undefined") {
+      document.body.style.overflow = ""
+    }
+  }
+
+  // Handle keyboard navigation in gallery
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!galleryOpen) return
+
+      if (e.key === "Escape") {
+        closeGallery()
+      } else if (e.key === "ArrowRight") {
+        nextImage()
+      } else if (e.key === "ArrowLeft") {
+        previousImage()
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [galleryOpen])
+
   const toggleWishlist = async (e: React.MouseEvent) => {
     e.preventDefault()
     if (!product || !clientId) return
@@ -420,7 +463,7 @@ export default function ProductDetail() {
           {/* Images Section */}
           <div className="w-full md:w-1/2 md:order-2 mb-8 md:mb-0">
             {/* Main Image with Navigation Arrows */}
-            <div className="relative rounded-2xl overflow-hidden bg-gray-100 mb-4">
+            <div className="relative rounded-2xl overflow-hidden bg-gray-100 mb-4 cursor-pointer" onClick={openGallery}>
               <div className="aspect-[4/3] relative">
                 <Image
                   src={
@@ -439,14 +482,20 @@ export default function ProductDetail() {
                 {product.image.length > 1 && (
                   <>
                     <button
-                      onClick={previousImage}
+                      onClick={(e) => {
+                        e.stopPropagation() // Prevent gallery from opening
+                        previousImage()
+                      }}
                       className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full shadow-lg transition-all"
                       aria-label="Previous image"
                     >
                       <ChevronLeft className="h-6 w-6 text-gray-800" />
                     </button>
                     <button
-                      onClick={nextImage}
+                      onClick={(e) => {
+                        e.stopPropagation() // Prevent gallery from opening
+                        nextImage()
+                      }}
                       className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full shadow-lg transition-all"
                       aria-label="Next image"
                     >
@@ -454,6 +503,11 @@ export default function ProductDetail() {
                     </button>
                   </>
                 )}
+
+                {/* Click to view indicator */}
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 text-white px-3 py-1 rounded-full text-sm flex items-center">
+                  <span>Click to zoom</span>
+                </div>
               </div>
             </div>
 
@@ -595,8 +649,107 @@ export default function ProductDetail() {
               </Button>
             </div>
           </div>
+
+             {/* Visualizer Button */}
+             <div className="pb-4 border-b border-gray-200">
+                <Button
+                  onClick={() => setShowVisualizer(!showVisualizer)}
+                  className="w-full bg-[#194a95] hover:bg-[#0f3a7a]"
+                >
+                  {showVisualizer ? "Hide Visualizer" : "Show Product Visualizer"}
+                </Button>
+              </div>
+
+                {/* Product Visualizer Section */}
+          {showVisualizer && product.image.length > 0 && (
+            <div className="max-w-6xl mx-auto mt-12 border-t pt-8">
+              <ProductVisualizer productImage={product.image[0]} productName={product.name}  />
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Image Gallery Modal */}
+      {galleryOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center">
+          <div className="relative w-full h-full flex flex-col">
+            {/* Close button */}
+            <button
+              onClick={closeGallery}
+              className="absolute top-4 right-4 z-10 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+              aria-label="Close gallery"
+            >
+              <X className="h-6 w-6" />
+            </button>
+
+            {/* Main image container */}
+            <div className="flex-1 flex items-center justify-center p-4">
+              <div className="relative w-full h-full max-w-4xl max-h-[80vh] mx-auto">
+                <Image
+                  src={
+                    imageLoadError[currentImageIndex]
+                      ? "/placeholder.svg"
+                      : product.image[currentImageIndex] || "/placeholder.svg"
+                  }
+                  alt={`${product.name} - Image ${currentImageIndex + 1}`}
+                  fill
+                  className="object-contain"
+                  onError={() => handleImageError(currentImageIndex)}
+                  priority
+                />
+              </div>
+            </div>
+
+            {/* Navigation controls */}
+            {product.image.length > 1 && (
+              <>
+                <button
+                  onClick={previousImage}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 p-3 rounded-full text-white transition-colors"
+                  aria-label="Previous image"
+                >
+                  <ChevronLeft className="h-8 w-8" />
+                </button>
+                <button
+                  onClick={nextImage}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 p-3 rounded-full text-white transition-colors"
+                  aria-label="Next image"
+                >
+                  <ChevronRight className="h-8 w-8" />
+                </button>
+              </>
+            )}
+
+            {/* Thumbnails at bottom */}
+            {product.image.length > 1 && (
+              <div className="p-4 bg-black/70">
+                <div className="flex justify-center gap-2 overflow-x-auto py-2 max-w-4xl mx-auto">
+                  {product.image.map((img, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleThumbnailClick(index)}
+                      className={`relative rounded-md overflow-hidden flex-shrink-0 w-16 h-16 md:w-20 md:h-20 ${
+                        selectedThumbnail === index ? "ring-2 ring-white" : "opacity-70"
+                      }`}
+                    >
+                      <Image
+                        src={imageLoadError[index] ? "/placeholder.svg" : img || "/placeholder.svg"}
+                        alt={`${product.name} thumbnail ${index + 1}`}
+                        fill
+                        className="object-cover"
+                        onError={() => handleImageError(index)}
+                      />
+                    </button>
+                  ))}
+                </div>
+                <p className="text-white text-center mt-2 text-sm">
+                  {currentImageIndex + 1} / {product.image.length}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

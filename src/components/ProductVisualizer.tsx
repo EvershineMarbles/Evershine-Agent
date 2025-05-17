@@ -16,9 +16,9 @@ const MOCKUPS = [
     src: "/assets/mockups/bathroom.png",
   },
   {
-    id: "bedroom-green",
-    name: "Bedroom",
-    src: "/assets/mockups/bedroom-green.png",
+    id: "modern-bedroom",
+    name: "Modern Bedroom",
+    src: "/assets/mockups/modern-bedroom.png",
   },
   {
     id: "living-room",
@@ -26,14 +26,14 @@ const MOCKUPS = [
     src: "/assets/mockups/living-room.jpeg",
   },
   {
+    id: "bedroom-green",
+    name: "Bedroom",
+    src: "/assets/mockups/bedroom-green.png",
+  },
+  {
     id: "luxury-living",
     name: "Luxury Living",
     src: "/assets/mockups/luxury-living.png",
-  },
-  {
-    id: "modern-bedroom",
-    name: "Modern Bedroom",
-    src: "/assets/mockups/modern-bedroom.png",
   },
   {
     id: "minimalist",
@@ -41,9 +41,6 @@ const MOCKUPS = [
     src: "/assets/mockups/minimalist.png",
   },
 ]
-
-// Minimum dimensions we want to ensure for good coverage
-const MIN_IMAGE_SIZE = 650 // Images smaller than this will use the enhanced method
 
 export default function ProductVisualizer({ productImage, productName }: ProductVisualizerProps) {
   const [activeTab, setActiveTab] = useState<string>(MOCKUPS[0].id)
@@ -53,6 +50,51 @@ export default function ProductVisualizer({ productImage, productName }: Product
   const bookmatchedTextureRef = useRef<string | null>(null)
   const [backgroundSize, setBackgroundSize] = useState("400px 400px") // Default size
   const [backgroundPosition, setBackgroundPosition] = useState("center") // Default position
+  const [mockupsLoaded, setMockupsLoaded] = useState<Record<string, boolean>>({})
+  const [allMockupsLoaded, setAllMockupsLoaded] = useState(false)
+
+  // Preload all mockup images immediately
+  useEffect(() => {
+    const preloadedMockups: Record<string, boolean> = {}
+    let loadedCount = 0
+
+    const preloadImage = (src: string, id: string) => {
+      return new Promise<void>((resolve) => {
+        const img = new Image()
+        img.crossOrigin = "anonymous"
+
+        img.onload = () => {
+          preloadedMockups[id] = true
+          loadedCount++
+          resolve()
+        }
+
+        img.onerror = () => {
+          preloadedMockups[id] = false
+          loadedCount++
+          resolve()
+        }
+
+        img.src = src
+      })
+    }
+
+    // Start preloading all mockups in parallel
+    Promise.all(MOCKUPS.map((mockup) => preloadImage(mockup.src, mockup.id))).then(() => {
+      console.log("All mockups preloaded successfully")
+      setAllMockupsLoaded(true)
+      setMockupsLoaded(preloadedMockups)
+    })
+
+    // Also preload the product image to start bookmatching process early
+    if (productImage) {
+      const productImg = new Image()
+      productImg.crossOrigin = "anonymous"
+      productImg.src = productImage.startsWith("http")
+        ? `/api/proxy-image?url=${encodeURIComponent(productImage)}`
+        : productImage
+    }
+  }, [productImage])
 
   // Create bookmatched texture as soon as component mounts
   useEffect(() => {
@@ -63,12 +105,14 @@ export default function ProductVisualizer({ productImage, productName }: Product
   useEffect(() => {
     const timer = setTimeout(() => {
       setLoading(false)
-    }, 1000)
+    }, 500)
 
     return () => clearTimeout(timer)
   }, [])
 
-  // Create a bookmatched texture from the product image
+  // Replace the createBookmatchedTexture function with this optimized version
+  // that handles 488x488 px images specifically
+
   const createBookmatchedTexture = (imageUrl: string) => {
     // If we already created the texture, don't recreate it
     if (bookmatchedTextureRef.current) {
@@ -93,99 +137,143 @@ export default function ProductVisualizer({ productImage, productName }: Product
       const originalWidth = img.width
       const originalHeight = img.height
 
-      // Determine if we need to use the enhanced method for small images
-      const isSmallImage = originalWidth < MIN_IMAGE_SIZE || originalHeight < MIN_IMAGE_SIZE
+      // Log the exact dimensions for debugging
+      console.log(`Image dimensions: ${originalWidth}x${originalHeight}`)
 
-      if (isSmallImage) {
-        // ENHANCED METHOD FOR SMALL IMAGES
-        // Instead of scaling up too much, we'll create a more detailed pattern
-        // with more repetitions but at a smaller scale to maintain quality
+      // Check for specific square image sizes that need special handling
+      const isExactSquare488 = originalWidth === 488 && originalHeight === 488
+      const isExactSquare646 = originalWidth === 646 && originalHeight === 646
+      const isNearlySquare = Math.abs(originalWidth - originalHeight) < 20
 
-        // For small images, we'll create a 4x4 grid of bookmatched patterns
-        // This gives us more coverage without excessive scaling
-        const gridSize = 4 // 4x4 grid
+      // Special handling for 488x488 and 646x646 images
+      if (isExactSquare488 || isExactSquare646) {
+        console.log(`Applying special bookmatching for ${originalWidth}x${originalHeight} image`)
+
+        // For these specific sizes, use a precise 2x2 grid with perfect mirroring
+        // This creates a clean bookmatched pattern with sharp details
+
+        // Make the canvas exactly 2x the size in each dimension
+        canvas.width = originalWidth * 2
+        canvas.height = originalHeight * 2
+
+        // Clear any previous transformations
+        ctx.setTransform(1, 0, 0, 1, 0, 0)
+
+        // Top-left: Original image
+        ctx.drawImage(img, 0, 0, originalWidth, originalHeight)
+
+        // Top-right: Horizontally flipped
+        ctx.save()
+        ctx.translate(canvas.width, 0)
+        ctx.scale(-1, 1)
+        ctx.drawImage(img, 0, 0, originalWidth, originalHeight)
+        ctx.restore()
+
+        // Bottom-left: Vertically flipped
+        ctx.save()
+        ctx.translate(0, canvas.height)
+        ctx.scale(1, -1)
+        ctx.drawImage(img, 0, 0, originalWidth, originalHeight)
+        ctx.restore()
+
+        // Bottom-right: Both horizontally and vertically flipped
+        ctx.save()
+        ctx.translate(canvas.width, canvas.height)
+        ctx.scale(-1, -1)
+        ctx.drawImage(img, 0, 0, originalWidth, originalHeight)
+        ctx.restore()
+
+        // Set background size to exactly match the 2x2 grid
+        setBackgroundSize(`${originalWidth * 2}px ${originalHeight * 2}px`)
+        setBackgroundPosition("center")
+      } else if (isNearlySquare) {
+        // For other square images, use a 4x4 grid with precise mirroring
+        // This creates a more detailed bookmatched pattern
+
+        // Make the canvas 4x the size in each dimension for more detail
+        const multiplier = 4
+        canvas.width = originalWidth * multiplier
+        canvas.height = originalHeight * multiplier
+
+        // Create a pattern of 4x4 tiles with alternating flips
+        for (let y = 0; y < multiplier; y++) {
+          for (let x = 0; x < multiplier; x++) {
+            // Create a more complex pattern with alternating flips
+            const flipX = x % 2 === 1
+            const flipY = y % 2 === 1
+
+            ctx.save()
+
+            // Position for this tile
+            const posX = x * originalWidth
+            const posY = y * originalHeight
+
+            // Apply transformations based on position
+            ctx.translate(posX + (flipX ? originalWidth : 0), posY + (flipY ? originalHeight : 0))
+            ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1)
+
+            // Draw the image
+            ctx.drawImage(img, 0, 0, originalWidth, originalHeight)
+
+            ctx.restore()
+          }
+        }
+
+        // Set background size to create a more detailed pattern
+        setBackgroundSize(`${originalWidth * 2}px ${originalHeight * 2}px`)
+        setBackgroundPosition("center")
+      } else {
+        // For non-square images, use a 4x4 grid approach
+        const gridSize = 4
 
         // Set canvas size to accommodate the grid
         canvas.width = originalWidth * gridSize
         canvas.height = originalHeight * gridSize
 
-        // Function to draw a single bookmatched pattern (2x2) at a specific position
-        const drawBookmatchedPattern = (startX: number, startY: number) => {
-          // Original image in top-left
-          ctx.drawImage(img, startX, startY, originalWidth, originalHeight)
+        // Fill the entire grid with copies of the image
+        for (let y = 0; y < gridSize; y++) {
+          for (let x = 0; x < gridSize; x++) {
+            // For every other position, flip the image horizontally, vertically, or both
+            const flipHorizontal = x % 2 === 1
+            const flipVertical = y % 2 === 1
 
-          // Horizontally flipped in top-right
-          ctx.save()
-          ctx.translate(startX + originalWidth * 2, startY)
-          ctx.scale(-1, 1)
-          ctx.drawImage(img, 0, 0, originalWidth, originalHeight)
-          ctx.restore()
+            ctx.save()
 
-          // Vertically flipped in bottom-left
-          ctx.save()
-          ctx.translate(startX, startY + originalHeight * 2)
-          ctx.scale(1, -1)
-          ctx.drawImage(img, 0, 0, originalWidth, originalHeight)
-          ctx.restore()
+            // Position at the correct grid cell
+            const posX = x * originalWidth
+            const posY = y * originalHeight
 
-          // Both horizontally and vertically flipped in bottom-right
-          ctx.save()
-          ctx.translate(startX + originalWidth * 2, startY + originalHeight * 2)
-          ctx.scale(-1, -1)
-          ctx.drawImage(img, 0, 0, originalWidth, originalHeight)
-          ctx.restore()
-        }
+            if (flipHorizontal && flipVertical) {
+              // Flip both horizontally and vertically
+              ctx.translate(posX + originalWidth, posY + originalHeight)
+              ctx.scale(-1, -1)
+              ctx.drawImage(img, 0, 0, originalWidth, originalHeight)
+            } else if (flipHorizontal) {
+              // Flip horizontally only
+              ctx.translate(posX + originalWidth, posY)
+              ctx.scale(-1, 1)
+              ctx.drawImage(img, 0, 0, originalWidth, originalHeight)
+            } else if (flipVertical) {
+              // Flip vertically only
+              ctx.translate(posX, posY + originalHeight)
+              ctx.scale(1, -1)
+              ctx.drawImage(img, 0, 0, originalWidth, originalHeight)
+            } else {
+              // No flip
+              ctx.drawImage(img, posX, posY, originalWidth, originalHeight)
+            }
 
-        // Draw multiple bookmatched patterns in a grid
-        for (let y = 0; y < gridSize; y += 2) {
-          for (let x = 0; x < gridSize; x += 2) {
-            drawBookmatchedPattern(x * originalWidth, y * originalHeight)
+            ctx.restore()
           }
         }
 
-        // Set a smaller background size to maintain quality
-        // We'll use a tiling approach rather than scaling
-        const patternSize = Math.min(originalWidth, originalHeight) * 2
-        setBackgroundSize(`${patternSize}px ${patternSize}px`)
-        setBackgroundPosition("center")
-      } else {
-        // ORIGINAL METHOD FOR ADEQUATELY SIZED IMAGES
-        // Set canvas size to 2x the image size to fit the bookmatched pattern
-        const patternSize = Math.max(img.width, img.height) * 2
-        canvas.width = patternSize
-        canvas.height = patternSize
-
-        // Draw the original image in the top-left quadrant
-        ctx.drawImage(img, 0, 0, img.width, img.height)
-
-        // Draw horizontally flipped image in top-right quadrant
-        ctx.save()
-        ctx.translate(patternSize, 0)
-        ctx.scale(-1, 1)
-        ctx.drawImage(img, 0, 0, img.width, img.height)
-        ctx.restore()
-
-        // Draw vertically flipped image in bottom-left quadrant
-        ctx.save()
-        ctx.translate(0, patternSize)
-        ctx.scale(1, -1)
-        ctx.drawImage(img, 0, 0, img.width, img.height)
-        ctx.restore()
-
-        // Draw both horizontally and vertically flipped image in bottom-right quadrant
-        ctx.save()
-        ctx.translate(patternSize, patternSize)
-        ctx.scale(-1, -1)
-        ctx.drawImage(img, 0, 0, img.width, img.height)
-        ctx.restore()
-
-        // Use the original background size for larger images
-        setBackgroundSize("400px 400px")
+        // Set background size to ensure full coverage
+        setBackgroundSize(`${originalWidth * 2}px ${originalHeight * 2}px`)
         setBackgroundPosition("center")
       }
 
-      // Store the bookmatched texture
-      bookmatchedTextureRef.current = canvas.toDataURL("image/jpeg", 0.95) // Higher quality JPEG
+      // Store the bookmatched texture with maximum quality
+      bookmatchedTextureRef.current = canvas.toDataURL("image/png") // Use PNG for maximum quality
       setTextureReady(true)
     }
 
@@ -206,6 +294,9 @@ export default function ProductVisualizer({ productImage, productName }: Product
     }
   }
 
+  // Determine if we should show loading state
+  const showLoading = loading || !textureReady || !allMockupsLoaded
+
   return (
     <div className="w-full max-w-3xl mx-auto">
       <h2 className="text-xl font-bold mb-4">Product Visualizer</h2>
@@ -223,7 +314,7 @@ export default function ProductVisualizer({ productImage, productName }: Product
           <TabsContent key={mockup.id} value={mockup.id} className="mt-0">
             <div className="border rounded-lg p-2 bg-gray-50">
               <div className="relative rounded-lg overflow-hidden bg-white border">
-                {loading || !textureReady ? (
+                {showLoading ? (
                   <div className="flex items-center justify-center h-[200px]">
                     <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#194a95]"></div>
                   </div>
@@ -236,7 +327,6 @@ export default function ProductVisualizer({ productImage, productName }: Product
                         backgroundRepeat: "repeat",
                         backgroundSize: backgroundSize,
                         backgroundPosition: backgroundPosition,
-                        imageRendering: "auto", // Changed from "high-quality" to "auto"
                       }}
                     >
                       <img
