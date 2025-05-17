@@ -634,7 +634,7 @@ export default function ProductDetail() {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex flex-wrap gap-4">
+            <div className="flex flex-wrap gap-4 mb-8">
               <Button
                 onClick={toggleWishlist}
                 disabled={wishlistLoading}
@@ -650,16 +650,15 @@ export default function ProductDetail() {
             </div>
           </div>
 
-             {/* Visualizer Button */}
-             <div className="pb-4 border-b border-gray-200">
-                <Button
-                  onClick={() => setShowVisualizer(!showVisualizer)}
-                  className="w-full bg-[#194a95] hover:bg-[#0f3a7a]"
-                >
-                  {showVisualizer ? "Hide Visualizer" : "Show Product Visualizer"}
-                </Button>
-              </div>
-
+           {/* Visualizer Button */}
+            <div className="pb-4 border-b border-gray-200 mt-4">
+              <Button
+                onClick={() => setShowVisualizer(!showVisualizer)}
+                className="w-full bg-[#194a95] hover:bg-[#0f3a7a] py-3 text-white"
+              >
+                {showVisualizer ? "Hide Visualizer" : "Show Product Visualizer"}
+              </Button>
+            </div>
                 {/* Product Visualizer Section */}
           {showVisualizer && product.image.length > 0 && (
             <div className="max-w-6xl mx-auto mt-12 border-t pt-8">
