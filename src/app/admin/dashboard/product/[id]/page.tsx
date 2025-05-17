@@ -3,7 +3,17 @@
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import axios, { AxiosError } from "axios"
-import { ArrowLeft, ChevronLeft, ChevronRight, Loader2, Trash2, ChevronDown, ChevronUp, Calculator, Download } from 'lucide-react'
+import {
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Trash2,
+  ChevronDown,
+  ChevronUp,
+  Calculator,
+  Download,
+} from "lucide-react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import {
@@ -20,6 +30,8 @@ import {
 import { Badge } from "@/components/ui/badge"
 import QRCodeGenerator from "@/components/QRCodeGenerator"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import ProductVisualizer from "@/components/ProductVisualizer"
+
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
@@ -115,6 +127,9 @@ export default function ProductDetail() {
   const [qrCodeUrl, setQrCodeUrl] = useState<string>("")
   const [showFullDescription, setShowFullDescription] = useState(false)
   const [quantityFormula, setQuantityFormula] = useState<string | null>(null)
+  const [showGallery, setShowGallery] = useState(false)
+  const [showVisualizer, setShowVisualizer] = useState(false)
+
 
   // Update the useEffect to use this enhanced debugging
   useEffect(() => {
@@ -388,9 +403,10 @@ export default function ProductDetail() {
                   }
                   alt={product.name}
                   fill
-                  className="object-cover"
+                  className="object-cover cursor-pointer"
                   onError={() => handleImageError(currentImageIndex)}
                   priority
+                  onClick={() => setShowGallery(true)}
                 />
 
                 {/* Navigation Arrows */}
@@ -640,14 +656,133 @@ export default function ProductDetail() {
             />
           )}
         </div>
-        
+
+        {/* Visualizer Button */}
+        <div className="pb-4 border-b border-gray-200 mt-4">
+              <Button
+                onClick={() => setShowVisualizer(!showVisualizer)}
+                className="w-full bg-[#194a95] hover:bg-[#0f3a7a] py-3 text-white"
+              >
+                {showVisualizer ? "Hide Visualizer" : "Show Product Visualizer"}
+              </Button>
+            </div>
+          {/* Product Visualizer Section */}
+          {showVisualizer && product.image.length > 0 && (
+            <div className="mt-4">
+              <ProductVisualizer productImage={product.image[0]} productName={product.name}  />
+            </div>
+          )}
+
         {/* Disclaimer */}
         <div className="max-w-6xl mx-auto mt-8 pt-4 border-t">
-          <p className="text-gray-500 text-sm italic text-center">
-            Disclaimer: Actual quantity can differ
-          </p>
+          <p className="text-gray-500 text-sm italic text-center">Disclaimer: Actual quantity can differ</p>
         </div>
       </div>
+      {/* Image Gallery Modal */}
+      {showGallery && product.image.length > 0 && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4"
+          onClick={() => setShowGallery(false)}
+        >
+          <div
+            className="relative max-w-4xl w-full h-full max-h-[80vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close button */}
+            <button
+              className="absolute right-2 top-2 z-10 bg-white/20 hover:bg-white/40 rounded-full p-2 text-white"
+              onClick={() => setShowGallery(false)}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+
+            {/* Main gallery image */}
+            <div className="relative flex-1 bg-black">
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Image
+                  src={imageLoadError[currentImageIndex] ? "/placeholder.svg" : product.image[currentImageIndex]}
+                  alt={`${product.name} - Image ${currentImageIndex + 1}`}
+                  fill
+                  className="object-contain"
+                  onError={() => handleImageError(currentImageIndex)}
+                />
+              </div>
+
+              {/* Image counter */}
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/50 text-white px-3 py-1 rounded-full text-sm">
+                {currentImageIndex + 1} / {product.image.length}
+              </div>
+
+              {/* Navigation arrows */}
+              {product.image.length > 1 && (
+                <>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      previousImage()
+                    }}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/40 p-3 rounded-full"
+                    aria-label="Previous image"
+                  >
+                    <ChevronLeft className="h-6 w-6 text-white" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      nextImage()
+                    }}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/40 p-3 rounded-full"
+                    aria-label="Next image"
+                  >
+                    <ChevronRight className="h-6 w-6 text-white" />
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Thumbnails */}
+            {product.image.length > 1 && (
+              <div className="bg-black/80 p-4 overflow-x-auto">
+                <div className="flex space-x-2 justify-center">
+                  {product.image.map((img, index) => (
+                    <button
+                      key={index}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleThumbnailClick(index)
+                      }}
+                      className={`relative h-16 w-16 flex-shrink-0 rounded overflow-hidden ${
+                        selectedThumbnail === index ? "ring-2 ring-[#194a95]" : "opacity-70"
+                      }`}
+                    >
+                      <Image
+                        src={imageLoadError[index] ? "/placeholder.svg" : img}
+                        alt={`${product.name} thumbnail ${index + 1}`}
+                        fill
+                        className="object-cover"
+                        onError={() => handleImageError(index)}
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

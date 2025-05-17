@@ -3,22 +3,10 @@
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import axios, { AxiosError } from "axios"
-import { ArrowLeft, ChevronLeft, ChevronRight, Loader2, Trash2, ChevronDown, ChevronUp, Calculator, Download } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Calculator } from 'lucide-react'
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
-import QRCodeGenerator from "@/components/QRCodeGenerator"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import ProductVisualizer from "@/components/ProductVisualizer"
 
@@ -116,8 +104,17 @@ export default function ProductDetail() {
   const [qrCodeUrl, setQrCodeUrl] = useState<string>("")
   const [showFullDescription, setShowFullDescription] = useState(false)
   const [quantityFormula, setQuantityFormula] = useState<string | null>(null)
+  const [galleryOpen, setGalleryOpen] = useState(false)
   const [showVisualizer, setShowVisualizer] = useState(false)
 
+
+  const openGallery = () => {
+    setGalleryOpen(true)
+  }
+
+  const closeGallery = () => {
+    setGalleryOpen(false)
+  }
 
   // Update the useEffect to use this enhanced debugging
   useEffect(() => {
@@ -184,7 +181,6 @@ export default function ProductDetail() {
 
     fetchProduct()
   }, [params.id])
-
 
   const handleThumbnailClick = (index: number) => {
     setCurrentImageIndex(index)
@@ -360,7 +356,7 @@ export default function ProductDetail() {
           <div className="w-full md:w-1/2 md:order-2 mb-8 md:mb-0">
             {/* Main Image with Navigation Arrows */}
             <div className="relative rounded-2xl overflow-hidden bg-gray-100 mb-4">
-              <div className="aspect-[4/3] relative">
+              <div className="aspect-[4/3] relative cursor-pointer" onClick={openGallery}>
                 <Image
                   src={
                     imageLoadError[currentImageIndex]
@@ -428,7 +424,6 @@ export default function ProductDetail() {
               <h1 className="text-3xl font-bold mt-1">{product.name}</h1>
             </div>
 
-        
             {/* Product Category */}
             <div className="pb-4 border-b border-gray-200">
               <p className="text-gray-500">Product Category</p>
@@ -548,7 +543,42 @@ export default function ProductDetail() {
                   </button>
                 )}
               </div>
-            </div>     
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Disclaimer */}
+      <div className="max-w-6xl mx-auto mt-8 pt-4 border-t">
+        <p className="text-gray-500 text-sm italic text-center">Disclaimer: Actual quantity can differ</p>
+      </div>
+      {/* Image Gallery Modal */}
+      {galleryOpen && product.image.length > 0 && (
+        <div className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4">
+          <div className="relative w-full max-w-4xl mx-auto">
+            {/* Close button */}
+            <button
+              onClick={closeGallery}
+              className="absolute right-4 top-4 z-10 bg-white/20 hover:bg-white/40 p-2 rounded-full transition-colors"
+              aria-label="Close gallery"
+            >
+              <ArrowLeft className="h-6 w-6 text-white" />
+            </button>
+
+            {/* Main gallery image */}
+            <div className="relative aspect-[4/3] w-full">
+              <Image
+                src={
+                  imageLoadError[currentImageIndex]
+                    ? "/placeholder.svg"
+                    : product.image[currentImageIndex] || "/placeholder.svg"
+                }
+                alt={product.name}
+                fill
+                className="object-contain"
+                onError={() => handleImageError(currentImageIndex)}
+                priority
+              />
             </div>
 
               {/* Visualizer Button */}
@@ -560,19 +590,57 @@ export default function ProductDetail() {
                 {showVisualizer ? "Hide Visualizer" : "Show Product Visualizer"}
               </Button>
             </div>
-          {/* Product Visualizer Section */}
-          {showVisualizer && product.image.length > 0 && (
-            <div className="mt-4">
-              <ProductVisualizer productImage={product.image[0]} productName={product.name}  />
-            </div>
-          )}
-      
+            {/* Product Visualizer Section */}
+            {showVisualizer && product.image.length > 0 && (
+              <div className="mt-4">
+                <ProductVisualizer productImage={product.image[0]} productName={product.name}  />
+              </div>
+            )}
+        
 
+            {/* Gallery navigation */}
+            {product.image.length > 1 && (
+              <>
+                <button
+                  onClick={previousImage}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/40 p-3 rounded-full transition-all"
+                  aria-label="Previous image"
+                >
+                  <ChevronLeft className="h-8 w-8 text-white" />
+                </button>
+                <button
+                  onClick={nextImage}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/40 p-3 rounded-full transition-all"
+                  aria-label="Next image"
+                >
+                  <ChevronRight className="h-8 w-8 text-white" />
+                </button>
 
-
+                {/* Thumbnails */}
+                <div className="flex justify-center mt-4 gap-2 overflow-x-auto py-2">
+                  {product.image.map((img, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleThumbnailClick(index)}
+                      className={`relative rounded-md overflow-hidden h-16 w-16 flex-shrink-0 ${
+                        selectedThumbnail === index ? "ring-2 ring-white" : ""
+                      }`}
+                    >
+                      <Image
+                        src={imageLoadError[index] ? "/placeholder.svg" : img || "/placeholder.svg"}
+                        alt={`${product.name} thumbnail ${index + 1}`}
+                        fill
+                        className="object-cover"
+                        onError={() => handleImageError(index)}
+                      />
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </div>
-        
+      )}
         {/* Disclaimer */}
         <div className="max-w-6xl mx-auto mt-8 pt-4 border-t">
           <p className="text-gray-500 text-sm italic text-center">
