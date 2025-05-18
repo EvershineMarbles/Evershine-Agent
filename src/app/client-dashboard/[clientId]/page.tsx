@@ -597,6 +597,28 @@ export default function ProductsPage() {
       <div className="p-6 md:p-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <h1 className="text-3xl font-bold">Welcome, {clientData?.name?.split(" ")[0] || "Client"}</h1>
+          // Add this button somewhere in your ProductsPage component
+<button
+  onClick={async () => {
+    const token = localStorage.getItem("clientImpersonationToken");
+    const response = await fetch("https://evershinebackend-2.onrender.com/api/getAllProducts", {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const data = await response.json();
+    console.log("API Response:", data);
+    
+    if (data.success && data.data && data.data.length > 0) {
+      console.log("First product:", data.data[0]);
+      console.log("Price fields:", {
+        price: data.data[0].price,
+        basePrice: data.data[0].basePrice
+      });
+    }
+  }}
+  className="px-4 py-2 bg-gray-200 rounded-md mb-4"
+>
+  Debug API Response
+</button>
         </div>
         {error && (
           <Alert variant="destructive" className="mb-4">
