@@ -5,14 +5,13 @@ import type React from "react"
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import axios, { AxiosError } from "axios"
-import { ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Heart, X } from "lucide-react"
+import { ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Heart, X, RefreshCw } from "lucide-react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/components/ui/use-toast"
 import { ToastAction } from "@/components/ui/toast"
 import ProductVisualizer from "@/components/ProductVisualizer"
-
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
 
@@ -30,14 +29,6 @@ interface Product {
   numberOfPieces?: number | null
   thickness?: string
   basePrice?: number
-}
-
-interface CommissionData {
-  agentId: string
-  name: string
-  email: string
-  commissionRate: number
-  categoryCommissions?: Record<string, number>
 }
 
 interface ApiResponse {
@@ -59,139 +50,118 @@ export default function ProductDetail() {
   const [wishlistLoading, setWishlistLoading] = useState(false)
   const [inWishlist, setInWishlist] = useState(false)
   const clientId = params.clientId as string
-  const [commissionData, setCommissionData] = useState<CommissionData | null>(null)
-  const [overrideCommissionRate, setOverrideCommissionRate] = useState<number | null>(null)
-  const [commissionLoading, setCommissionLoading] = useState(false)
-  const [basePrice, setBasePrice] = useState<number | null>(null)
   const [showFullDescription, setShowFullDescription] = useState(false)
   // Gallery state
   const [galleryOpen, setGalleryOpen] = useState(false)
   const [showVisualizer, setShowVisualizer] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [lastPriceCheck, setLastPriceCheck] = useState<Date>(new Date())
 
-
-  // Load saved commission rate from localStorage on component mount
+  // Add polling for price updates
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      // Use a client-specific key for commission rate
-      const savedRate = localStorage.getItem(`commission-override-${clientId}`)
-      if (savedRate) {
-        setOverrideCommissionRate(Number(savedRate))
-      } else {
-        // Reset to null if no saved rate for this client
-        setOverrideCommissionRate(null)
-      }
-    }
-  }, [clientId])
-
-  // Add fetchCommissionData function
-  const fetchCommissionData = async () => {
-    try {
-      setCommissionLoading(true)
-      const token = localStorage.getItem("clientImpersonationToken")
-      if (!token) {
-        return null
-      }
-
-      const response = await fetch(`${API_URL}/api/client/agent-commission`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-
-      if (!response.ok) {
-        return null
-      }
-
-      const data = await response.json()
-      if (data.success && data.data) {
-        setCommissionData(data.data)
-        return data.data
-      }
-      return null
-    } catch (error) {
-      console.error("Error fetching commission data:", error)
-      return null
-    } finally {
-      setCommissionLoading(false)
-    }
-  }
-
-  // Add calculateAdjustedPrice function with override support
-  const calculateAdjustedPrice = (price: number, category: string) => {
-    // Use the base price if available
-    const productBasePrice = basePrice || price
-
-    // Get the default commission rate (from agent or category-specific)
-    let defaultRate = commissionData?.commissionRate || 10
-
-    // Check for category-specific commission
-    if (commissionData?.categoryCommissions && category && commissionData.categoryCommissions[category]) {
-      defaultRate = commissionData.categoryCommissions[category]
-    }
-
-    // Add the override rate to the default rate if an override is set
-    const finalRate = overrideCommissionRate !== null ? defaultRate + overrideCommissionRate : defaultRate
-
-    // Calculate adjusted price based on the original basePrice
-    const adjustedPrice = productBasePrice * (1 + finalRate / 100)
-    return Math.round(adjustedPrice * 100) / 100 // Round to 2 decimal places
-  }
-
-  useEffect(() => {
-    const fetchProduct = async () => {
+    // Function to check for price updates
+    const checkForPriceUpdates = async () => {
       try {
-        setLoading(true)
-        setError("")
+        const token = localStorage.getItem("clientImpersonationToken")
+        if (!token) return
 
-        if (!params.id) {
-          throw new Error("Product ID is missing")
-        }
-
-        // First fetch commission data
-        await fetchCommissionData()
-
-        const response = await axios.get<ApiResponse>(`${API_URL}/api/getPostDataById`, {
-          params: { id: params.id },
+        // Call the price update check endpoint
+        const response = await fetch(`${API_URL}/api/checkPriceUpdates/${clientId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
         })
 
-        if (response.data.success && response.data.data?.[0]) {
-          const productData = response.data.data[0]
+        if (response.ok) {
+          const data = await response.json()
 
-          // Store the base price
-          setBasePrice(productData.basePrice || productData.price)
+          // If prices have been updated since our last check
+          if (data.pricesUpdated && new Date(data.lastUpdated) > lastPriceCheck) {
+            console.log("Prices have been updated, refreshing product data")
+            setLastPriceCheck(new Date())
 
-          // Add missing fields if they don't exist
-          const processedProduct = {
-            ...productData,
-            size: productData.size !== undefined ? productData.size : "",
-            numberOfPieces: productData.numberOfPieces !== undefined ? productData.numberOfPieces : null,
-            thickness: productData.thickness !== undefined ? productData.thickness : "",
+            // Refetch product with updated price
+            fetchProduct()
+
+            // Notify the user
+            toast({
+              title: "Price Updated",
+              description: "This product's price has been updated with the latest commission rates.",
+              duration: 5000,
+            })
           }
-
-          setProduct(processedProduct)
-          setImageLoadError(new Array(productData.image.length).fill(false))
-
-          // Check if product is in wishlist
-          checkWishlistStatus(productData.postId)
-        } else {
-          throw new Error(response.data.msg || "No data found")
         }
       } catch (error) {
-        let errorMessage = "Error fetching product"
-
-        if (error instanceof AxiosError) {
-          errorMessage = error.response?.data?.msg || error.message
-        } else if (error instanceof Error) {
-          errorMessage = error.message
-        }
-
-        console.error("Error fetching product:", error)
-        setError(errorMessage)
-      } finally {
-        setLoading(false)
+        console.error("Error checking for price updates:", error)
       }
     }
 
+    // Check every 30 seconds
+    const intervalId = setInterval(checkForPriceUpdates, 30000)
+
+    // Clean up on unmount
+    return () => clearInterval(intervalId)
+  }, [clientId, toast, lastPriceCheck])
+
+  const fetchProduct = async () => {
+    try {
+      setLoading(true)
+      setError("")
+
+      if (!params.id) {
+        throw new Error("Product ID is missing")
+      }
+
+      const response = await axios.get<ApiResponse>(`${API_URL}/api/getPostDataById`, {
+        params: { id: params.id },
+      })
+
+      if (response.data.success && response.data.data?.[0]) {
+        const productData = response.data.data[0]
+
+        // Add missing fields if they don't exist
+        const processedProduct = {
+          ...productData,
+          size: productData.size !== undefined ? productData.size : "",
+          numberOfPieces: productData.numberOfPieces !== undefined ? productData.numberOfPieces : null,
+          thickness: productData.thickness !== undefined ? productData.thickness : "",
+        }
+
+        setProduct(processedProduct)
+        setImageLoadError(new Array(productData.image.length).fill(false))
+
+        // Check if product is in wishlist
+        checkWishlistStatus(productData.postId)
+      } else {
+        throw new Error(response.data.msg || "No data found")
+      }
+    } catch (error) {
+      let errorMessage = "Error fetching product"
+
+      if (error instanceof AxiosError) {
+        errorMessage = error.response?.data?.msg || error.message
+      } else if (error instanceof Error) {
+        errorMessage = error.message
+      }
+
+      console.error("Error fetching product:", error)
+      setError(errorMessage)
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
+  }
+
+  useEffect(() => {
     fetchProduct()
   }, [params.id])
+
+  // Function to manually refresh product data
+  const handleRefresh = () => {
+    setRefreshing(true)
+    fetchProduct()
+  }
 
   // Check if product is in wishlist
   const checkWishlistStatus = async (productId: string) => {
@@ -344,7 +314,7 @@ export default function ProductDetail() {
           description: `${product.name} has been removed from your wishlist.`,
         })
       } else {
-        // Add to wishlist
+        // Add to wishlist - no longer sending price, backend will calculate
         const response = await fetch(`${API_URL}/api/addToWishlist`, {
           method: "POST",
           headers: {
@@ -353,8 +323,7 @@ export default function ProductDetail() {
           },
           body: JSON.stringify({
             productId: product.postId,
-            // Include the current price with commission applied
-            price: calculateAdjustedPrice(product.price, product.category),
+            // No price calculation, backend will handle it
           }),
         })
 
@@ -449,14 +418,27 @@ export default function ProductDetail() {
 
   return (
     <div className="min-h-screen bg-white p-6">
-      {/* Back Button */}
-      <button
-        onClick={() => router.back()}
-        className="mb-6 hover:bg-gray-100 p-2 rounded-full transition-colors"
-        aria-label="Go back"
-      >
-        <ArrowLeft className="h-6 w-6" />
-      </button>
+      {/* Back Button and Refresh Button */}
+      <div className="flex justify-between mb-6">
+        <button
+          onClick={() => router.back()}
+          className="hover:bg-gray-100 p-2 rounded-full transition-colors"
+          aria-label="Go back"
+        >
+          <ArrowLeft className="h-6 w-6" />
+        </button>
+
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="relative"
+          aria-label="Refresh product data"
+        >
+          <RefreshCw className={`h-5 w-5 ${refreshing ? "animate-spin" : ""}`} />
+        </Button>
+      </div>
 
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col md:flex-row md:gap-12">
@@ -546,9 +528,7 @@ export default function ProductDetail() {
             {/* Price */}
             <div className="pb-4 border-b border-gray-200">
               <p className="text-gray-500">Price (per sqft)</p>
-              <p className="text-xl font-bold mt-1">
-                ₹{product && calculateAdjustedPrice(product.price, product.category)}/per sqft
-              </p>
+              <p className="text-xl font-bold mt-1">₹{product.price}/per sqft</p>
             </div>
 
             {/* Product Category */}
@@ -648,27 +628,23 @@ export default function ProductDetail() {
                 {wishlistLoading ? "Processing..." : "Add to Wishlist"}
               </Button>
             </div>
-            
-          
-
           </div>
         </div>
-            {/* Visualizer Button */}
-            <div className="pb-4 border-b border-gray-200 mt-4">
-              <Button
-                onClick={() => setShowVisualizer(!showVisualizer)}
-                className="w-full bg-[#194a95] hover:bg-[#0f3a7a] py-3 text-white"
-              >
-                {showVisualizer ? "Hide Visualizer" : "Show Product Visualizer"}
-              </Button>
-            </div>
-          {/* Product Visualizer Section */}
-          {showVisualizer && product.image.length > 0 && (
-            <div className="mt-4">
-              <ProductVisualizer productImage={product.image[0]} productName={product.name}  />
-            </div>
-          )}
-
+        {/* Visualizer Button */}
+        <div className="pb-4 border-b border-gray-200 mt-4">
+          <Button
+            onClick={() => setShowVisualizer(!showVisualizer)}
+            className="w-full bg-[#194a95] hover:bg-[#0f3a7a] py-3 text-white"
+          >
+            {showVisualizer ? "Hide Visualizer" : "Show Product Visualizer"}
+          </Button>
+        </div>
+        {/* Product Visualizer Section */}
+        {showVisualizer && product.image.length > 0 && (
+          <div className="mt-4">
+            <ProductVisualizer productImage={product.image[0]} productName={product.name} />
+          </div>
+        )}
       </div>
 
       {/* Image Gallery Modal */}

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowLeft, Trash2, Loader2, ShoppingBag } from "lucide-react"
+import { ArrowLeft, Trash2, Loader2, ShoppingBag, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -32,6 +32,8 @@ export default function CartPage() {
   const [updating, setUpdating] = useState<Record<string, boolean>>({})
   const [isCheckingOut, setIsCheckingOut] = useState(false)
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
+  const [lastPriceCheck, setLastPriceCheck] = useState<Date>(new Date())
 
   // Get API URL from environment or use default
   const getApiUrl = () => {
@@ -61,6 +63,55 @@ export default function CartPage() {
       return null
     }
   }
+
+  // Add polling for price updates
+  useEffect(() => {
+    // Function to check for price updates
+    const checkForPriceUpdates = async () => {
+      try {
+        const token = getToken()
+        if (!token) return
+
+        const apiUrl = getApiUrl()
+
+        // Call the price update check endpoint
+        const response = await fetch(`${apiUrl}/api/checkPriceUpdates/${clientId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+
+          // If prices have been updated since our last check
+          if (data.pricesUpdated && new Date(data.lastUpdated) > lastPriceCheck) {
+            console.log("Prices have been updated, refreshing cart data")
+            setLastPriceCheck(new Date())
+
+            // Refetch cart with updated prices
+            fetchCart()
+
+            // Notify the user
+            toast({
+              title: "Prices Updated",
+              description: "Cart prices have been updated with the latest commission rates.",
+              duration: 5000,
+            })
+          }
+        }
+      } catch (error) {
+        console.error("Error checking for price updates:", error)
+      }
+    }
+
+    // Check every 30 seconds
+    const intervalId = setInterval(checkForPriceUpdates, 30000)
+
+    // Clean up on unmount
+    return () => clearInterval(intervalId)
+  }, [clientId, toast, lastPriceCheck])
 
   // Fetch cart items from server
   useEffect(() => {
@@ -127,7 +178,14 @@ export default function CartPage() {
       setCartItems([])
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
+  }
+
+  // Handle manual refresh
+  const handleRefresh = () => {
+    setRefreshing(true)
+    fetchCart()
   }
 
   // Fetch product price if needed
@@ -171,10 +229,6 @@ export default function CartPage() {
 
       const apiUrl = getApiUrl()
 
-      // Get the current item to preserve its price
-      const currentItem = cartItems.find((item) => item.postId === productId)
-      if (!currentItem) return
-
       // First remove the item
       await fetch(`${apiUrl}/api/deleteUserCartItem`, {
         method: "DELETE",
@@ -185,7 +239,7 @@ export default function CartPage() {
         body: JSON.stringify({ productId }),
       })
 
-      // Then add it back with the new quantity and preserve the price
+      // Then add it back with the new quantity - let backend handle pricing
       await fetch(`${apiUrl}/api/addToCart`, {
         method: "POST",
         headers: {
@@ -195,7 +249,7 @@ export default function CartPage() {
         body: JSON.stringify({
           productId,
           quantity: newQuantity,
-          price: currentItem.price, // Preserve the price
+          // Remove price, backend will calculate
         }),
       })
 
@@ -401,12 +455,18 @@ export default function CartPage() {
           <h1 className="text-3xl font-bold">Your Cart</h1>
         </div>
 
-        {cartItems.length > 0 && (
-          <Button variant="outline" onClick={clearCart} className="text-red-500 border-red-200 hover:bg-red-50">
-            <Trash2 className="h-4 w-4 mr-2" />
-            Clear Cart
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="icon" onClick={handleRefresh} disabled={refreshing} className="relative">
+            <RefreshCw className={`h-5 w-5 ${refreshing ? "animate-spin" : ""}`} />
           </Button>
-        )}
+
+          {cartItems.length > 0 && (
+            <Button variant="outline" onClick={clearCart} className="text-red-500 border-red-200 hover:bg-red-50">
+              <Trash2 className="h-4 w-4 mr-2" />
+              Clear Cart
+            </Button>
+          )}
+        </div>
       </div>
 
       {checkoutError && (
