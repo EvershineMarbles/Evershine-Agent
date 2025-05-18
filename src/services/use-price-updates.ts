@@ -1,0 +1,56 @@
+"use client"
+
+import { useEffect } from "react"
+import { priceUpdateService } from "@/services/websocket-service"
+import { priceUpdateFallbackService } from "@/services/price-update-fallback"
+import { useToast } from "@/components/ui/use-toast"
+
+/**
+ * Hook to manage price update connections and events
+ * @param clientId The client ID to use for price updates
+ * @param onPriceUpdate Callback function to execute when prices are updated
+ */
+export function usePriceUpdates(clientId: string, onPriceUpdate: () => void) {
+  const { toast } = useToast()
+
+  useEffect(() => {
+    if (!clientId) return
+
+    // Initialize WebSocket service
+    priceUpdateService.initialize(clientId)
+
+    // Function to handle price updates
+    const handlePriceUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent
+      console.log("Price update detected, refreshing data", customEvent.detail)
+
+      // Show notification to user
+      toast({
+        title: "Prices Updated",
+        description: "Product prices have been updated. Refreshing data...",
+        duration: 5000,
+      })
+
+      // Call the callback to refresh data
+      onPriceUpdate()
+    }
+
+    // Function to handle WebSocket failure
+    const handleWebSocketFailure = () => {
+      console.log("WebSocket failed, activating polling fallback")
+      priceUpdateFallbackService.initialize(clientId)
+    }
+
+    // Add event listeners
+    window.addEventListener("prices-updated", handlePriceUpdate)
+    window.addEventListener("websocket-failed", handleWebSocketFailure)
+
+    // Clean up on unmount
+    return () => {
+      priceUpdateService.destroy()
+      priceUpdateFallbackService.destroy()
+      window.removeEventListener("prices-updated", handlePriceUpdate)
+      window.removeEventListener("websocket-failed", handleWebSocketFailure)
+    }
+  }, [clientId, onPriceUpdate, toast])
+}
