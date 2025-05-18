@@ -10,7 +10,6 @@ import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ArrowLeft, Loader2, FileText, Package, Heart, ShoppingCart, ExternalLink } from "lucide-react"
 import { fetchWithAdminAuth } from "@/lib/admin-auth"
-import Image from "next/image"
 
 interface ClientDetails {
   _id: string
@@ -460,12 +459,17 @@ export default function ClientDetails({ clientId }: ClientDetailsProps) {
                           <TableCell>
                             <div className="w-16 h-16 relative rounded overflow-hidden">
                               {item.image ? (
-                                <Image
-                                  src={item.image || "/placeholder.svg"}
-                                  alt={item.name}
-                                  fill
-                                  className="object-cover"
-                                />
+                                <div className="w-full h-full">
+                                  <img
+                                    src={item.image || "/placeholder.svg"}
+                                    alt={item.name}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      e.currentTarget.onerror = null
+                                      e.currentTarget.src = "/placeholder.svg"
+                                    }}
+                                  />
+                                </div>
                               ) : (
                                 <div className="w-full h-full bg-gray-200 flex items-center justify-center">
                                   <Package className="h-6 w-6 text-gray-400" />
@@ -528,12 +532,17 @@ export default function ClientDetails({ clientId }: ClientDetailsProps) {
                           <TableCell>
                             <div className="w-16 h-16 relative rounded overflow-hidden">
                               {item.image ? (
-                                <Image
-                                  src={item.image || "/placeholder.svg"}
-                                  alt={item.name}
-                                  fill
-                                  className="object-cover"
-                                />
+                                <div className="w-full h-full">
+                                  <img
+                                    src={item.image || "/placeholder.svg"}
+                                    alt={item.name}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      e.currentTarget.onerror = null
+                                      e.currentTarget.src = "/placeholder.svg"
+                                    }}
+                                  />
+                                </div>
                               ) : (
                                 <div className="w-full h-full bg-gray-200 flex items-center justify-center">
                                   <Package className="h-6 w-6 text-gray-400" />
