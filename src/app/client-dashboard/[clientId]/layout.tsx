@@ -5,7 +5,7 @@ import { IconSidebar } from "@/components/icon-sidebar"
 import Link from "next/link"
 import { ArrowLeft, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { priceUpdateService } from "@/services/price-update-fallback"
+import { priceUpdateService } from "@/services/websocket-service"
 
 // Define the type for the unwrapped params
 type ClientParams = {

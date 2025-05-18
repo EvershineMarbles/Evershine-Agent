@@ -17,8 +17,9 @@ export function usePriceUpdates(clientId: string, onPriceUpdate: () => void) {
     priceUpdateService.initialize(clientId)
 
     // Function to handle price updates
-    const handlePriceUpdate = () => {
-      console.log("Price update detected, refreshing data")
+    const handlePriceUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent
+      console.log("Price update detected, refreshing data", customEvent.detail)
       onPriceUpdate()
     }
 
