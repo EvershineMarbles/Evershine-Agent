@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/components/ui/use-toast"
 import { ToastAction } from "@/components/ui/toast"
 import ProductVisualizer from "@/components/ProductVisualizer"
+import { usePriceUpdates } from "@/hooks/use-price-updates"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
 
@@ -56,53 +57,6 @@ export default function ProductDetail() {
   const [showVisualizer, setShowVisualizer] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [lastPriceCheck, setLastPriceCheck] = useState<Date>(new Date())
-
-  // Add polling for price updates
-  useEffect(() => {
-    // Function to check for price updates
-    const checkForPriceUpdates = async () => {
-      try {
-        const token = localStorage.getItem("clientImpersonationToken")
-        if (!token) return
-
-        // Call the price update check endpoint
-        const response = await fetch(`${API_URL}/api/checkPriceUpdates/${clientId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-
-          // If prices have been updated since our last check
-          if (data.pricesUpdated && new Date(data.lastUpdated) > lastPriceCheck) {
-            console.log("Prices have been updated, refreshing product data")
-            setLastPriceCheck(new Date())
-
-            // Refetch product with updated price
-            fetchProduct()
-
-            // Notify the user
-            toast({
-              title: "Price Updated",
-              description: "This product's price has been updated with the latest commission rates.",
-              duration: 5000,
-            })
-          }
-        }
-      } catch (error) {
-        console.error("Error checking for price updates:", error)
-      }
-    }
-
-    // Check every 30 seconds
-    const intervalId = setInterval(checkForPriceUpdates, 30000)
-
-    // Clean up on unmount
-    return () => clearInterval(intervalId)
-  }, [clientId, toast, lastPriceCheck])
 
   const fetchProduct = async () => {
     try {
@@ -152,6 +106,58 @@ export default function ProductDetail() {
       setRefreshing(false)
     }
   }
+
+  // Use the price updates hook
+  usePriceUpdates(clientId, fetchProduct)
+
+  // Add polling for price updates
+  /*
+  useEffect(() => {
+    // Function to check for price updates
+    const checkForPriceUpdates = async () => {
+      try {
+        const token = localStorage.getItem("clientImpersonationToken")
+        if (!token) return
+
+        // Call the price update check endpoint
+        const response = await fetch(`${API_URL}/api/checkPriceUpdates/${clientId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+
+          // If prices have been updated since our last check
+          if (data.pricesUpdated && new Date(data.lastUpdated) > lastPriceCheck) {
+            console.log("Prices have been updated, refreshing product data")
+            setLastPriceCheck(new Date())
+
+            // Refetch product with updated price
+            fetchProduct()
+
+            // Notify the user
+            toast({
+              title: "Price Updated",
+              description: "This product's price has been updated with the latest commission rates.",
+              duration: 5000,
+            })
+          }
+        }
+      } catch (error) {
+        console.error("Error checking for price updates:", error)
+      }
+    }
+
+    // Check every 30 seconds
+    const intervalId = setInterval(checkForPriceUpdates, 30000)
+
+    // Clean up on unmount
+    return () => clearInterval(intervalId)
+  }, [clientId, toast, lastPriceCheck])
+  */
 
   useEffect(() => {
     fetchProduct()

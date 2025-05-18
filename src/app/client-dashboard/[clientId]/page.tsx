@@ -10,6 +10,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { Button } from "@/components/ui/button"
+import { usePriceUpdates } from "@/hooks/use-price-updates"
 
 // Define the Product interface
 interface Product {
@@ -62,6 +63,82 @@ export default function ProductsPage() {
   const [wishlistLoading, setWishlistLoading] = useState(false)
   const [lastPriceCheck, setLastPriceCheck] = useState<Date>(new Date())
 
+  // Fetch products function
+  const fetchProducts = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      // Use environment variable if available, otherwise use a default URL
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
+      console.log("Fetching products from:", `${apiUrl}/api/getAllProducts`)
+
+      const token = localStorage.getItem("clientImpersonationToken")
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      }
+
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`
+      }
+
+      const response = await fetch(`${apiUrl}/api/getAllProducts`, {
+        method: "GET",
+        headers,
+        // Add a timeout to prevent long waiting times
+        signal: AbortSignal.timeout(8000), // 8 second timeout
+      })
+
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      if (data.success && Array.isArray(data.data)) {
+        console.log("Products fetched successfully:", data.data)
+
+        // Filter out products with missing or invalid postId
+        const validProducts = data.data.filter(
+          (product: Product) => product.postId && typeof product.postId === "string",
+        )
+
+        if (validProducts.length < data.data.length) {
+          console.warn(`Filtered out ${data.data.length - validProducts.length} products with invalid postId`)
+        }
+
+        // Process the image URLs to ensure they're valid
+        const processedProducts = validProducts.map((product: Product) => ({
+          ...product,
+          image:
+            Array.isArray(product.image) && product.image.length > 0
+              ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
+              : ["/placeholder.svg"],
+        }))
+
+        setProducts(processedProducts)
+      } else {
+        throw new Error(data.msg || "Invalid API response format")
+      }
+    } catch (error: any) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to load products"
+      console.error("Error fetching products:", error)
+      setError(errorMessage)
+
+      // Show error toast
+      toast({
+        title: "Error fetching products",
+        description: "Could not load products from the server. Please try again later.",
+        variant: "destructive",
+      })
+
+      // Set empty products array
+      setProducts([])
+    } finally {
+      setLoading(false)
+    }
+  }, [toast])
+
   // Debug scroll event
   useEffect(() => {
     console.log("Setting up scroll debug in ProductsPage")
@@ -73,7 +150,11 @@ export default function ProductsPage() {
     return () => window.removeEventListener("scroll", logScroll)
   }, [])
 
-  // Add polling for price updates
+  // Use the price updates hook
+  usePriceUpdates(clientId, fetchProducts)
+
+  // Remove the existing polling useEffect:
+  /*
   useEffect(() => {
     // Function to check for price updates
     const checkForPriceUpdates = async () => {
@@ -121,6 +202,7 @@ export default function ProductsPage() {
     // Clean up on unmount
     return () => clearInterval(intervalId)
   }, [clientId, toast, lastPriceCheck])
+  */
 
   // Fetch wishlist from backend
   const fetchWishlist = useCallback(async () => {
@@ -200,82 +282,6 @@ export default function ProductsPage() {
       localStorage.setItem(`cart-${clientId}`, JSON.stringify(cart))
     }
   }, [cart, clientId])
-
-  // Fetch products function
-  const fetchProducts = useCallback(async () => {
-    try {
-      setLoading(true)
-      setError(null)
-
-      // Use environment variable if available, otherwise use a default URL
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
-      console.log("Fetching products from:", `${apiUrl}/api/getAllProducts`)
-
-      const token = localStorage.getItem("clientImpersonationToken")
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      }
-
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`
-      }
-
-      const response = await fetch(`${apiUrl}/api/getAllProducts`, {
-        method: "GET",
-        headers,
-        // Add a timeout to prevent long waiting times
-        signal: AbortSignal.timeout(8000), // 8 second timeout
-      })
-
-      if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`)
-      }
-
-      const data = await response.json()
-
-      if (data.success && Array.isArray(data.data)) {
-        console.log("Products fetched successfully:", data.data)
-
-        // Filter out products with missing or invalid postId
-        const validProducts = data.data.filter(
-          (product: Product) => product.postId && typeof product.postId === "string",
-        )
-
-        if (validProducts.length < data.data.length) {
-          console.warn(`Filtered out ${data.data.length - validProducts.length} products with invalid postId`)
-        }
-
-        // Process the image URLs to ensure they're valid
-        const processedProducts = validProducts.map((product: Product) => ({
-          ...product,
-          image:
-            Array.isArray(product.image) && product.image.length > 0
-              ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
-              : ["/placeholder.svg"],
-        }))
-
-        setProducts(processedProducts)
-      } else {
-        throw new Error(data.msg || "Invalid API response format")
-      }
-    } catch (error: any) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to load products"
-      console.error("Error fetching products:", error)
-      setError(errorMessage)
-
-      // Show error toast
-      toast({
-        title: "Error fetching products",
-        description: "Could not load products from the server. Please try again later.",
-        variant: "destructive",
-      })
-
-      // Set empty products array
-      setProducts([])
-    } finally {
-      setLoading(false)
-    }
-  }, [toast])
 
   // Fetch products on component mount
   useEffect(() => {

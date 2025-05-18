@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
+import { usePriceUpdates } from "@/hooks/use-price-updates"
 
 interface CartItem {
   _id: string
@@ -64,60 +65,7 @@ export default function CartPage() {
     }
   }
 
-  // Add polling for price updates
-  useEffect(() => {
-    // Function to check for price updates
-    const checkForPriceUpdates = async () => {
-      try {
-        const token = getToken()
-        if (!token) return
-
-        const apiUrl = getApiUrl()
-
-        // Call the price update check endpoint
-        const response = await fetch(`${apiUrl}/api/checkPriceUpdates/${clientId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-
-          // If prices have been updated since our last check
-          if (data.pricesUpdated && new Date(data.lastUpdated) > lastPriceCheck) {
-            console.log("Prices have been updated, refreshing cart data")
-            setLastPriceCheck(new Date())
-
-            // Refetch cart with updated prices
-            fetchCart()
-
-            // Notify the user
-            toast({
-              title: "Prices Updated",
-              description: "Cart prices have been updated with the latest commission rates.",
-              duration: 5000,
-            })
-          }
-        }
-      } catch (error) {
-        console.error("Error checking for price updates:", error)
-      }
-    }
-
-    // Check every 30 seconds
-    const intervalId = setInterval(checkForPriceUpdates, 30000)
-
-    // Clean up on unmount
-    return () => clearInterval(intervalId)
-  }, [clientId, toast, lastPriceCheck])
-
   // Fetch cart items from server
-  useEffect(() => {
-    fetchCart()
-  }, [])
-
   const fetchCart = async () => {
     try {
       setLoading(true)
@@ -181,6 +129,65 @@ export default function CartPage() {
       setRefreshing(false)
     }
   }
+
+  // Use the price updates hook
+  usePriceUpdates(clientId, fetchCart)
+
+  // Add polling for price updates
+  /*
+  useEffect(() => {
+    // Function to check for price updates
+    const checkForPriceUpdates = async () => {
+      try {
+        const token = getToken()
+        if (!token) return
+
+        const apiUrl = getApiUrl()
+
+        // Call the price update check endpoint
+        const response = await fetch(`${apiUrl}/api/checkPriceUpdates/${clientId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+
+          // If prices have been updated since our last check
+          if (data.pricesUpdated && new Date(data.lastUpdated) > lastPriceCheck) {
+            console.log("Prices have been updated, refreshing cart data")
+            setLastPriceCheck(new Date())
+
+            // Refetch cart with updated prices
+            fetchCart()
+
+            // Notify the user
+            toast({
+              title: "Prices Updated",
+              description: "Cart prices have been updated with the latest commission rates.",
+              duration: 5000,
+            })
+          }
+        }
+      } catch (error) {
+        console.error("Error checking for price updates:", error)
+      }
+    }
+
+    // Check every 30 seconds
+    const intervalId = setInterval(checkForPriceUpdates, 30000)
+
+    // Clean up on unmount
+    return () => clearInterval(intervalId)
+  }, [clientId, toast, lastPriceCheck])
+  */
+
+  // Fetch cart items from server
+  useEffect(() => {
+    fetchCart()
+  }, [])
 
   // Handle manual refresh
   const handleRefresh = () => {

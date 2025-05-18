@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
 import { Input } from "@/components/ui/input"
 import axios from "axios"
+import { usePriceUpdates } from "@/hooks/use-price-updates"
 
 interface WishlistItem {
   _id: string
@@ -39,71 +40,6 @@ export default function WishlistPage() {
   const getApiUrl = () => {
     return process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
   }
-
-  // Get token from localStorage
-  const getToken = () => {
-    try {
-      // Try both token storage options
-      const token = localStorage.getItem("clientImpersonationToken") || localStorage.getItem("token")
-      if (!token) {
-        setError("No authentication token found. Please log in again.")
-        return null
-      }
-      return token
-    } catch (e) {
-      setError("Error accessing authentication. Please refresh the page.")
-      return null
-    }
-  }
-
-  // Add polling for price updates
-  useEffect(() => {
-    // Function to check for price updates
-    const checkForPriceUpdates = async () => {
-      try {
-        const token = getToken()
-        if (!token) return
-
-        const apiUrl = getApiUrl()
-
-        // Call the price update check endpoint
-        const response = await fetch(`${apiUrl}/api/checkPriceUpdates/${clientId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-
-          // If prices have been updated since our last check
-          if (data.pricesUpdated && new Date(data.lastUpdated) > lastPriceCheck) {
-            console.log("Prices have been updated, refreshing wishlist data")
-            setLastPriceCheck(new Date())
-
-            // Refetch wishlist with updated prices
-            fetchWishlist()
-
-            // Notify the user
-            toast({
-              title: "Prices Updated",
-              description: "Wishlist prices have been updated with the latest commission rates.",
-              duration: 5000,
-            })
-          }
-        }
-      } catch (error) {
-        console.error("Error checking for price updates:", error)
-      }
-    }
-
-    // Check every 30 seconds
-    const intervalId = setInterval(checkForPriceUpdates, 30000)
-
-    // Clean up on unmount
-    return () => clearInterval(intervalId)
-  }, [clientId, toast, lastPriceCheck])
 
   // Fetch wishlist items
   const fetchWishlist = async () => {
@@ -154,6 +90,76 @@ export default function WishlistPage() {
       setRefreshing(false)
     }
   }
+
+  // Get token from localStorage
+  const getToken = () => {
+    try {
+      // Try both token storage options
+      const token = localStorage.getItem("clientImpersonationToken") || localStorage.getItem("token")
+      if (!token) {
+        setError("No authentication token found. Please log in again.")
+        return null
+      }
+      return token
+    } catch (e) {
+      setError("Error accessing authentication. Please refresh the page.")
+      return null
+    }
+  }
+
+  // Use the price updates hook
+  usePriceUpdates(clientId, fetchWishlist)
+
+  // Add polling for price updates
+  /*
+  useEffect(() => {
+    // Function to check for price updates
+    const checkForPriceUpdates = async () => {
+      try {
+        const token = getToken()
+        if (!token) return
+
+        const apiUrl = getApiUrl()
+
+        // Call the price update check endpoint
+        const response = await fetch(`${apiUrl}/api/checkPriceUpdates/${clientId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+
+          // If prices have been updated since our last check
+          if (data.pricesUpdated && new Date(data.lastUpdated) > lastPriceCheck) {
+            console.log("Prices have been updated, refreshing wishlist data")
+            setLastPriceCheck(new Date())
+
+            // Refetch wishlist with updated prices
+            fetchWishlist()
+
+            // Notify the user
+            toast({
+              title: "Prices Updated",
+              description: "Wishlist prices have been updated with the latest commission rates.",
+              duration: 5000,
+            })
+          }
+        }
+      } catch (error) {
+        console.error("Error checking for price updates:", error)
+      }
+    }
+
+    // Check every 30 seconds
+    const intervalId = setInterval(checkForPriceUpdates, 30000)
+
+    // Clean up on unmount
+    return () => clearInterval(intervalId)
+  }, [clientId, toast, lastPriceCheck])
+  */
 
   // Fetch cart count
   const fetchCartCount = async () => {
