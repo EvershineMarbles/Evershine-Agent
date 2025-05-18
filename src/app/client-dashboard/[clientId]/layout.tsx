@@ -5,7 +5,6 @@ import { IconSidebar } from "@/components/icon-sidebar"
 import Link from "next/link"
 import { ArrowLeft, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { priceUpdateService } from "@/services/price-update-fallback"
 
 // Define the type for the unwrapped params
 type ClientParams = {
@@ -29,19 +28,6 @@ export default function ClientDashboardLayout({
   // State for agent name
   const [agentName, setAgentName] = React.useState<string | null>(null)
   const [agentEmail, setAgentEmail] = React.useState<string | null>(null)
-
-  // Initialize WebSocket service for price updates
-  React.useEffect(() => {
-    if (clientId) {
-      // Initialize the price update service
-      priceUpdateService.initialize(clientId)
-
-      // Clean up on unmount
-      return () => {
-        priceUpdateService.destroy()
-      }
-    }
-  }, [clientId])
 
   // Load wishlist, cart counts, and agent info from localStorage
   React.useEffect(() => {
