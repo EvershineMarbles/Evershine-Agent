@@ -1,690 +1,757 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useCallback } from "react"
-import { useParams, useRouter } from "next/navigation"
-import Link from "next/link"
-import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode } from "lucide-react"
-import Image from "next/image"
-import { useToast } from "@/components/ui/use-toast"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { ErrorBoundary } from "@/components/error-boundary"
-import { Button } from "@/components/ui/button"
-import { usePriceUpdates } from "@/hooks/use-price-updates"
 
-// Define the Product interface
+import { useEffect, useState } from "react"
+import { useParams, useRouter } from "next/navigation"
+import axios, { AxiosError } from "axios"
+import { ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Heart, X } from "lucide-react"
+import Image from "next/image"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { useToast } from "@/components/ui/use-toast"
+import { ToastAction } from "@/components/ui/toast"
+import ProductVisualizer from "@/components/ProductVisualizer"
+
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
+
 interface Product {
   _id: string
   name: string
   price: number
+  category: string
+  applicationAreas: string | string[]
+  description: string
+  image: string[]
+  postId: string
+  quantityAvailable: number
+  size?: string
+  numberOfPieces?: number | null
+  thickness?: string
   basePrice?: number
-  image: string[]
-  postId: string
-  category: string
-  description: string
-  status?: "draft" | "pending" | "approved"
-  applicationAreas?: string
-  quantityAvailable?: number
 }
 
-// Define the WishlistItem interface
-interface WishlistItem {
-  postId: string
+interface CommissionData {
+  agentId: string
   name: string
-  price: number
-  category: string
-  applicationAreas?: string[]
-  description: string
-  image: string[]
-  quantity: number
-  quantityAvailable?: number
+  email: string
+  commissionRate: number
+  categoryCommissions?: Record<string, number>
 }
 
-export default function ProductsPage() {
-  console.log("ProductsPage rendering")
+interface ApiResponse {
+  success: boolean
+  data?: Product[]
+  msg?: string
+}
 
-  // Use the useParams hook to get the clientId
+export default function ProductDetail() {
   const params = useParams()
   const router = useRouter()
-  const clientId = params.clientId as string
-
   const { toast } = useToast()
-  const [products, setProducts] = useState<Product[]>([])
+  const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [imageError, setImageError] = useState<Record<string, boolean>>({})
-  // Wishlist and cart state
-  const [wishlist, setWishlist] = useState<string[]>([])
-  const [cart, setCart] = useState<string[]>([])
-  const [addingToCart, setAddingToCart] = useState<Record<string, boolean>>({})
-  const [addingToWishlist, setAddingToWishlist] = useState<Record<string, boolean>>({})
-  const [error, setError] = useState<string | null>(null)
-  const [clientData, setClientData] = useState<any>(null)
+  const [error, setError] = useState<string>("")
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  const [selectedThumbnail, setSelectedThumbnail] = useState(0)
+  const [imageLoadError, setImageLoadError] = useState<boolean[]>([])
   const [wishlistLoading, setWishlistLoading] = useState(false)
+  const [inWishlist, setInWishlist] = useState(false)
+  const clientId = params.clientId as string
+  const [commissionData, setCommissionData] = useState<CommissionData | null>(null)
+  const [overrideCommissionRate, setOverrideCommissionRate] = useState<number | null>(null)
+  const [commissionLoading, setCommissionLoading] = useState(false)
+  const [basePrice, setBasePrice] = useState<number | null>(null)
+  const [showFullDescription, setShowFullDescription] = useState(false)
+  // Gallery state
+  const [galleryOpen, setGalleryOpen] = useState(false)
+  const [showVisualizer, setShowVisualizer] = useState(false)
 
-  // Fetch products function
-  const fetchProducts = useCallback(async () => {
+
+  // Load saved commission rate from localStorage on component mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      // Use a client-specific key for commission rate
+      const savedRate = localStorage.getItem(`commission-override-${clientId}`)
+      if (savedRate) {
+        setOverrideCommissionRate(Number(savedRate))
+      } else {
+        // Reset to null if no saved rate for this client
+        setOverrideCommissionRate(null)
+      }
+    }
+  }, [clientId])
+
+  // Add fetchCommissionData function
+  const fetchCommissionData = async () => {
     try {
-      setLoading(true)
-      setError(null)
-
-      // Use environment variable if available, otherwise use a default URL
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
-      console.log("Fetching products from:", `${apiUrl}/api/getAllProducts`)
-
+      setCommissionLoading(true)
       const token = localStorage.getItem("clientImpersonationToken")
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
+      if (!token) {
+        return null
       }
 
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`
-      }
-
-      const response = await fetch(`${apiUrl}/api/getAllProducts`, {
-        method: "GET",
-        headers,
-        // Add a timeout to prevent long waiting times
-        signal: AbortSignal.timeout(8000), // 8 second timeout
+      const response = await fetch(`${API_URL}/api/client/agent-commission`, {
+        headers: { Authorization: `Bearer ${token}` },
       })
 
       if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`)
+        return null
       }
 
       const data = await response.json()
+      if (data.success && data.data) {
+        setCommissionData(data.data)
+        return data.data
+      }
+      return null
+    } catch (error) {
+      console.error("Error fetching commission data:", error)
+      return null
+    } finally {
+      setCommissionLoading(false)
+    }
+  }
 
-      if (data.success && Array.isArray(data.data)) {
-        console.log("Products fetched successfully:", data.data)
+  // Add calculateAdjustedPrice function with override support
+  const calculateAdjustedPrice = (price: number, category: string) => {
+    // Use the base price if available
+    const productBasePrice = basePrice || price
 
-        // Process products - use _id as fallback if postId is missing
-        const validProducts = data.data.map((product: Product) => {
-          // If postId is missing or invalid, use _id as fallback
-          if (!product.postId || typeof product.postId !== "string") {
-            console.warn(`Product ${product._id} has invalid postId, using _id as fallback`)
-            return { ...product, postId: product._id }
-          }
-          return product
+    // Get the default commission rate (from agent or category-specific)
+    let defaultRate = commissionData?.commissionRate || 10
+
+    // Check for category-specific commission
+    if (commissionData?.categoryCommissions && category && commissionData.categoryCommissions[category]) {
+      defaultRate = commissionData.categoryCommissions[category]
+    }
+
+    // Add the override rate to the default rate if an override is set
+    const finalRate = overrideCommissionRate !== null ? defaultRate + overrideCommissionRate : defaultRate
+
+    // Calculate adjusted price based on the original basePrice
+    const adjustedPrice = productBasePrice * (1 + finalRate / 100)
+    return Math.round(adjustedPrice * 100) / 100 // Round to 2 decimal places
+  }
+
+  useEffect(() => {
+    const fetchProduct = async () => {
+      try {
+        setLoading(true)
+        setError("")
+
+        if (!params.id) {
+          throw new Error("Product ID is missing")
+        }
+
+        // First fetch commission data
+        await fetchCommissionData()
+
+        const response = await axios.get<ApiResponse>(`${API_URL}/api/getPostDataById`, {
+          params: { id: params.id },
         })
 
-        console.log(`Processed ${validProducts.length} products, using fallbacks where needed`)
+        if (response.data.success && response.data.data?.[0]) {
+          const productData = response.data.data[0]
 
-        // Process the image URLs to ensure they're valid
-        const processedProducts = validProducts.map((product: Product) => ({
-          ...product,
-          image:
-            Array.isArray(product.image) && product.image.length > 0
-              ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
-              : ["/placeholder.svg"],
-        }))
+          // Store the base price
+          setBasePrice(productData.basePrice || productData.price)
 
-        setProducts(processedProducts)
-      } else {
-        throw new Error(data.msg || "Invalid API response format")
+          // Add missing fields if they don't exist
+          const processedProduct = {
+            ...productData,
+            size: productData.size !== undefined ? productData.size : "",
+            numberOfPieces: productData.numberOfPieces !== undefined ? productData.numberOfPieces : null,
+            thickness: productData.thickness !== undefined ? productData.thickness : "",
+          }
+
+          setProduct(processedProduct)
+          setImageLoadError(new Array(productData.image.length).fill(false))
+
+          // Check if product is in wishlist
+          checkWishlistStatus(productData.postId)
+        } else {
+          throw new Error(response.data.msg || "No data found")
+        }
+      } catch (error) {
+        let errorMessage = "Error fetching product"
+
+        if (error instanceof AxiosError) {
+          errorMessage = error.response?.data?.msg || error.message
+        } else if (error instanceof Error) {
+          errorMessage = error.message
+        }
+
+        console.error("Error fetching product:", error)
+        setError(errorMessage)
+      } finally {
+        setLoading(false)
       }
-    } catch (error: any) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to load products"
-      console.error("Error fetching products:", error)
-      setError(errorMessage)
-
-      // Show error toast
-      toast({
-        title: "Error fetching products",
-        description: "Could not load products from the server. Please try again later.",
-        variant: "destructive",
-      })
-
-      // Set empty products array
-      setProducts([])
-    } finally {
-      setLoading(false)
     }
-  }, [toast])
 
-  // Use the price updates hook
-  usePriceUpdates(clientId, fetchProducts)
+    fetchProduct()
+  }, [params.id])
 
-  // Fetch wishlist from backend
-  const fetchWishlist = useCallback(async () => {
+  // Check if product is in wishlist
+  const checkWishlistStatus = async (productId: string) => {
     try {
-      setWishlistLoading(true)
-      const token = localStorage.getItem("clientImpersonationToken")
-
-      if (!token) {
-        console.warn("No token found for fetching wishlist")
-        return
+      // First check localStorage
+      const savedWishlist = localStorage.getItem("wishlist")
+      if (savedWishlist) {
+        const wishlistItems = JSON.parse(savedWishlist)
+        if (wishlistItems.includes(productId)) {
+          setInWishlist(true)
+          return
+        }
       }
 
-      const response = await fetch("https://evershinebackend-2.onrender.com/api/getUserWishlist", {
+      // Then check API
+      const token = localStorage.getItem("clientImpersonationToken")
+      if (!token) return
+
+      const response = await fetch(`${API_URL}/api/getUserWishlist`, {
+        method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
       })
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch wishlist: ${response.status}`)
-      }
-
-      const data = await response.json()
-
-      if (data.success && data.data && Array.isArray(data.data.items)) {
-        // Extract just the postIds from the wishlist items
-        const wishlistIds = data.data.items.map((item: WishlistItem) => item.postId)
-        console.log("Fetched wishlist from backend:", wishlistIds)
-        setWishlist(wishlistIds)
-
-        // Update localStorage for optimistic UI updates
-        localStorage.setItem(`wishlist-${clientId}`, JSON.stringify(wishlistIds))
-      } else {
-        console.log("No wishlist items found or invalid response format")
-        setWishlist([])
-        localStorage.setItem(`wishlist-${clientId}`, JSON.stringify([]))
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.data && Array.isArray(data.data.items)) {
+          const isInWishlist = data.data.items.some((item: any) => item.postId === productId)
+          setInWishlist(isInWishlist)
+        }
       }
     } catch (error) {
-      console.error("Error fetching wishlist:", error)
-      // Fallback to localStorage if API fails
-      try {
-        const savedWishlist = localStorage.getItem(`wishlist-${clientId}`)
-        if (savedWishlist) {
-          setWishlist(JSON.parse(savedWishlist))
-        }
-      } catch (e) {
-        console.error("Error loading wishlist from localStorage:", e)
-      }
-    } finally {
-      setWishlistLoading(false)
-    }
-  }, [clientId])
-
-  // Load cart from localStorage
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const savedCart = localStorage.getItem(`cart-${clientId}`)
-        if (savedCart) {
-          setCart(JSON.parse(savedCart))
-        }
-      } catch (e) {
-        console.error("Error loading cart from localStorage:", e)
-      }
-    }
-  }, [clientId])
-
-  // Fetch wishlist when component mounts or clientId changes
-  useEffect(() => {
-    fetchWishlist()
-  }, [fetchWishlist, clientId])
-
-  // Save cart to localStorage whenever it changes
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem(`cart-${clientId}`, JSON.stringify(cart))
-    }
-  }, [cart, clientId])
-
-  // Fetch products on component mount
-  useEffect(() => {
-    fetchProducts()
-  }, [fetchProducts])
-
-  // Navigate to wishlist page
-  const goToWishlist = () => {
-    router.push(`/client-dashboard/${clientId}/wishlist`)
-  }
-
-  // Update the toggleWishlist function to make an API call instead of just updating local state
-  const toggleWishlist = useCallback(
-    async (e: React.MouseEvent, productId: string) => {
-      e.preventDefault() // Prevent navigation
-
-      // Add validation here
-      if (!productId || typeof productId !== "string") {
-        toast({
-          title: "Error",
-          description: "Invalid product ID. Cannot update wishlist.",
-          variant: "destructive",
-        })
-        return
-      }
-
-      // Set loading state for this specific product
-      setAddingToWishlist((prev) => ({ ...prev, [productId]: true }))
-
-      // Optimistically update UI
-      if (wishlist.includes(productId)) {
-        // Remove from wishlist
-        setWishlist((prev) => prev.filter((id) => id !== productId))
-      } else {
-        // Add to wishlist
-        setWishlist((prev) => [...prev, productId])
-      }
-
-      try {
-        // Get the token
-        const token = localStorage.getItem("clientImpersonationToken")
-
-        if (!token) {
-          throw new Error("No authentication token found. Please refresh the token using the debug panel above")
-        }
-
-        if (wishlist.includes(productId)) {
-          // Remove from wishlist
-          const response = await fetch("https://evershinebackend-2.onrender.com/api/deleteUserWishlistItem", {
-            method: "DELETE",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ productId }),
-          })
-
-          if (!response.ok) {
-            throw new Error(`API error: ${response.status} ${response.statusText}`)
-          }
-
-          const data = await response.json()
-
-          if (data.success) {
-            // Update localStorage after successful API call
-            const updatedWishlist = wishlist.filter((id) => id !== productId)
-            localStorage.setItem(`wishlist-${clientId}`, JSON.stringify(updatedWishlist))
-
-            toast({
-              title: "Removed from wishlist",
-              description: "Item has been removed from your wishlist",
-              variant: "default",
-            })
-
-            // Refresh wishlist from backend to ensure sync
-            fetchWishlist()
-          } else {
-            throw new Error(data.message || "Failed to remove from wishlist")
-          }
-        } else {
-          // Add to wishlist - no longer sending price, backend will calculate
-          const response = await fetch("https://evershinebackend-2.onrender.com/api/addToWishlist", {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              productId,
-              // No price calculation, backend will handle it
-            }),
-          })
-
-          if (!response.ok) {
-            throw new Error(`API error: ${response.status} ${response.statusText}`)
-          }
-
-          const data = await response.json()
-
-          if (data.success) {
-            // Update localStorage after successful API call
-            const updatedWishlist = [...wishlist.filter((id) => id !== productId), productId]
-            localStorage.setItem(`wishlist-${clientId}`, JSON.stringify(updatedWishlist))
-
-            toast({
-              title: "Added to wishlist",
-              description: (
-                <div className="flex flex-col space-y-2">
-                  <p>Item has been added to your wishlist</p>
-                  <Button onClick={goToWishlist} className="bg-[#194a95] hover:bg-[#0f3a7a] text-white" size="sm">
-                    View Wishlist
-                  </Button>
-                </div>
-              ),
-              variant: "default",
-            })
-
-            // Refresh wishlist from backend to ensure sync
-            fetchWishlist()
-          } else {
-            throw new Error(data.message || "Failed to add to wishlist")
-          }
-        }
-      } catch (error: any) {
-        console.error("Error updating wishlist:", error)
-
-        // Revert the optimistic update
-        if (wishlist.includes(productId)) {
-          // We were trying to remove, but failed, so add it back
-          setWishlist((prev) => [...prev, productId])
-        } else {
-          // We were trying to add, but failed, so remove it
-          setWishlist((prev) => prev.filter((id) => id !== productId))
-        }
-
-        toast({
-          title: "Error",
-          description: error.message || "Failed to update wishlist. Please try again.",
-          variant: "destructive",
-        })
-      } finally {
-        setAddingToWishlist((prev) => ({ ...prev, [productId]: false }))
-      }
-    },
-    [wishlist, toast, clientId, router, fetchWishlist],
-  )
-
-  // Add to cart function
-  const addToCart = async (e: React.MouseEvent, productId: string, productName: string) => {
-    e.preventDefault() // Prevent navigation
-
-    if (cart.includes(productId)) {
-      toast({
-        title: "Already in cart",
-        description: "This item is already in your cart",
-        variant: "default",
-      })
-      return
-    }
-
-    try {
-      // Set loading state for this specific product
-      setAddingToCart((prev) => ({ ...prev, [productId]: true }))
-
-      // Immediately update UI state to show item as added to cart
-      setCart((prev) => [...prev, productId])
-
-      // Update localStorage cart
-      const savedCart = localStorage.getItem(`cart-${clientId}`)
-      const cartItems = savedCart ? JSON.parse(savedCart) : []
-      localStorage.setItem(`cart-${clientId}`, JSON.stringify([...cartItems, productId]))
-
-      // Get the token
-      const token = localStorage.getItem("clientImpersonationToken")
-
-      if (!token) {
-        throw new Error("No authentication token found. Please refresh the token and try again.")
-      }
-
-      // Make API request in background - no longer sending price, backend will calculate
-      const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          productId,
-          // No price calculation, let backend handle it
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status} ${response.statusText}`)
-      }
-
-      const data = await response.json()
-
-      if (data.success) {
-        toast({
-          title: "Added to cart",
-          description: `${productName} has been added to your cart`,
-          variant: "default",
-        })
-      } else {
-        throw new Error(data.message || "Failed to add to cart")
-      }
-    } catch (error: any) {
-      // If there was an error, revert the cart state
-      setCart((prev) => prev.filter((id) => id !== productId))
-
-      console.error("Error adding to cart:", error)
-      toast({
-        title: "Error adding to cart",
-        description: error.message || "Failed to add item to cart. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      // Clear loading state
-      setAddingToCart((prev) => ({ ...prev, [productId]: false }))
+      console.error("Error checking wishlist status:", error)
     }
   }
 
-  // Add refresh wishlist function
-  const refreshWishlist = () => {
-    fetchWishlist()
-    toast({
-      title: "Refreshing wishlist",
-      description: "Getting the latest wishlist data from the server",
+  const handleThumbnailClick = (index: number) => {
+    setCurrentImageIndex(index)
+    setSelectedThumbnail(index)
+  }
+
+  const handleImageError = (index: number) => {
+    setImageLoadError((prev) => {
+      const newErrors = [...prev]
+      newErrors[index] = true
+      return newErrors
     })
   }
 
-  // Filter products based on search query
-  const filteredProducts = products.filter(
-    (product) =>
-      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      product.category.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
-
-  // Handle image loading errors
-  const handleImageError = useCallback((productId: string) => {
-    console.log("Image error for product:", productId)
-    setImageError((prev) => ({ ...prev, [productId]: true }))
-  }, [])
-
-  // Handle QR code scanning
-  const handleScanQR = () => {
-    router.push(`/client-dashboard/${clientId}/scan`)
+  const nextImage = () => {
+    if (product) {
+      setCurrentImageIndex((prev) => (prev + 1) % product.image.length)
+      setSelectedThumbnail((prev) => (prev + 1) % product.image.length)
+    }
   }
 
-  // Fetch client data
-  useEffect(() => {
-    const fetchClientData = async () => {
-      try {
-        const token = localStorage.getItem("clientImpersonationToken")
-        if (!token) return
+  const previousImage = () => {
+    if (product) {
+      setCurrentImageIndex((prev) => (prev === 0 ? product.image.length - 1 : prev - 1))
+      setSelectedThumbnail((prev) => (prev === 0 ? product.image.length - 1 : prev - 1))
+    }
+  }
 
-        const response = await fetch(`https://evershinebackend-2.onrender.com/api/getClientDetails/${clientId}`, {
+  // Open gallery when main image is clicked
+  const openGallery = () => {
+    setGalleryOpen(true)
+    // Prevent body scrolling when gallery is open
+    if (typeof document !== "undefined") {
+      document.body.style.overflow = "hidden"
+    }
+  }
+
+  // Close gallery
+  const closeGallery = () => {
+    setGalleryOpen(false)
+    // Restore body scrolling
+    if (typeof document !== "undefined") {
+      document.body.style.overflow = ""
+    }
+  }
+
+  // Handle keyboard navigation in gallery
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!galleryOpen) return
+
+      if (e.key === "Escape") {
+        closeGallery()
+      } else if (e.key === "ArrowRight") {
+        nextImage()
+      } else if (e.key === "ArrowLeft") {
+        previousImage()
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [galleryOpen])
+
+  const toggleWishlist = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    if (!product || !clientId) return
+
+    try {
+      setWishlistLoading(true)
+
+      const token = localStorage.getItem("clientImpersonationToken")
+      if (!token) {
+        throw new Error("No authentication token found. Please refresh the page and try again.")
+      }
+
+      if (inWishlist) {
+        // Remove from wishlist
+        const response = await fetch(`${API_URL}/api/deleteUserWishlistItem`, {
+          method: "DELETE",
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
+          body: JSON.stringify({ productId: product.postId }),
         })
 
-        if (response.ok) {
-          const data = await response.json()
-          if (data.data) {
-            setClientData(data.data)
-          }
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status} ${response.statusText}`)
         }
-      } catch (error) {
-        console.error("Error fetching client data:", error)
+
+        const data = await response.json()
+
+        if (!data.success) {
+          throw new Error(data.message || "Failed to remove from wishlist")
+        }
+
+        // Update local state
+        setInWishlist(false)
+
+        // Update localStorage for wishlist
+        const savedWishlist = localStorage.getItem("wishlist")
+        if (savedWishlist) {
+          const wishlistItems = JSON.parse(savedWishlist)
+          const updatedWishlist = wishlistItems.filter((id: string) => id !== product.postId)
+          localStorage.setItem("wishlist", JSON.stringify(updatedWishlist))
+        }
+
+        toast({
+          title: "Removed from wishlist",
+          description: `${product.name} has been removed from your wishlist.`,
+        })
+      } else {
+        // Add to wishlist
+        const response = await fetch(`${API_URL}/api/addToWishlist`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            productId: product.postId,
+            // Include the current price with commission applied
+            price: calculateAdjustedPrice(product.price, product.category),
+          }),
+        })
+
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status} ${response.statusText}`)
+        }
+
+        const data = await response.json()
+
+        if (!data.success) {
+          throw new Error(data.message || "Failed to add to wishlist")
+        }
+
+        // Update local state
+        setInWishlist(true)
+
+        // Update localStorage for wishlist
+        const savedWishlist = localStorage.getItem("wishlist")
+        const wishlistItems = savedWishlist ? JSON.parse(savedWishlist) : []
+        if (!wishlistItems.includes(product.postId)) {
+          localStorage.setItem("wishlist", JSON.stringify([...wishlistItems, product.postId]))
+        }
+
+        toast({
+          title: "Added to wishlist",
+          description: `${product.name} has been added to your wishlist.`,
+          action: (
+            <ToastAction
+              altText="View wishlist"
+              onClick={() => router.push(`/client-dashboard/${clientId}/wishlist`)}
+              className="bg-[#194a95] text-white hover:bg-[#0f3a7a]"
+            >
+              View Wishlist
+            </ToastAction>
+          ),
+        })
       }
+    } catch (error) {
+      console.error("Error updating wishlist:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update wishlist. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setWishlistLoading(false)
     }
+  }
 
-    fetchClientData()
-  }, [clientId])
-
-  // Loading state
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center h-[80vh]">
-        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-muted-foreground">Loading products...</p>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#194a95]"></div>
       </div>
     )
   }
 
-  // Add this function to handle product card clicks
-  const handleProductClick = (e: React.MouseEvent, productId: string) => {
-    // Check if the click was on a button or its children
-    const target = e.target as HTMLElement
-    if (target.closest("button")) {
-      // If clicked on a button, don't navigate
-      e.preventDefault()
-      return
-    }
-
-    // Otherwise, allow navigation to proceed
-    router.push(`/client-dashboard/${clientId}/product/${productId}`)
+  if (error || !product) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="w-full max-w-md p-6 text-center space-y-2">
+          <h2 className="text-xl font-medium text-gray-900">{error || "No data found"}</h2>
+          <p className="text-sm text-gray-500">Product ID: {params.id}</p>
+          <Button onClick={() => router.back()} className="mt-4 bg-[#194a95]">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back
+          </Button>
+        </div>
+      </div>
+    )
   }
 
+  // Parse application areas safely, handling both string and array types
+  const getApplicationAreas = () => {
+    if (!product.applicationAreas) return []
+
+    if (typeof product.applicationAreas === "string") {
+      return product.applicationAreas
+        .split(",")
+        .filter(Boolean)
+        .map((area) => area.trim())
+    }
+
+    if (Array.isArray(product.applicationAreas)) {
+      return product.applicationAreas
+    }
+
+    return []
+  }
+
+  const applicationAreas = getApplicationAreas()
+
   return (
-    <ErrorBoundary>
-      <div className="p-6 md:p-8">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-          <h1 className="text-3xl font-bold">Welcome, {clientData?.name?.split(" ")[0] || "Client"}</h1>
-        </div>
-        {error && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+    <div className="min-h-screen bg-white p-6">
+      {/* Back Button */}
+      <button
+        onClick={() => router.back()}
+        className="mb-6 hover:bg-gray-100 p-2 rounded-full transition-colors"
+        aria-label="Go back"
+      >
+        <ArrowLeft className="h-6 w-6" />
+      </button>
 
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Products</h1>
+      <div className="max-w-6xl mx-auto">
+        <div className="flex flex-col md:flex-row md:gap-12">
+          {/* Images Section */}
+          <div className="w-full md:w-1/2 md:order-2 mb-8 md:mb-0">
+            {/* Main Image with Navigation Arrows */}
+            <div className="relative rounded-2xl overflow-hidden bg-gray-100 mb-4 cursor-pointer" onClick={openGallery}>
+              <div className="aspect-[4/3] relative">
+                <Image
+                  src={
+                    imageLoadError[currentImageIndex]
+                      ? "/placeholder.svg"
+                      : product.image[currentImageIndex] || "/placeholder.svg"
+                  }
+                  alt={product.name}
+                  fill
+                  className="object-cover"
+                  onError={() => handleImageError(currentImageIndex)}
+                  priority
+                />
 
-          <div className="flex items-center gap-4">
-            {/* Scan QR Button */}
-            <button
-              onClick={handleScanQR}
-              className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-              aria-label="Scan QR Code"
-            >
-              <QrCode className="h-6 w-6 text-gray-600" />
-            </button>
-
-            <Link href={`/client-dashboard/${clientId}/wishlist`} className="relative">
-              <Heart className="h-6 w-6 text-gray-600" />
-              {wishlist.length > 0 && (
-                <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  {wishlist.length}
-                </span>
-              )}
-            </Link>
-
-            <Link href={`/client-dashboard/${clientId}/cart`} className="relative">
-              <ShoppingCart className="h-6 w-6 text-gray-600" />
-              {cart.length > 0 && (
-                <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  {cart.length}
-                </span>
-              )}
-            </Link>
-          </div>
-        </div>
-
-        <div className="relative mb-6">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search products by name or category..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 pr-4 py-2 w-full rounded-lg border border-input focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-          />
-        </div>
-
-        {filteredProducts.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-xl font-medium mb-4">No products found</p>
-            <p className="text-muted-foreground mb-6">
-              {searchQuery ? "Try a different search term" : "No products are currently available"}
-            </p>
-            <button
-              onClick={fetchProducts}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
-            >
-              Refresh Products
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            {filteredProducts.map((product) => {
-              return (
-                <div
-                  key={product._id}
-                  className="group relative bg-card rounded-lg overflow-hidden border border-border hover:border-primary transition-all hover:shadow-md cursor-pointer"
-                  onClick={(e) => handleProductClick(e, product.postId)}
-                >
-                  <div className="p-3">
-                    <div className="relative w-full overflow-hidden rounded-xl bg-gray-50 aspect-square">
-                      <Image
-                        src={imageError[product._id] ? "/placeholder.svg" : product.image?.[0] || "/placeholder.svg"}
-                        alt={product.name}
-                        fill
-                        unoptimized={true} // This bypasses Vercel's image optimization
-                        className="object-cover transition-transform group-hover:scale-105 duration-300"
-                        onError={() => handleImageError(product._id)}
-                      />
-
-                      {/* Wishlist button overlay */}
-                      <button
-                        onClick={(e) => toggleWishlist(e, product.postId)}
-                        className="absolute top-2 right-2 p-2 rounded-full bg-white/80 hover:bg-white transition-colors z-10"
-                        aria-label={wishlist.includes(product.postId) ? "Remove from wishlist" : "Add to wishlist"}
-                        type="button"
-                        disabled={addingToWishlist[product.postId]}
-                      >
-                        {addingToWishlist[product.postId] ? (
-                          <Loader2 className="h-5 w-5 animate-spin" />
-                        ) : (
-                          <Heart
-                            className={`h-5 w-5 ${
-                              wishlist.includes(product.postId) ? "text-red-500 fill-red-500" : "text-gray-600"
-                            }`}
-                          />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="p-4">
-                    <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
-
-                    {/* Price display */}
-                    <div className="mt-2">
-                      <p className="text-lg font-bold">₹{product.price.toLocaleString()}/sqft</p>
-                    </div>
-
-                    <p className="text-sm text-muted-foreground mt-1">
-                      <span className="font-medium">Category:</span> {product.category}
-                    </p>
-
+                {/* Navigation Arrows */}
+                {product.image.length > 1 && (
+                  <>
                     <button
-                      onClick={(e) => toggleWishlist(e, product.postId)}
-                      className={`mt-4 w-full py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2
-                                ${
-                                  wishlist.includes(product.postId)
-                                    ? "bg-gray-100 text-gray-600 border border-gray-200"
-                                    : addingToWishlist[product.postId]
-                                      ? "bg-gray-200 text-gray-700"
-                                      : "bg-primary hover:bg-primary/90 text-primary-foreground"
-                                } 
-                                transition-colors`}
-                      disabled={addingToWishlist[product.postId]}
-                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation() // Prevent gallery from opening
+                        previousImage()
+                      }}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full shadow-lg transition-all"
+                      aria-label="Previous image"
                     >
-                      {addingToWishlist[product.postId] ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                      ) : wishlist.includes(product.postId) ? (
-                        <>
-                          <Heart className="h-4 w-4 fill-gray-500 mr-1" />
-                          Added to Wishlist
-                        </>
-                      ) : (
-                        <>
-                          <Heart className="h-4 w-4 mr-1" />
-                          Add to Wishlist
-                        </>
-                      )}
+                      <ChevronLeft className="h-6 w-6 text-gray-800" />
                     </button>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation() // Prevent gallery from opening
+                        nextImage()
+                      }}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full shadow-lg transition-all"
+                      aria-label="Next image"
+                    >
+                      <ChevronRight className="h-6 w-6 text-gray-800" />
+                    </button>
+                  </>
+                )}
 
-        {/* Add extra space at the bottom to ensure scrolling is possible */}
-        <div className="h-[500px]"></div>
+                {/* Click to view indicator */}
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 text-white px-3 py-1 rounded-full text-sm flex items-center">
+                  <span>Click to zoom</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Thumbnails */}
+            {product.image.length > 1 && (
+              <div className="grid grid-cols-4 gap-4">
+                {product.image.map((img, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleThumbnailClick(index)}
+                    className={`relative rounded-xl overflow-hidden aspect-square ${
+                      selectedThumbnail === index ? "ring-2 ring-[#194a95]" : ""
+                    }`}
+                  >
+                    <Image
+                      src={imageLoadError[index] ? "/placeholder.svg" : img || "/placeholder.svg"}
+                      alt={`${product.name} thumbnail ${index + 1}`}
+                      fill
+                      className="object-cover"
+                      onError={() => handleImageError(index)}
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Product Details */}
+          <div className="w-full md:w-1/2 md:order-1 space-y-6">
+            {/* Product Name */}
+            <div className="pb-4 border-b border-gray-200">
+              <p className="text-gray-500">Product Name</p>
+              <h1 className="text-3xl font-bold mt-1">{product.name}</h1>
+            </div>
+
+            {/* Price */}
+            <div className="pb-4 border-b border-gray-200">
+              <p className="text-gray-500">Price (per sqft)</p>
+              <p className="text-xl font-bold mt-1">
+                ₹{product && calculateAdjustedPrice(product.price, product.category)}/per sqft
+              </p>
+            </div>
+
+            {/* Product Category */}
+            <div className="pb-4 border-b border-gray-200">
+              <p className="text-gray-500">Product Category</p>
+              <p className="text-xl font-bold mt-1">{product.category}</p>
+            </div>
+
+            {/* Quantity Available */}
+            <div className="pb-4 border-b border-gray-200">
+              <p className="text-gray-500">Quality Available (in sqft)</p>
+              <p className="text-xl font-bold mt-1">{product.quantityAvailable}</p>
+            </div>
+
+            {/* Size, No. of Pieces, and Thickness in 3 columns */}
+            <div className="grid grid-cols-3 gap-4 pb-4 border-b border-gray-200">
+              <div>
+                <p className="text-gray-500">Size</p>
+                <p className="text-lg font-bold mt-1">
+                  {product.size !== undefined && product.size !== null && product.size !== "" ? product.size : "-"}
+                </p>
+              </div>
+              <div>
+                <p className="text-gray-500">No. of Pieces</p>
+                <p className="text-lg font-bold mt-1">
+                  {product.numberOfPieces !== undefined && product.numberOfPieces !== null
+                    ? product.numberOfPieces
+                    : "-"}
+                </p>
+              </div>
+              <div>
+                <p className="text-gray-500">Thickness</p>
+                <p className="text-lg font-bold mt-1">
+                  {product.thickness !== undefined && product.thickness !== null && product.thickness !== ""
+                    ? product.thickness
+                    : "-"}
+                </p>
+              </div>
+            </div>
+
+            {/* Application Areas */}
+            <div className="pb-4 border-b border-gray-200">
+              <p className="text-gray-500">Application Areas</p>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {applicationAreas.length > 0 ? (
+                  applicationAreas.map((area, index) => (
+                    <Badge key={index} className="bg-[#194a95] hover:bg-[#194a95] text-white px-3 py-1 text-sm">
+                      {area}
+                    </Badge>
+                  ))
+                ) : (
+                  <p className="text-gray-600">No application areas specified</p>
+                )}
+              </div>
+            </div>
+
+            {/* About Product */}
+            <div className="pb-4 border-b border-gray-200">
+              <p className="text-gray-500">About Product</p>
+              <div className="mt-1">
+                <p
+                  className={`text-xl font-normal ${!showFullDescription ? "line-clamp-2" : ""} transition-all duration-200`}
+                >
+                  {product.description || "Product mainly used for countertop"}
+                </p>
+                {(product.description?.length || 0) > 80 && (
+                  <button
+                    onClick={() => setShowFullDescription(!showFullDescription)}
+                    className="text-[#194a95] hover:text-[#0f3a7a] mt-1 text-sm flex items-center"
+                  >
+                    {showFullDescription ? (
+                      <>
+                        Show less <ChevronUp className="ml-1 h-4 w-4" />
+                      </>
+                    ) : (
+                      <>
+                        View more <ChevronDown className="ml-1 h-4 w-4" />
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-wrap gap-4 mb-8">
+              <Button
+                onClick={toggleWishlist}
+                disabled={wishlistLoading}
+                className={`px-8 py-3 rounded-md flex items-center gap-2 ${
+                  inWishlist
+                    ? "bg-gray-200 hover:bg-gray-300 text-gray-700"
+                    : "bg-[#194a95] hover:bg-[#0f3a7a] text-white"
+                }`}
+              >
+                <Heart className={`w-4 h-4 ${inWishlist ? "fill-current" : ""}`} />
+                {wishlistLoading ? "Processing..." : "Add to Wishlist"}
+              </Button>
+            </div>
+            
+          
+
+          </div>
+        </div>
+            {/* Visualizer Button */}
+            <div className="pb-4 border-b border-gray-200 mt-4">
+              <Button
+                onClick={() => setShowVisualizer(!showVisualizer)}
+                className="w-full bg-[#194a95] hover:bg-[#0f3a7a] py-3 text-white"
+              >
+                {showVisualizer ? "Hide Visualizer" : "Show Product Visualizer"}
+              </Button>
+            </div>
+          {/* Product Visualizer Section */}
+          {showVisualizer && product.image.length > 0 && (
+            <div className="mt-4">
+              <ProductVisualizer productImage={product.image[0]} productName={product.name}  />
+            </div>
+          )}
+
       </div>
-    </ErrorBoundary>
+
+      {/* Image Gallery Modal */}
+      {galleryOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center">
+          <div className="relative w-full h-full flex flex-col">
+            {/* Close button */}
+            <button
+              onClick={closeGallery}
+              className="absolute top-4 right-4 z-10 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+              aria-label="Close gallery"
+            >
+              <X className="h-6 w-6" />
+            </button>
+
+            {/* Main image container */}
+            <div className="flex-1 flex items-center justify-center p-4">
+              <div className="relative w-full h-full max-w-4xl max-h-[80vh] mx-auto">
+                <Image
+                  src={
+                    imageLoadError[currentImageIndex]
+                      ? "/placeholder.svg"
+                      : product.image[currentImageIndex] || "/placeholder.svg"
+                  }
+                  alt={`${product.name} - Image ${currentImageIndex + 1}`}
+                  fill
+                  className="object-contain"
+                  onError={() => handleImageError(currentImageIndex)}
+                  priority
+                />
+              </div>
+            </div>
+
+            {/* Navigation controls */}
+            {product.image.length > 1 && (
+              <>
+                <button
+                  onClick={previousImage}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 p-3 rounded-full text-white transition-colors"
+                  aria-label="Previous image"
+                >
+                  <ChevronLeft className="h-8 w-8" />
+                </button>
+                <button
+                  onClick={nextImage}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 p-3 rounded-full text-white transition-colors"
+                  aria-label="Next image"
+                >
+                  <ChevronRight className="h-8 w-8" />
+                </button>
+              </>
+            )}
+
+            {/* Thumbnails at bottom */}
+            {product.image.length > 1 && (
+              <div className="p-4 bg-black/70">
+                <div className="flex justify-center gap-2 overflow-x-auto py-2 max-w-4xl mx-auto">
+                  {product.image.map((img, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleThumbnailClick(index)}
+                      className={`relative rounded-md overflow-hidden flex-shrink-0 w-16 h-16 md:w-20 md:h-20 ${
+                        selectedThumbnail === index ? "ring-2 ring-white" : "opacity-70"
+                      }`}
+                    >
+                      <Image
+                        src={imageLoadError[index] ? "/placeholder.svg" : img || "/placeholder.svg"}
+                        alt={`${product.name} thumbnail ${index + 1}`}
+                        fill
+                        className="object-cover"
+                        onError={() => handleImageError(index)}
+                      />
+                    </button>
+                  ))}
+                </div>
+                <p className="text-white text-center mt-2 text-sm">
+                  {currentImageIndex + 1} / {product.image.length}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
