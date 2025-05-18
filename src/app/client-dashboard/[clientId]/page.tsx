@@ -10,6 +10,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { Button } from "@/components/ui/button"
+import { fetchMultipleProductPrices } from "@/utils/priceUtils"
 
 // Define the Product interface
 interface Product {
@@ -61,6 +62,7 @@ export default function ProductsPage() {
   const [error, setError] = useState<string | null>(null)
   const [clientData, setClientData] = useState<any>(null)
   const [wishlistLoading, setWishlistLoading] = useState(false)
+  const [updatedPrices, setUpdatedPrices] = useState<Record<string, { price: number; basePrice?: number }>>({})
 
   // Debug scroll event
   useEffect(() => {
@@ -262,10 +264,38 @@ export default function ProductsPage() {
     }
   }, [toast])
 
+  // Add this function to update product prices
+  const updateProductPrices = useCallback(async () => {
+    if (products.length === 0) return
+
+    // Extract all product IDs
+    const productIds = products.map((product) => product.postId).filter(Boolean)
+
+    if (productIds.length === 0) return
+
+    try {
+      const result = await fetchMultipleProductPrices(productIds)
+
+      if (result.success && result.prices) {
+        console.log("Updated prices received:", result.prices)
+        setUpdatedPrices(result.prices)
+      }
+    } catch (error) {
+      console.error("Failed to update product prices:", error)
+    }
+  }, [products])
+
   // Fetch products on component mount
   useEffect(() => {
     fetchProducts()
   }, [fetchProducts])
+
+  // Add this useEffect to fetch prices after products are loaded
+  useEffect(() => {
+    if (products.length > 0 && !loading) {
+      updateProductPrices()
+    }
+  }, [products, loading, updateProductPrices])
 
   // Navigate to wishlist page
   const goToWishlist = () => {
@@ -678,9 +708,23 @@ export default function ProductsPage() {
 
                     {/* Price display - showing both original and calculated prices */}
                     <div className="mt-2">
-                      <p className="text-lg font-bold">{formatPrice(product.price)}</p>
-                      {product.basePrice && product.basePrice !== product.price && (
-                        <p className="text-sm text-muted-foreground line-through">{formatPrice(product.basePrice)}</p>
+                      <p className="text-lg font-bold">
+                        {formatPrice(
+                          updatedPrices[product.postId]?.price !== undefined
+                            ? updatedPrices[product.postId].price
+                            : product.price,
+                        )}
+                      </p>
+                      {((updatedPrices[product.postId]?.basePrice !== undefined &&
+                        updatedPrices[product.postId]?.basePrice !== updatedPrices[product.postId]?.price) ||
+                        (product.basePrice && product.basePrice !== product.price)) && (
+                        <p className="text-sm text-muted-foreground line-through">
+                          {formatPrice(
+                            updatedPrices[product.postId]?.basePrice !== undefined
+                              ? updatedPrices[product.postId].basePrice
+                              : product.basePrice,
+                          )}
+                        </p>
                       )}
                     </div>
 
