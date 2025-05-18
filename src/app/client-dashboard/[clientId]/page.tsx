@@ -16,7 +16,8 @@ interface Product {
   _id: string
   name: string
   price: number
-  basePrice?: number // Add this field to recognize the original price
+  basePrice?: number // Original price before commission
+  calculatedPrice?: number // Price with commission applied
   image: string[]
   postId: string
   category: string
@@ -527,6 +528,75 @@ export default function ProductsPage() {
     return `₹${price.toLocaleString()}/sqft`
   }
 
+  // Add this function to check for price updates
+  const checkPriceUpdates = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("clientImpersonationToken")
+      if (!token) return
+
+      const response = await fetch("https://evershinebackend-2.onrender.com/api/checkPriceUpdates", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.hasUpdates) {
+          console.log("Price updates detected, refreshing products")
+          fetchProducts()
+        }
+      }
+    } catch (error) {
+      console.error("Error checking price updates:", error)
+    }
+  }, [fetchProducts])
+
+  // Add this useEffect to check for price updates when component mounts
+  useEffect(() => {
+    checkPriceUpdates()
+
+    // Optional: Set up WebSocket connection for real-time price updates
+    const setupPriceWebSocket = () => {
+      const ws = new WebSocket("wss://evershinebackend-2.onrender.com/priceUpdates")
+
+      ws.onopen = () => {
+        console.log("WebSocket connection established for price updates")
+      }
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data)
+          if (data.type === "PRICE_UPDATE") {
+            console.log("Real-time price update received, refreshing products")
+            fetchProducts()
+          }
+        } catch (e) {
+          console.error("Error processing WebSocket message:", e)
+        }
+      }
+
+      ws.onerror = (error) => {
+        console.error("WebSocket error:", error)
+      }
+
+      ws.onclose = () => {
+        console.log("WebSocket connection closed")
+        // Attempt to reconnect after a delay
+        setTimeout(setupPriceWebSocket, 5000)
+      }
+
+      return ws
+    }
+
+    const ws = setupPriceWebSocket()
+
+    return () => {
+      if (ws) ws.close()
+    }
+  }, [checkPriceUpdates, fetchProducts])
+
   return (
     <ErrorBoundary>
       <div className="p-6 md:p-8">
@@ -641,7 +711,7 @@ export default function ProductsPage() {
                   <div className="p-4">
                     <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
 
-                    {/* Price display - using price directly from backend */}
+                    {/* Price display - showing both original and calculated prices */}
                     <div className="mt-2">
                       <p className="text-lg font-bold">{formatPrice(product.price)}</p>
                       {product.basePrice && product.basePrice !== product.price && (
