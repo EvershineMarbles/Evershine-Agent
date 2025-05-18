@@ -14,6 +14,9 @@ export function usePriceUpdates(clientId: string, onPriceUpdate: () => void) {
   const { toast } = useToast()
 
   useEffect(() => {
+    // Safety check - only run in browser
+    if (typeof window === "undefined") return
+
     if (!clientId) return
 
     // Initialize WebSocket service

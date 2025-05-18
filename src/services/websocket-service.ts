@@ -19,6 +19,12 @@ class PriceUpdateService {
 
   // Connect to WebSocket server
   private connectWebSocket() {
+    // Check if we're in a browser environment
+    if (typeof window === "undefined") {
+      console.log("Not in browser environment, skipping WebSocket connection")
+      return
+    }
+
     try {
       const token = localStorage.getItem("clientImpersonationToken") || localStorage.getItem("token")
       if (!token) {
@@ -137,6 +143,11 @@ class PriceUpdateService {
 
   // Fall back to polling mechanism
   private fallbackToPolling() {
+    // Check if we're in a browser environment
+    if (typeof window === "undefined") {
+      return
+    }
+
     // Dispatch event to activate polling fallback
     window.dispatchEvent(new CustomEvent("websocket-failed"))
   }

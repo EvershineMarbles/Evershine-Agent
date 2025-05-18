@@ -1,78 +1,101 @@
 /**
  * Fallback service for price updates using polling
- * This is used when WebSocket connection fails
  */
 class PriceUpdateFallbackService {
   private clientId: string | null = null
-  private pollInterval = 30000 // 30 seconds
-  private intervalId: NodeJS.Timeout | null = null
-  private lastPriceCheck: Date = new Date()
+  private pollingInterval: NodeJS.Timeout | null = null
+  private pollingTime = 60000 // 1 minute
 
+  // Initialize the service with client ID
   initialize(clientId: string) {
+    // Check if we're in a browser environment
+    if (typeof window === "undefined") {
+      console.log("Not in browser environment, skipping polling initialization")
+      return this
+    }
+
     this.clientId = clientId
-    this.lastPriceCheck = new Date()
     this.startPolling()
     return this
   }
 
+  // Start polling for price updates
   private startPolling() {
     // Clear any existing interval
-    this.stopPolling()
-
-    // Start new polling interval
-    this.intervalId = setInterval(() => {
-      this.checkForPriceUpdates()
-    }, this.pollInterval)
-
-    console.log("Price update polling started as WebSocket fallback")
-  }
-
-  private stopPolling() {
-    if (this.intervalId) {
-      clearInterval(this.intervalId)
-      this.intervalId = null
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval)
     }
+
+    // Check for updates immediately
+    this.checkForPriceUpdates()
+
+    // Set up polling interval
+    this.pollingInterval = setInterval(() => {
+      this.checkForPriceUpdates()
+    }, this.pollingTime)
   }
 
+  // Check for price updates
   private async checkForPriceUpdates() {
     try {
-      if (!this.clientId) return
+      // Check if we're in a browser environment
+      if (typeof window === "undefined") return
 
       const token = localStorage.getItem("clientImpersonationToken") || localStorage.getItem("token")
-      if (!token) return
+      if (!token) {
+        console.error("No authentication token found for price update check")
+        return
+      }
 
+      const lastChecked = localStorage.getItem("lastPriceCheck") || null
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
-      const lastCheckedISO = this.lastPriceCheck.toISOString()
 
-      const response = await fetch(
-        `${apiUrl}/api/prices/check-updates?lastChecked=${lastCheckedISO}&clientId=${this.clientId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
+      const response = await fetch(`${apiUrl}/api/prices/check-updates`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-      )
+        body: JSON.stringify({
+          lastChecked,
+          clientId: this.clientId,
+        }),
+      })
 
-      if (response.ok) {
-        const data = await response.json()
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`)
+      }
 
-        // If prices have been updated since our last check
-        if (data.pricesUpdated) {
-          console.log("Prices have been updated (polling fallback), refreshing data")
-          this.lastPriceCheck = new Date(data.lastUpdated)
+      const data = await response.json()
 
-          // Dispatch the same event as the WebSocket service would
-          window.dispatchEvent(new CustomEvent("prices-updated", { detail: data }))
-        }
+      if (data.pricesUpdated) {
+        console.log("Prices have been updated via polling!")
+
+        // Update the last checked timestamp
+        localStorage.setItem("lastPriceCheck", data.lastUpdated)
+
+        // Dispatch the same event as the WebSocket service for consistency
+        window.dispatchEvent(
+          new CustomEvent("prices-updated", {
+            detail: {
+              type: "price_update",
+              message: "Prices have been updated",
+              timestamp: data.lastUpdated,
+            },
+          }),
+        )
       }
     } catch (error) {
-      console.error("Error checking for price updates (polling fallback):", error)
+      console.error("Error checking price updates:", error)
     }
   }
 
+  // Clean up on service destruction
   destroy() {
-    this.stopPolling()
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval)
+      this.pollingInterval = null
+    }
     this.clientId = null
   }
 }

@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode, RefreshCw } from "lucide-react"
+import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode } from "lucide-react"
 import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -51,7 +51,6 @@ export default function ProductsPage() {
   const { toast } = useToast()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [imageError, setImageError] = useState<Record<string, boolean>>({})
   // Wishlist and cart state
@@ -62,6 +61,7 @@ export default function ProductsPage() {
   const [error, setError] = useState<string | null>(null)
   const [clientData, setClientData] = useState<any>(null)
   const [wishlistLoading, setWishlistLoading] = useState(false)
+  const [lastPriceCheck, setLastPriceCheck] = useState<Date>(new Date())
 
   // Fetch products function
   const fetchProducts = useCallback(async () => {
@@ -98,17 +98,14 @@ export default function ProductsPage() {
       if (data.success && Array.isArray(data.data)) {
         console.log("Products fetched successfully:", data.data)
 
-        // Process products - use _id as fallback if postId is missing
-        const validProducts = data.data.map((product: Product) => {
-          // If postId is missing or invalid, use _id as fallback
-          if (!product.postId || typeof product.postId !== "string") {
-            console.warn(`Product ${product._id} has invalid postId, using _id as fallback`)
-            return { ...product, postId: product._id }
-          }
-          return product
-        })
+        // Filter out products with missing or invalid postId
+        const validProducts = data.data.filter(
+          (product: Product) => product.postId && typeof product.postId === "string",
+        )
 
-        console.log(`Processed ${validProducts.length} products, using fallbacks where needed`)
+        if (validProducts.length < data.data.length) {
+          console.warn(`Filtered out ${data.data.length - validProducts.length} products with invalid postId`)
+        }
 
         // Process the image URLs to ensure they're valid
         const processedProducts = validProducts.map((product: Product) => ({
@@ -139,12 +136,73 @@ export default function ProductsPage() {
       setProducts([])
     } finally {
       setLoading(false)
-      setRefreshing(false)
     }
   }, [toast])
 
+  // Debug scroll event
+  useEffect(() => {
+    console.log("Setting up scroll debug in ProductsPage")
+    const logScroll = () => {
+      console.log("Scroll event detected in ProductsPage, window.scrollY:", window.scrollY)
+    }
+
+    window.addEventListener("scroll", logScroll)
+    return () => window.removeEventListener("scroll", logScroll)
+  }, [])
+
   // Use the price updates hook
   usePriceUpdates(clientId, fetchProducts)
+
+  // Remove the existing polling useEffect:
+  /*
+  useEffect(() => {
+    // Function to check for price updates
+    const checkForPriceUpdates = async () => {
+      try {
+        const token = localStorage.getItem("clientImpersonationToken")
+        if (!token) return
+
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
+
+        // Call the price update check endpoint
+        const response = await fetch(`${apiUrl}/api/checkPriceUpdates/${clientId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+
+          // If prices have been updated since our last check
+          if (data.pricesUpdated && new Date(data.lastUpdated) > lastPriceCheck) {
+            console.log("Prices have been updated, refreshing product data")
+            setLastPriceCheck(new Date())
+
+            // Refetch products with updated prices
+            fetchProducts()
+
+            // Notify the user
+            toast({
+              title: "Prices Updated",
+              description: "Product prices have been updated with the latest commission rates.",
+              duration: 5000,
+            })
+          }
+        }
+      } catch (error) {
+        console.error("Error checking for price updates:", error)
+      }
+    }
+
+    // Check every 30 seconds
+    const intervalId = setInterval(checkForPriceUpdates, 30000)
+
+    // Clean up on unmount
+    return () => clearInterval(intervalId)
+  }, [clientId, toast, lastPriceCheck])
+  */
 
   // Fetch wishlist from backend
   const fetchWishlist = useCallback(async () => {
@@ -229,13 +287,6 @@ export default function ProductsPage() {
   useEffect(() => {
     fetchProducts()
   }, [fetchProducts])
-
-  // Handle manual refresh
-  const handleRefresh = () => {
-    setRefreshing(true)
-    fetchProducts()
-    fetchWishlist()
-  }
 
   // Navigate to wishlist page
   const goToWishlist = () => {
@@ -454,6 +505,15 @@ export default function ProductsPage() {
     }
   }
 
+  // Add refresh wishlist function
+  const refreshWishlist = () => {
+    fetchWishlist()
+    toast({
+      title: "Refreshing wishlist",
+      description: "Getting the latest wishlist data from the server",
+    })
+  }
+
   // Filter products based on search query
   const filteredProducts = products.filter(
     (product) =>
@@ -529,19 +589,7 @@ export default function ProductsPage() {
       <div className="p-6 md:p-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <h1 className="text-3xl font-bold">Welcome, {clientData?.name?.split(" ")[0] || "Client"}</h1>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="flex items-center gap-2"
-          >
-            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-            {refreshing ? "Refreshing..." : "Refresh Prices"}
-          </Button>
         </div>
-
         {error && (
           <Alert variant="destructive" className="mb-4">
             <AlertCircle className="h-4 w-4" />
@@ -609,14 +657,11 @@ export default function ProductsPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             {filteredProducts.map((product) => {
-              // Use postId or _id as fallback
-              const productId = product.postId || product._id
-
               return (
                 <div
                   key={product._id}
                   className="group relative bg-card rounded-lg overflow-hidden border border-border hover:border-primary transition-all hover:shadow-md cursor-pointer"
-                  onClick={(e) => handleProductClick(e, productId)}
+                  onClick={(e) => handleProductClick(e, product.postId)}
                 >
                   <div className="p-3">
                     <div className="relative w-full overflow-hidden rounded-xl bg-gray-50 aspect-square">
@@ -631,18 +676,18 @@ export default function ProductsPage() {
 
                       {/* Wishlist button overlay */}
                       <button
-                        onClick={(e) => toggleWishlist(e, productId)}
+                        onClick={(e) => toggleWishlist(e, product.postId)}
                         className="absolute top-2 right-2 p-2 rounded-full bg-white/80 hover:bg-white transition-colors z-10"
-                        aria-label={wishlist.includes(productId) ? "Remove from wishlist" : "Add to wishlist"}
+                        aria-label={wishlist.includes(product.postId) ? "Remove from wishlist" : "Add to wishlist"}
                         type="button"
-                        disabled={addingToWishlist[productId]}
+                        disabled={addingToWishlist[product.postId]}
                       >
-                        {addingToWishlist[productId] ? (
+                        {addingToWishlist[product.postId] ? (
                           <Loader2 className="h-5 w-5 animate-spin" />
                         ) : (
                           <Heart
                             className={`h-5 w-5 ${
-                              wishlist.includes(productId) ? "text-red-500 fill-red-500" : "text-gray-600"
+                              wishlist.includes(product.postId) ? "text-red-500 fill-red-500" : "text-gray-600"
                             }`}
                           />
                         )}
@@ -653,14 +698,9 @@ export default function ProductsPage() {
                   <div className="p-4">
                     <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
 
-                    {/* Price display with base price if available */}
+                    {/* Price display */}
                     <div className="mt-2">
                       <p className="text-lg font-bold">₹{product.price.toLocaleString()}/sqft</p>
-                      {product.basePrice && product.basePrice !== product.price && (
-                        <p className="text-sm text-muted-foreground line-through">
-                          ₹{product.basePrice.toLocaleString()}/sqft
-                        </p>
-                      )}
                     </div>
 
                     <p className="text-sm text-muted-foreground mt-1">
@@ -668,22 +708,22 @@ export default function ProductsPage() {
                     </p>
 
                     <button
-                      onClick={(e) => toggleWishlist(e, productId)}
+                      onClick={(e) => toggleWishlist(e, product.postId)}
                       className={`mt-4 w-full py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2
                                 ${
-                                  wishlist.includes(productId)
+                                  wishlist.includes(product.postId)
                                     ? "bg-gray-100 text-gray-600 border border-gray-200"
-                                    : addingToWishlist[productId]
+                                    : addingToWishlist[product.postId]
                                       ? "bg-gray-200 text-gray-700"
                                       : "bg-primary hover:bg-primary/90 text-primary-foreground"
                                 } 
                                 transition-colors`}
-                      disabled={addingToWishlist[productId]}
+                      disabled={addingToWishlist[product.postId]}
                       type="button"
                     >
-                      {addingToWishlist[productId] ? (
+                      {addingToWishlist[product.postId] ? (
                         <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                      ) : wishlist.includes(productId) ? (
+                      ) : wishlist.includes(product.postId) ? (
                         <>
                           <Heart className="h-4 w-4 fill-gray-500 mr-1" />
                           Added to Wishlist
@@ -701,6 +741,9 @@ export default function ProductsPage() {
             })}
           </div>
         )}
+
+        {/* Add extra space at the bottom to ensure scrolling is possible */}
+        <div className="h-[500px]"></div>
       </div>
     </ErrorBoundary>
   )
