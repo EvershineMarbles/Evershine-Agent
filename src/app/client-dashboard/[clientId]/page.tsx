@@ -10,13 +10,14 @@ import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { Button } from "@/components/ui/button"
+import { usePriceUpdates } from "@/hooks/use-price-updates"
 
 // Define the Product interface
 interface Product {
   _id: string
   name: string
   price: number
-  basePrice?: number // Add this field to recognize the original price
+  basePrice?: number
   image: string[]
   postId: string
   category: string
@@ -24,15 +25,6 @@ interface Product {
   status?: "draft" | "pending" | "approved"
   applicationAreas?: string
   quantityAvailable?: number
-}
-
-// Add the CommissionData interface
-interface CommissionData {
-  agentId: string
-  name: string
-  email: string
-  commissionRate: number
-  categoryCommissions?: Record<string, number>
 }
 
 // Define the WishlistItem interface
@@ -68,55 +60,86 @@ export default function ProductsPage() {
   const [addingToWishlist, setAddingToWishlist] = useState<Record<string, boolean>>({})
   const [error, setError] = useState<string | null>(null)
   const [clientData, setClientData] = useState<any>(null)
-  // Add commission data state
-  const [commissionData, setCommissionData] = useState<CommissionData | null>(null)
-  // Add state for commission rate override
-  const [overrideCommissionRate, setOverrideCommissionRate] = useState<number | null>(null)
-  const [commissionLoading, setCommissionLoading] = useState(false)
   const [wishlistLoading, setWishlistLoading] = useState(false)
 
-  // Load saved commission rate from localStorage on component mount
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      // Use a client-specific key for commission rate
-      const savedRate = localStorage.getItem(`commission-override-${clientId}`)
-      if (savedRate) {
-        setOverrideCommissionRate(Number(savedRate))
-      } else {
-        // Reset to null if no saved rate for this client
-        setOverrideCommissionRate(null)
+  // Fetch products function
+  const fetchProducts = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      // Use environment variable if available, otherwise use a default URL
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
+      console.log("Fetching products from:", `${apiUrl}/api/getAllProducts`)
+
+      const token = localStorage.getItem("clientImpersonationToken")
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
       }
-    }
-  }, [clientId])
 
-  // Save commission rate to localStorage whenever it changes
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      // Use a client-specific key for commission rate
-      if (overrideCommissionRate !== null) {
-        localStorage.setItem(`commission-override-${clientId}`, overrideCommissionRate.toString())
-      } else {
-        localStorage.removeItem(`commission-override-${clientId}`)
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`
       }
+
+      const response = await fetch(`${apiUrl}/api/getAllProducts`, {
+        method: "GET",
+        headers,
+        // Add a timeout to prevent long waiting times
+        signal: AbortSignal.timeout(8000), // 8 second timeout
+      })
+
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      if (data.success && Array.isArray(data.data)) {
+        console.log("Products fetched successfully:", data.data)
+
+        // Filter out products with missing or invalid postId
+        const validProducts = data.data.filter(
+          (product: Product) => product.postId && typeof product.postId === "string",
+        )
+
+        if (validProducts.length < data.data.length) {
+          console.warn(`Filtered out ${data.data.length - validProducts.length} products with invalid postId`)
+        }
+
+        // Process the image URLs to ensure they're valid
+        const processedProducts = validProducts.map((product: Product) => ({
+          ...product,
+          image:
+            Array.isArray(product.image) && product.image.length > 0
+              ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
+              : ["/placeholder.svg"],
+        }))
+
+        setProducts(processedProducts)
+      } else {
+        throw new Error(data.msg || "Invalid API response format")
+      }
+    } catch (error: any) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to load products"
+      console.error("Error fetching products:", error)
+      setError(errorMessage)
+
+      // Show error toast
+      toast({
+        title: "Error fetching products",
+        description: "Could not load products from the server. Please try again later.",
+        variant: "destructive",
+      })
+
+      // Set empty products array
+      setProducts([])
+    } finally {
+      setLoading(false)
     }
-  }, [overrideCommissionRate, clientId])
+  }, [toast])
 
-  // Handle commission rate change
-  const handleCommissionRateChange = (rate: number | null) => {
-    setOverrideCommissionRate(rate)
-    console.log(`Setting commission rate for client ${clientId} to ${rate}`)
-  }
-
-  // Debug scroll event
-  useEffect(() => {
-    console.log("Setting up scroll debug in ProductsPage")
-    const logScroll = () => {
-      console.log("Scroll event detected in ProductsPage, window.scrollY:", window.scrollY)
-    }
-
-    window.addEventListener("scroll", logScroll)
-    return () => window.removeEventListener("scroll", logScroll)
-  }, [])
+  // Use the price updates hook
+  usePriceUpdates(clientId, fetchProducts)
 
   // Fetch wishlist from backend
   const fetchWishlist = useCallback(async () => {
@@ -197,147 +220,6 @@ export default function ProductsPage() {
     }
   }, [cart, clientId])
 
-  // Add fetchCommissionData function
-  const fetchCommissionData = useCallback(async () => {
-    try {
-      setCommissionLoading(true)
-      const token = localStorage.getItem("clientImpersonationToken")
-      if (!token) {
-        return null
-      }
-
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
-      const response = await fetch(`${apiUrl}/api/client/agent-commission`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-
-      if (!response.ok) {
-        return null
-      }
-
-      const data = await response.json()
-      if (data.success && data.data) {
-        setCommissionData(data.data)
-        return data.data
-      }
-      return null
-    } catch (error) {
-      console.error("Error fetching commission data:", error)
-      return null
-    } finally {
-      setCommissionLoading(false)
-    }
-  }, [])
-
-  // Add calculateAdjustedPrice function with override support
-  const calculateAdjustedPrice = useCallback(
-    (product: Product) => {
-      // Always use basePrice (which should be the original price)
-      const basePrice = product.basePrice || product.price
-
-      // Get the default commission rate (from agent or category-specific)
-      let defaultRate = commissionData?.commissionRate || 10
-
-      // Check for category-specific commission
-      if (
-        commissionData?.categoryCommissions &&
-        product.category &&
-        commissionData.categoryCommissions[product.category]
-      ) {
-        defaultRate = commissionData.categoryCommissions[product.category]
-      }
-
-      // Add the override rate to the default rate if an override is set
-      const finalRate = overrideCommissionRate !== null ? defaultRate + overrideCommissionRate : defaultRate
-
-      // Calculate adjusted price based on the original basePrice
-      const adjustedPrice = basePrice * (1 + finalRate / 100)
-      return Math.round(adjustedPrice * 100) / 100 // Round to 2 decimal places
-    },
-    [commissionData, overrideCommissionRate],
-  )
-
-  // Fetch products function
-  const fetchProducts = useCallback(async () => {
-    try {
-      setLoading(true)
-      setError(null)
-
-      // First fetch commission data
-      await fetchCommissionData()
-
-      // Use environment variable if available, otherwise use a default URL
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
-      console.log("Fetching products from:", `${apiUrl}/api/getAllProducts`)
-
-      const token = localStorage.getItem("clientImpersonationToken")
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      }
-
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`
-      }
-
-      const response = await fetch(`${apiUrl}/api/getAllProducts`, {
-        method: "GET",
-        headers,
-        // Add a timeout to prevent long waiting times
-        signal: AbortSignal.timeout(8000), // 8 second timeout
-      })
-
-      if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`)
-      }
-
-      const data = await response.json()
-
-      if (data.success && Array.isArray(data.data)) {
-        console.log("Products fetched successfully:", data.data)
-
-        // Filter out products with missing or invalid postId
-        const validProducts = data.data.filter(
-          (product: Product) => product.postId && typeof product.postId === "string",
-        )
-
-        if (validProducts.length < data.data.length) {
-          console.warn(`Filtered out ${data.data.length - validProducts.length} products with invalid postId`)
-        }
-
-        // Process the image URLs to ensure they're valid
-        const processedProducts = validProducts.map((product: Product) => ({
-          ...product,
-          image:
-            Array.isArray(product.image) && product.image.length > 0
-              ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
-              : ["/placeholder.svg"],
-          // Ensure basePrice is set if it doesn't exist
-          basePrice: product.basePrice || product.price,
-        }))
-
-        setProducts(processedProducts)
-      } else {
-        throw new Error(data.msg || "Invalid API response format")
-      }
-    } catch (error: any) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to load products"
-      console.error("Error fetching products:", error)
-      setError(errorMessage)
-
-      // Show error toast
-      toast({
-        title: "Error fetching products",
-        description: "Could not load products from the server. Please try again later.",
-        variant: "destructive",
-      })
-
-      // Set empty products array
-      setProducts([])
-    } finally {
-      setLoading(false)
-    }
-  }, [toast, fetchCommissionData])
-
   // Fetch products on component mount
   useEffect(() => {
     fetchProducts()
@@ -417,14 +299,7 @@ export default function ProductsPage() {
             throw new Error(data.message || "Failed to remove from wishlist")
           }
         } else {
-          // Add to wishlist
-          const product = products.find((p) => p.postId === productId)
-          if (!product) {
-            throw new Error("Product not found")
-          }
-
-          const adjustedPrice = calculateAdjustedPrice(product)
-
+          // Add to wishlist - no longer sending price, backend will calculate
           const response = await fetch("https://evershinebackend-2.onrender.com/api/addToWishlist", {
             method: "POST",
             headers: {
@@ -433,15 +308,9 @@ export default function ProductsPage() {
             },
             body: JSON.stringify({
               productId,
-              // Include the current price with commission applied
-              price: adjustedPrice,
+              // No price calculation, backend will handle it
             }),
           })
-
-          // Add console log to debug the price being sent
-          console.log(
-            `Adding to wishlist: Product ${productId} with price ${adjustedPrice} (commission rate: ${overrideCommissionRate !== null ? overrideCommissionRate : "default"})`,
-          )
 
           if (!response.ok) {
             throw new Error(`API error: ${response.status} ${response.statusText}`)
@@ -494,7 +363,7 @@ export default function ProductsPage() {
         setAddingToWishlist((prev) => ({ ...prev, [productId]: false }))
       }
     },
-    [wishlist, toast, clientId, router, fetchWishlist, products, calculateAdjustedPrice],
+    [wishlist, toast, clientId, router, fetchWishlist],
   )
 
   // Add to cart function
@@ -529,14 +398,7 @@ export default function ProductsPage() {
         throw new Error("No authentication token found. Please refresh the token and try again.")
       }
 
-      const product = products.find((p) => p.postId === productId)
-      if (!product) {
-        throw new Error("Product not found")
-      }
-
-      const adjustedPrice = calculateAdjustedPrice(product)
-
-      // Make API request in background
+      // Make API request in background - no longer sending price, backend will calculate
       const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
         method: "POST",
         headers: {
@@ -545,8 +407,7 @@ export default function ProductsPage() {
         },
         body: JSON.stringify({
           productId,
-          // Include the current price with commission applied
-          price: adjustedPrice,
+          // No price calculation, let backend handle it
         }),
       })
 
@@ -626,32 +487,6 @@ export default function ProductsPage() {
           const data = await response.json()
           if (data.data) {
             setClientData(data.data)
-
-            // Set commission rate based on consultant level color
-            if (data.data.consultantLevel) {
-              const consultantLevel = data.data.consultantLevel
-              console.log("Client consultant level:", consultantLevel)
-
-              // Map color to commission rate
-              let commissionRate = null
-              switch (consultantLevel) {
-                case "red":
-                  commissionRate = 5
-                  break
-                case "yellow":
-                  commissionRate = 10
-                  break
-                case "purple":
-                  commissionRate = 15
-                  break
-                default:
-                  commissionRate = null
-              }
-
-              // Set the override commission rate
-              setOverrideCommissionRate(commissionRate)
-              console.log(`Setting commission rate to ${commissionRate}% based on consultant level ${consultantLevel}`)
-            }
           }
         }
       } catch (error) {
@@ -662,16 +497,6 @@ export default function ProductsPage() {
     fetchClientData()
   }, [clientId])
 
-  useEffect(() => {
-    if (clientData?.consultantLevel && overrideCommissionRate !== null) {
-      // toast({
-      //   title: "Commission Rate Applied",
-      //   description: `${overrideCommissionRate}% commission rate applied based on client's consultant level`,
-      //   duration: 3000,
-      // });
-    }
-  }, [clientData?.consultantLevel, overrideCommissionRate, toast]);
-  
   // Loading state
   if (loading) {
     return (
@@ -713,8 +538,6 @@ export default function ProductsPage() {
           <h1 className="text-3xl font-bold">Products</h1>
 
           <div className="flex items-center gap-4">
-        
-
             {/* Scan QR Button */}
             <button
               onClick={handleScanQR}
@@ -771,9 +594,6 @@ export default function ProductsPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             {filteredProducts.map((product) => {
-              // Calculate the adjusted price based on commission
-              const adjustedPrice = calculateAdjustedPrice(product)
-
               return (
                 <div
                   key={product._id}
@@ -815,9 +635,9 @@ export default function ProductsPage() {
                   <div className="p-4">
                     <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
 
-                    {/* Simplified price display - just the adjusted price */}
+                    {/* Price display */}
                     <div className="mt-2">
-                      <p className="text-lg font-bold">₹{adjustedPrice.toLocaleString()}/sqft</p>
+                      <p className="text-lg font-bold">₹{product.price.toLocaleString()}/sqft</p>
                     </div>
 
                     <p className="text-sm text-muted-foreground mt-1">
