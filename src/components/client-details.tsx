@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ArrowLeft, Loader2, FileText, Package, Heart, ShoppingCart, ExternalLink } from "lucide-react"
+import { ArrowLeft, Loader2, FileText, Edit, Package } from "lucide-react"
 import { fetchWithAdminAuth } from "@/lib/admin-auth"
 
 interface ClientDetails {
@@ -55,28 +55,6 @@ interface Order {
   }
 }
 
-interface WishlistItem {
-  _id: string
-  postId: string
-  name: string
-  price: number
-  image: string
-  description?: string
-  category?: string
-  createdAt: string
-}
-
-interface CartItem {
-  _id: string
-  productId: string
-  name: string
-  price: number
-  image: string
-  quantity: number
-  description?: string
-  category?: string
-}
-
 interface ClientDetailsProps {
   clientId: string
 }
@@ -85,8 +63,6 @@ export default function ClientDetails({ clientId }: ClientDetailsProps) {
   const router = useRouter()
   const [client, setClient] = useState<ClientDetails | null>(null)
   const [orders, setOrders] = useState<Order[]>([])
-  const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([])
-  const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState("details")
@@ -116,26 +92,6 @@ export default function ClientDetails({ clientId }: ClientDetailsProps) {
             const ordersData = await ordersResponse.json()
             if (ordersData.success && ordersData.data) {
               setOrders(ordersData.data.orders)
-            }
-          }
-
-          // Fetch client wishlist
-          const wishlistResponse = await fetchWithAdminAuth(`/api/admin/clients/${clientId}/wishlist`)
-
-          if (wishlistResponse.ok) {
-            const wishlistData = await wishlistResponse.json()
-            if (wishlistData.success && wishlistData.data) {
-              setWishlistItems(wishlistData.data.items || [])
-            }
-          }
-
-          // Fetch client cart
-          const cartResponse = await fetchWithAdminAuth(`/api/admin/clients/${clientId}/cart`)
-
-          if (cartResponse.ok) {
-            const cartData = await cartResponse.json()
-            if (cartData.success && cartData.data) {
-              setCartItems(cartData.data.items || [])
             }
           }
         } else {
@@ -241,14 +197,13 @@ export default function ClientDetails({ clientId }: ClientDetailsProps) {
           </Button>
           <h1 className="text-3xl font-bold">{client.name}</h1>
         </div>
+
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList>
           <TabsTrigger value="details">Client Details</TabsTrigger>
           <TabsTrigger value="orders">Orders</TabsTrigger>
-          <TabsTrigger value="wishlist">Wishlist</TabsTrigger>
-          <TabsTrigger value="cart">Cart</TabsTrigger>
         </TabsList>
 
         <TabsContent value="details" className="mt-6">
@@ -420,164 +375,6 @@ export default function ClientDetails({ clientId }: ClientDetailsProps) {
                       ))}
                     </TableBody>
                   </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="wishlist" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Client Wishlist</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {wishlistItems.length === 0 ? (
-                <div className="text-center py-8">
-                  <Heart className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-lg font-medium mb-2">No Wishlist Items Found</p>
-                  <p className="text-muted-foreground mb-6">
-                    This client hasn't added any products to their wishlist yet.
-                  </p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Product</TableHead>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Price</TableHead>
-                        <TableHead>Category</TableHead>
-                        <TableHead>Added On</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {wishlistItems.map((item) => (
-                        <TableRow key={item._id}>
-                          <TableCell>
-                            <div className="w-16 h-16 relative rounded overflow-hidden">
-                              {item.image ? (
-                                <div className="w-full h-full">
-                                  <img
-                                    src={item.image || "/placeholder.svg"}
-                                    alt={item.name}
-                                    className="w-full h-full object-cover"
-                                    onError={(e) => {
-                                      e.currentTarget.onerror = null
-                                      e.currentTarget.src = "/placeholder.svg"
-                                    }}
-                                  />
-                                </div>
-                              ) : (
-                                <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-                                  <Package className="h-6 w-6 text-gray-400" />
-                                </div>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="font-medium">{item.name}</TableCell>
-                          <TableCell>₹{item.price.toLocaleString()}</TableCell>
-                          <TableCell>{item.category || "-"}</TableCell>
-                          <TableCell>{formatDate(item.createdAt)}</TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => router.push(`/admin/dashboard/product/${item.postId}`)}
-                            >
-                              <ExternalLink className="h-4 w-4 mr-1" />
-                              View
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="cart" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Client Cart</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {cartItems.length === 0 ? (
-                <div className="text-center py-8">
-                  <ShoppingCart className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-lg font-medium mb-2">No Cart Items Found</p>
-                  <p className="text-muted-foreground mb-6">This client's shopping cart is empty.</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Product</TableHead>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Price</TableHead>
-                        <TableHead>Quantity</TableHead>
-                        <TableHead>Total</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {cartItems.map((item) => (
-                        <TableRow key={item._id}>
-                          <TableCell>
-                            <div className="w-16 h-16 relative rounded overflow-hidden">
-                              {item.image ? (
-                                <div className="w-full h-full">
-                                  <img
-                                    src={item.image || "/placeholder.svg"}
-                                    alt={item.name}
-                                    className="w-full h-full object-cover"
-                                    onError={(e) => {
-                                      e.currentTarget.onerror = null
-                                      e.currentTarget.src = "/placeholder.svg"
-                                    }}
-                                  />
-                                </div>
-                              ) : (
-                                <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-                                  <Package className="h-6 w-6 text-gray-400" />
-                                </div>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="font-medium">{item.name}</TableCell>
-                          <TableCell>₹{item.price.toLocaleString()}</TableCell>
-                          <TableCell>{item.quantity}</TableCell>
-                          <TableCell>₹{(item.price * item.quantity).toLocaleString()}</TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => router.push(`/admin/dashboard/product/${item.productId}`)}
-                            >
-                              <ExternalLink className="h-4 w-4 mr-1" />
-                              View
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                  <div className="mt-6 flex justify-end">
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <div className="flex justify-between text-base font-medium">
-                        <span>Total:</span>
-                        <span>
-                          ₹{cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0).toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               )}
             </CardContent>

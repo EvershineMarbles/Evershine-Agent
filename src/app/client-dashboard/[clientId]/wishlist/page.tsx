@@ -4,12 +4,11 @@ import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowLeft, Trash2, Loader2, Heart, ShoppingCart, RefreshCw } from "lucide-react"
+import { ArrowLeft, Trash2, Loader2, Heart, ShoppingCart, RefreshCw } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
 import { Input } from "@/components/ui/input"
 import axios from "axios"
-import { usePriceUpdates } from "@/hooks/use-price-updates"
 
 interface WishlistItem {
   _id: string
@@ -34,11 +33,26 @@ export default function WishlistPage() {
   const [cartCount, setCartCount] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
   const [quantities, setQuantities] = useState<Record<string, number>>({})
-  const [lastPriceCheck, setLastPriceCheck] = useState<Date>(new Date())
 
   // Get API URL from environment or use default
   const getApiUrl = () => {
     return process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
+  }
+
+  // Get token from localStorage
+  const getToken = () => {
+    try {
+      // Try both token storage options
+      const token = localStorage.getItem("clientImpersonationToken") || localStorage.getItem("token")
+      if (!token) {
+        setError("No authentication token found. Please log in again.")
+        return null
+      }
+      return token
+    } catch (e) {
+      setError("Error accessing authentication. Please refresh the page.")
+      return null
+    }
   }
 
   // Fetch wishlist items
@@ -90,76 +104,6 @@ export default function WishlistPage() {
       setRefreshing(false)
     }
   }
-
-  // Get token from localStorage
-  const getToken = () => {
-    try {
-      // Try both token storage options
-      const token = localStorage.getItem("clientImpersonationToken") || localStorage.getItem("token")
-      if (!token) {
-        setError("No authentication token found. Please log in again.")
-        return null
-      }
-      return token
-    } catch (e) {
-      setError("Error accessing authentication. Please refresh the page.")
-      return null
-    }
-  }
-
-  // Use the price updates hook
-  usePriceUpdates(clientId, fetchWishlist)
-
-  // Add polling for price updates
-  /*
-  useEffect(() => {
-    // Function to check for price updates
-    const checkForPriceUpdates = async () => {
-      try {
-        const token = getToken()
-        if (!token) return
-
-        const apiUrl = getApiUrl()
-
-        // Call the price update check endpoint
-        const response = await fetch(`${apiUrl}/api/checkPriceUpdates/${clientId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-
-          // If prices have been updated since our last check
-          if (data.pricesUpdated && new Date(data.lastUpdated) > lastPriceCheck) {
-            console.log("Prices have been updated, refreshing wishlist data")
-            setLastPriceCheck(new Date())
-
-            // Refetch wishlist with updated prices
-            fetchWishlist()
-
-            // Notify the user
-            toast({
-              title: "Prices Updated",
-              description: "Wishlist prices have been updated with the latest commission rates.",
-              duration: 5000,
-            })
-          }
-        }
-      } catch (error) {
-        console.error("Error checking for price updates:", error)
-      }
-    }
-
-    // Check every 30 seconds
-    const intervalId = setInterval(checkForPriceUpdates, 30000)
-
-    // Clean up on unmount
-    return () => clearInterval(intervalId)
-  }, [clientId, toast, lastPriceCheck])
-  */
 
   // Fetch cart count
   const fetchCartCount = async () => {
@@ -258,7 +202,7 @@ export default function WishlistPage() {
     }
   }
 
-  // Modify this function to let backend handle pricing
+  // Add item to cart
   const addToCart = async (productId: string) => {
     try {
       setActionLoading((prev) => ({
@@ -270,17 +214,16 @@ export default function WishlistPage() {
       if (!token) return
 
       const apiUrl = getApiUrl()
-
+      
       // Get the quantity for this product
       const quantity = quantities[productId] || 1000
 
-      // Try with axios - now sending the quantity only, not price
+      // Try with axios - now sending the quantity
       const response = await axios.post(
         `${apiUrl}/api/addToCart`,
-        {
+        { 
           productId,
-          quantity, // Send the quantity to the API
-          // No price calculation, backend will handle it
+          quantity // Send the quantity to the API
         },
         {
           headers: {
