@@ -187,6 +187,16 @@ export default function ProductsPage() {
       if (data.success && Array.isArray(data.data)) {
         console.log("Products fetched successfully:", data.data)
 
+        // Add this debugging code
+        console.log("PRICE DEBUGGING:")
+        data.data.slice(0, 3).forEach((product: Product, index: number) => {
+          console.log(`Product ${index + 1} (${product.name}):`)
+          console.log(`  - price: ${product.price}`)
+          console.log(`  - basePrice: ${product.basePrice}`)
+          console.log(`  - calculatedPrice: ${product.calculatedPrice}`)
+          console.log(`  - postId: ${product.postId}`)
+        })
+
         // Filter out products with missing or invalid postId
         const validProducts = data.data.filter(
           (product: Product) => product.postId && typeof product.postId === "string",
@@ -205,7 +215,31 @@ export default function ProductsPage() {
               : ["/placeholder.svg"],
         }))
 
-        setProducts(processedProducts)
+        // Add this code to ensure we're using the correct price:
+        const productsWithCorrectPrices = processedProducts.map((product) => {
+          // If calculatedPrice exists, use it as the main price
+          if (product.calculatedPrice && typeof product.calculatedPrice === "number") {
+            return {
+              ...product,
+              basePrice: product.price, // Store original price as basePrice
+              price: product.calculatedPrice, // Use calculated price as the main price
+            }
+          }
+
+          // If price is missing or invalid, set a default
+          if (!product.price || product.price <= 0) {
+            console.warn(`Product ${product._id} has invalid price: ${product.price}, using default`)
+            return {
+              ...product,
+              price: product.basePrice || 100, // Use basePrice or default to 100
+            }
+          }
+
+          return product
+        })
+
+        // Replace this line:
+        setProducts(productsWithCorrectPrices)
       } else {
         throw new Error(data.msg || "Invalid API response format")
       }
