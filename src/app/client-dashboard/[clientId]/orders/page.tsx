@@ -16,6 +16,8 @@ interface OrderItem {
   price: number
   basePrice?: number
   quantity: number
+  // Add a field to store the final price
+  finalPrice?: number
 }
 
 interface ShippingAddress {
@@ -59,9 +61,6 @@ export default function OrdersPage() {
   // Add commission-related state from wishlist page
   const [commissionData, setCommissionData] = useState<CommissionData | null>(null)
   const [overrideCommissionRate, setOverrideCommissionRate] = useState<number | null>(null)
-
-  // Add a state to store calculated prices for each order
-  const [orderPrices, setOrderPrices] = useState<Record<string, Record<string, number>>>({})
 
   // Get API URL from environment or use default
   const getApiUrl = () => {
@@ -123,16 +122,6 @@ export default function OrdersPage() {
         // Reset to null if no saved rate for this client
         setOverrideCommissionRate(null)
       }
-
-      // Load saved order prices from localStorage
-      const savedPrices = localStorage.getItem(`order-prices-${clientId}`)
-      if (savedPrices) {
-        try {
-          setOrderPrices(JSON.parse(savedPrices))
-        } catch (e) {
-          console.error("Error parsing saved order prices:", e)
-        }
-      }
     }
   }, [clientId])
 
@@ -192,10 +181,10 @@ export default function OrdersPage() {
   }, [clientId])
 
   // Calculate adjusted price with commission (from wishlist page)
-  const calculateAdjustedPrice = (item: OrderItem, orderId: string) => {
-    // Check if we already have a calculated price for this item in this order
-    if (orderPrices[orderId] && orderPrices[orderId][item.name]) {
-      return orderPrices[orderId][item.name]
+  const calculateAdjustedPrice = (item: OrderItem) => {
+    // If the item already has a final price, use that
+    if (item.finalPrice !== undefined) {
+      return item.finalPrice
     }
 
     // Always use basePrice (which should be the original price)
@@ -215,7 +204,7 @@ export default function OrdersPage() {
     // Calculate adjusted price based on the original basePrice
     const adjustedPrice = basePrice * (1 + finalRate / 100)
 
-    console.log(`ORDERS - Calculating price for ${item.name} in order ${orderId}:`)
+    console.log(`ORDERS - Calculating price for ${item.name}:`)
     console.log(`ORDERS - Base price: ${basePrice}`)
     console.log(`ORDERS - Base commission rate: ${defaultRate}`)
     console.log(`ORDERS - Override commission rate: ${overrideCommissionRate}`)
@@ -263,39 +252,62 @@ export default function OrdersPage() {
       const data = await response.json()
       console.log("ORDERS - Full API response:", data)
 
-      // Process orders and calculate prices for new orders
+      // Process orders to calculate and store final prices
       const processOrders = (ordersData: any[]) => {
-        // Create a copy of the current order prices
-        const newOrderPrices = { ...orderPrices }
+        // Get stored orders from localStorage
+        let storedOrders: Record<string, any> = {}
+        try {
+          const storedOrdersJson = localStorage.getItem(`orders-${clientId}`)
+          if (storedOrdersJson) {
+            storedOrders = JSON.parse(storedOrdersJson)
+          }
+        } catch (e) {
+          console.error("Error parsing stored orders:", e)
+        }
 
         // Process each order
         const processedOrders = ordersData.map((order) => {
-          // Ensure each item has basePrice preserved
-          const orderWithBasePrices = {
-            ...order,
-            items: order.items.map((item: OrderItem) => ({
+          // Check if we already have this order stored
+          if (storedOrders[order.orderId]) {
+            // Use the stored order with its calculated prices
+            return storedOrders[order.orderId]
+          }
+
+          // This is a new order, calculate prices
+          const processedItems = order.items.map((item: OrderItem) => {
+            // Ensure basePrice is preserved
+            const itemWithBasePrice = {
               ...item,
               basePrice: item.basePrice || item.price,
-            })),
+            }
+
+            // Calculate the final price
+            const finalPrice = calculateAdjustedPrice(itemWithBasePrice)
+
+            // Store the final price with the item
+            return {
+              ...itemWithBasePrice,
+              finalPrice: finalPrice,
+            }
+          })
+
+          // Create the processed order
+          const processedOrder = {
+            ...order,
+            items: processedItems,
           }
 
-          // If this is a new order (not in orderPrices), calculate and store prices
-          if (!newOrderPrices[order.orderId]) {
-            newOrderPrices[order.orderId] = {}
+          // Store this order for future reference
+          storedOrders[order.orderId] = processedOrder
 
-            // Calculate prices for each item
-            orderWithBasePrices.items.forEach((item: OrderItem) => {
-              newOrderPrices[order.orderId][item.name] = calculateAdjustedPrice(item, order.orderId)
-            })
-          }
-
-          return orderWithBasePrices
+          return processedOrder
         })
 
-        // Save the updated prices to state and localStorage
-        setOrderPrices(newOrderPrices)
-        if (typeof window !== "undefined") {
-          localStorage.setItem(`order-prices-${clientId}`, JSON.stringify(newOrderPrices))
+        // Save all orders to localStorage
+        try {
+          localStorage.setItem(`orders-${clientId}`, JSON.stringify(storedOrders))
+        } catch (e) {
+          console.error("Error storing orders:", e)
         }
 
         return processedOrders
@@ -348,11 +360,7 @@ export default function OrdersPage() {
   // Calculate order total with adjusted prices
   const calculateAdjustedTotal = (order: Order) => {
     return order.items.reduce((total, item) => {
-      // Use the stored price if available, otherwise calculate it
-      const adjustedPrice =
-        orderPrices[order.orderId] && orderPrices[order.orderId][item.name]
-          ? orderPrices[order.orderId][item.name]
-          : calculateAdjustedPrice(item, order.orderId)
+      const adjustedPrice = calculateAdjustedPrice(item)
       return total + adjustedPrice * item.quantity
     }, 0)
   }
@@ -470,12 +478,7 @@ export default function OrdersPage() {
                     <h3 className="font-medium mb-2">Items</h3>
                     <div className="space-y-2">
                       {order.items.map((item, index) => {
-                        // Use the stored price if available, otherwise calculate it
-                        const adjustedPrice =
-                          orderPrices[order.orderId] && orderPrices[order.orderId][item.name]
-                            ? orderPrices[order.orderId][item.name]
-                            : calculateAdjustedPrice(item, order.orderId)
-
+                        const adjustedPrice = calculateAdjustedPrice(item)
                         return (
                           <div key={index} className="flex justify-between border-b pb-2">
                             <div>
