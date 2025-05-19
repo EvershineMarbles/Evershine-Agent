@@ -41,6 +41,27 @@ export default function ProductsPage() {
   const [addingToCart, setAddingToCart] = useState<Record<string, boolean>>({})
   const [error, setError] = useState<string | null>(null)
 
+  // Function to calculate adjusted price based on commission
+  const calculateAdjustedPrice = useCallback(
+    (
+      basePrice: number,
+      commissionData: { commissionRate: number | null } | null,
+      overrideCommissionRate: number | null,
+    ) => {
+      // Set a default rate of 10 if no commission data is available
+      const defaultRate = commissionData?.commissionRate || 0
+
+      // Add the override rate to the default rate if an override is set
+      const finalRate = overrideCommissionRate !== null ? defaultRate + overrideCommissionRate : defaultRate
+
+      // Calculate adjusted price based on the original basePrice, only if we have a commission rate
+      const adjustedPrice = finalRate > 0 ? basePrice * (1 + finalRate / 100) : basePrice
+
+      return adjustedPrice
+    },
+    [],
+  )
+
   // Load wishlist and cart from localStorage
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -246,7 +267,7 @@ export default function ProductsPage() {
         } else {
           throw new Error(data.message || "Failed to add to cart")
         }
-      } catch (error: Error | unknown) {
+      } catch (error: any) {
         const errorMessage = error instanceof Error ? error.message : "Failed to add item to cart. Please try again."
         console.error("Error adding to cart:", error)
         toast({
