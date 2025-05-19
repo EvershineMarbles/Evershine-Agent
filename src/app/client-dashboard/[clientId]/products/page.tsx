@@ -236,7 +236,7 @@ export default function ProductsPage() {
       const basePrice = product.basePrice || product.price
 
       // Get the default commission rate (from agent or category-specific)
-      let defaultRate = commissionData?.commissionRate || 10
+      let defaultRate = commissionData?.commissionRate || 0
 
       // Check for category-specific commission
       if (
