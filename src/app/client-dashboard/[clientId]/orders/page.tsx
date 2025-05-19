@@ -50,9 +50,8 @@ export default function OrdersPage() {
   const router = useRouter()
   const { toast } = useToast()
   const clientId = params.clientId as string
-  const orderId = params.orderId as string // Get orderId from params
 
-  const [order, setOrder] = useState<Order | null>(null) // Store single order instead of array
+  const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
@@ -208,8 +207,8 @@ export default function OrdersPage() {
     return Math.round(adjustedPrice * 100) / 100 // Round to 2 decimal places
   }
 
-  // Fetch single order
-  const fetchOrder = async () => {
+  // Fetch orders
+  const fetchOrders = async () => {
     try {
       setLoading(true)
       setError(null)
@@ -224,10 +223,9 @@ export default function OrdersPage() {
       await fetchCommissionData()
 
       const apiUrl = getApiUrl()
-      console.log("Fetching order with token:", token.substring(0, 15) + "...")
+      console.log("Fetching orders with token:", token.substring(0, 15) + "...")
 
-      // Modified to fetch a single order by ID
-      const response = await fetch(`${apiUrl}/api/clients/${clientId}/orders/${orderId}`, {
+      const response = await fetch(`${apiUrl}/api/clients/${clientId}/orders`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -239,8 +237,6 @@ export default function OrdersPage() {
       if (!response.ok) {
         if (response.status === 401) {
           throw new Error("Authentication failed. Please refresh the token and try again.")
-        } else if (response.status === 404) {
-          throw new Error("Order not found.")
         } else {
           throw new Error(`API error: ${response.status} ${response.statusText}`)
         }
@@ -249,18 +245,23 @@ export default function OrdersPage() {
       const data = await response.json()
       console.log("ORDERS - Full API response:", data)
 
-      // Set the single order
-      if (data && data.data) {
-        setOrder(data.data)
-      } else if (data) {
-        // If the response is the order directly
-        setOrder(data)
+      // Your backend returns { message, data } format
+      if (data && Array.isArray(data.data)) {
+        console.log("ORDERS - Orders data:", data.data)
+        setOrders(data.data)
       } else {
-        setError("Order not found or invalid response format.")
+        // If data.data is not an array, check if the response itself is an array
+        if (Array.isArray(data)) {
+          console.log("ORDERS - Orders data (direct array):", data)
+          setOrders(data)
+        } else {
+          console.warn("ORDERS - Unexpected response format:", data)
+          setOrders([])
+        }
       }
     } catch (error: any) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to load order. Please try again."
-      console.error("Error fetching order:", error)
+      const errorMessage = error instanceof Error ? error.message : "Failed to load orders. Please try again."
+      console.error("Error fetching orders:", error)
       setError(errorMessage)
       toast({
         title: "Error",
@@ -275,13 +276,8 @@ export default function OrdersPage() {
 
   // Initialize data on component mount
   useEffect(() => {
-    if (orderId) {
-      fetchOrder()
-    } else {
-      setError("No order ID provided.")
-      setLoading(false)
-    }
-  }, [clientId, orderId, toast])
+    fetchOrders()
+  }, [clientId, toast])
 
   // Format date
   const formatDate = (dateString: string) => {
@@ -304,7 +300,7 @@ export default function OrdersPage() {
   // Handle refresh
   const handleRefresh = () => {
     setRefreshing(true)
-    fetchOrder()
+    fetchOrders()
   }
 
   // Loading state
@@ -312,7 +308,7 @@ export default function OrdersPage() {
     return (
       <div className="flex flex-col items-center justify-center h-[80vh]">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-muted-foreground">Loading order details...</p>
+        <p className="text-muted-foreground">Loading orders...</p>
       </div>
     )
   }
@@ -325,7 +321,7 @@ export default function OrdersPage() {
             <ArrowLeft className="h-5 w-5" />
             <span className="sr-only">Go back</span>
           </Button>
-          <h1 className="text-3xl font-bold">Order Details</h1>
+          <h1 className="text-3xl font-bold">Your Orders</h1>
         </div>
 
         <Button
@@ -334,7 +330,7 @@ export default function OrdersPage() {
           onClick={handleRefresh}
           disabled={refreshing}
           className="relative"
-          aria-label="Refresh order"
+          aria-label="Refresh orders"
         >
           <RefreshCw className={`h-5 w-5 ${refreshing ? "animate-spin" : ""}`} />
         </Button>
@@ -347,7 +343,7 @@ export default function OrdersPage() {
             <Button
               variant="outline"
               className="mt-2 border-red-300 text-red-800 hover:bg-red-100"
-              onClick={() => fetchOrder()}
+              onClick={() => fetchOrders()}
             >
               Try Again
             </Button>
@@ -355,140 +351,143 @@ export default function OrdersPage() {
         </Card>
       )}
 
-      {!order ? (
+      {orders.length === 0 ? (
         <Card className="text-center py-12">
           <CardContent className="pt-6">
             <Package className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-            <h2 className="text-xl font-medium mb-4">Order not found</h2>
-            <p className="text-muted-foreground mb-6">The requested order could not be found</p>
+            <h2 className="text-xl font-medium mb-4">No orders found</h2>
+            <p className="text-muted-foreground mb-6">You haven&apos;t placed any orders yet</p>
             <Button
-              onClick={() => router.push(`/client-dashboard/${clientId}/orders`)}
+              onClick={() => router.push(`/client-dashboard/${clientId}/products`)}
               className="bg-primary hover:bg-primary/90"
             >
-              View All Orders
+              Browse Products
             </Button>
           </CardContent>
         </Card>
       ) : (
-        <Card className="overflow-hidden">
-          <CardHeader className="bg-muted/20 pb-3">
-            <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-2">
-              <CardTitle className="text-lg">Order #{order.orderId}</CardTitle>
-              <div className="flex flex-wrap gap-2 text-sm">
-                <span className="text-muted-foreground">Placed on {formatDate(order.createdAt)}</span>
-                <span className="mx-2 text-muted-foreground hidden md:inline">•</span>
-                <Badge
-                  variant={
-                    order.status === "delivered"
-                      ? "success"
-                      : order.status === "shipped"
-                        ? "info"
-                        : order.status === "processing"
-                          ? "warning"
-                          : order.status === "cancelled"
+        <div className="space-y-6">
+          {orders.map((order) => (
+            <Card key={order.orderId} className="overflow-hidden">
+              <CardHeader className="bg-muted/20 pb-3">
+                <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-2">
+                  <CardTitle className="text-lg">Order #{order.orderId}</CardTitle>
+                  <div className="flex flex-wrap gap-2 text-sm">
+                    <span className="text-muted-foreground">Placed on {formatDate(order.createdAt)}</span>
+                    <span className="mx-2 text-muted-foreground hidden md:inline">•</span>
+                    <Badge
+                      variant={
+                        order.status === "delivered"
+                          ? "success"
+                          : order.status === "shipped"
+                            ? "info"
+                            : order.status === "processing"
+                              ? "warning"
+                              : order.status === "cancelled"
+                                ? "destructive"
+                                : "outline"
+                      }
+                    >
+                      {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                    </Badge>
+                    <Badge
+                      variant={
+                        order.paymentStatus === "paid"
+                          ? "success"
+                          : order.paymentStatus === "failed"
                             ? "destructive"
-                            : "outline"
-                  }
-                >
-                  {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                </Badge>
-                <Badge
-                  variant={
-                    order.paymentStatus === "paid"
-                      ? "success"
-                      : order.paymentStatus === "failed"
-                        ? "destructive"
-                        : "warning"
-                  }
-                >
-                  Payment: {order.paymentStatus.charAt(0).toUpperCase() + order.paymentStatus.slice(1)}
-                </Badge>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="md:col-span-2">
-                <h3 className="font-medium mb-2">Items</h3>
-                <div className="space-y-2">
-                  {order.items.map((item, index) => {
-                    const adjustedPrice = calculateAdjustedPrice(item)
-                    return (
-                      <div key={index} className="flex justify-between border-b pb-2">
-                        <div>
-                          <p className="font-medium">{item.name}</p>
-                          <p className="text-sm text-muted-foreground">{item.category}</p>
-                        </div>
-                        <div className="text-right">
-                          <p>
-                            ₹
-                            {adjustedPrice.toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}{" "}
-                            × {item.quantity}
-                          </p>
-                          <p className="font-medium">
-                            ₹
-                            {(adjustedPrice * item.quantity).toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </p>
-                          {item.basePrice && item.basePrice !== adjustedPrice && (
-                            <p className="text-xs text-muted-foreground">Base: ₹{item.basePrice.toLocaleString()}</p>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-                <div className="flex justify-between mt-4 pt-2 font-bold">
-                  <span>Total</span>
-                  <span>
-                    ₹
-                    {calculateAdjustedTotal(order).toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </span>
-                </div>
-              </div>
-              <div>
-                <h3 className="font-medium mb-2">Shipping Address</h3>
-                {order.shippingAddress ? (
-                  <div className="text-sm">
-                    <p>{order.shippingAddress.street}</p>
-                    <p>
-                      {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.postalCode}
-                    </p>
-                    <p>{order.shippingAddress.country}</p>
+                            : "warning"
+                      }
+                    >
+                      Payment: {order.paymentStatus.charAt(0).toUpperCase() + order.paymentStatus.slice(1)}
+                    </Badge>
                   </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">No shipping address provided</p>
-                )}
-
-                <div className="mt-4">
-                  <Button variant="outline" className="w-full mt-2" size="sm">
-                    <FileText className="h-4 w-4 mr-2" />
-                    View Invoice
-                  </Button>
                 </div>
-              </div>
-            </div>
-          </CardContent>
-          <CardFooter className="bg-muted/10 justify-end py-3">
-            <Button variant="outline" size="sm">
-              Track Order
-            </Button>
-          </CardFooter>
-        </Card>
+              </CardHeader>
+              <CardContent className="p-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="md:col-span-2">
+                    <h3 className="font-medium mb-2">Items</h3>
+                    <div className="space-y-2">
+                      {order.items.map((item, index) => {
+                        const adjustedPrice = calculateAdjustedPrice(item)
+                        return (
+                          <div key={index} className="flex justify-between border-b pb-2">
+                            <div>
+                              <p className="font-medium">{item.name}</p>
+                              <p className="text-sm text-muted-foreground">{item.category}</p>
+                            </div>
+                            <div className="text-right">
+                              <p>
+                                ₹
+                                {adjustedPrice.toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}{" "}
+                                × {item.quantity}
+                              </p>
+                              <p className="font-medium">
+                                ₹
+                                {(adjustedPrice * item.quantity).toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
+                              </p>
+                              {item.basePrice && item.basePrice !== adjustedPrice && (
+                                <p className="text-xs text-muted-foreground">
+                                  Base: ₹{item.basePrice.toLocaleString()}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <div className="flex justify-between mt-4 pt-2 font-bold">
+                      <span>Total</span>
+                      <span>
+                        ₹
+                        {calculateAdjustedTotal(order).toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="font-medium mb-2">Shipping Address</h3>
+                    {order.shippingAddress ? (
+                      <div className="text-sm">
+                        <p>{order.shippingAddress.street}</p>
+                        <p>
+                          {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.postalCode}
+                        </p>
+                        <p>{order.shippingAddress.country}</p>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No shipping address provided</p>
+                    )}
+
+                    <div className="mt-4">
+                      <Button variant="outline" className="w-full mt-2" size="sm">
+                        <FileText className="h-4 w-4 mr-2" />
+                        View Invoice
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter className="bg-muted/10 justify-end py-3">
+                <Button variant="outline" size="sm">
+                  Track Order
+                </Button>
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
       )}
 
       <div className="mt-8 text-center">
-        <Link href={`/client-dashboard/${clientId}/orders`} className="text-primary hover:underline mr-4">
-          Back to Orders
-        </Link>
         <Link href={`/client-dashboard/${clientId}`} className="text-primary hover:underline">
           Back to Dashboard
         </Link>
