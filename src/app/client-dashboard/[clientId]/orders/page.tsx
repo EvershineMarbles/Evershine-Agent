@@ -16,8 +16,6 @@ interface OrderItem {
   price: number
   basePrice?: number
   quantity: number
-  // Add a field to store the final price
-  finalPrice?: number
 }
 
 interface ShippingAddress {
@@ -182,11 +180,6 @@ export default function OrdersPage() {
 
   // Calculate adjusted price with commission (from wishlist page)
   const calculateAdjustedPrice = (item: OrderItem) => {
-    // If the item already has a final price, use that
-    if (item.finalPrice !== undefined) {
-      return item.finalPrice
-    }
-
     // Always use basePrice (which should be the original price)
     const basePrice = item.basePrice || item.price
 
@@ -252,76 +245,15 @@ export default function OrdersPage() {
       const data = await response.json()
       console.log("ORDERS - Full API response:", data)
 
-      // Process orders to calculate and store final prices
-      const processOrders = (ordersData: any[]) => {
-        // Get stored orders from localStorage
-        let storedOrders: Record<string, any> = {}
-        try {
-          const storedOrdersJson = localStorage.getItem(`orders-${clientId}`)
-          if (storedOrdersJson) {
-            storedOrders = JSON.parse(storedOrdersJson)
-          }
-        } catch (e) {
-          console.error("Error parsing stored orders:", e)
-        }
-
-        // Process each order
-        const processedOrders = ordersData.map((order) => {
-          // Check if we already have this order stored
-          if (storedOrders[order.orderId]) {
-            // Use the stored order with its calculated prices
-            return storedOrders[order.orderId]
-          }
-
-          // This is a new order, calculate prices
-          const processedItems = order.items.map((item: OrderItem) => {
-            // Ensure basePrice is preserved
-            const itemWithBasePrice = {
-              ...item,
-              basePrice: item.basePrice || item.price,
-            }
-
-            // Calculate the final price
-            const finalPrice = calculateAdjustedPrice(itemWithBasePrice)
-
-            // Store the final price with the item
-            return {
-              ...itemWithBasePrice,
-              finalPrice: finalPrice,
-            }
-          })
-
-          // Create the processed order
-          const processedOrder = {
-            ...order,
-            items: processedItems,
-          }
-
-          // Store this order for future reference
-          storedOrders[order.orderId] = processedOrder
-
-          return processedOrder
-        })
-
-        // Save all orders to localStorage
-        try {
-          localStorage.setItem(`orders-${clientId}`, JSON.stringify(storedOrders))
-        } catch (e) {
-          console.error("Error storing orders:", e)
-        }
-
-        return processedOrders
-      }
-
       // Your backend returns { message, data } format
       if (data && Array.isArray(data.data)) {
         console.log("ORDERS - Orders data:", data.data)
-        setOrders(processOrders(data.data))
+        setOrders(data.data)
       } else {
         // If data.data is not an array, check if the response itself is an array
         if (Array.isArray(data)) {
           console.log("ORDERS - Orders data (direct array):", data)
-          setOrders(processOrders(data))
+          setOrders(data)
         } else {
           console.warn("ORDERS - Unexpected response format:", data)
           setOrders([])
@@ -389,7 +321,7 @@ export default function OrdersPage() {
             <ArrowLeft className="h-5 w-5" />
             <span className="sr-only">Go back</span>
           </Button>
-          <h1 className="text-3xl font-bold">Your Orders</h1>
+          <h1 className="text-3xl font-bold">Your Current Order</h1>
         </div>
 
         <Button
@@ -435,125 +367,142 @@ export default function OrdersPage() {
         </Card>
       ) : (
         <div className="space-y-6">
-          {orders.map((order) => (
-            <Card key={order.orderId} className="overflow-hidden">
-              <CardHeader className="bg-muted/20 pb-3">
-                <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-2">
-                  <CardTitle className="text-lg">Order #{order.orderId}</CardTitle>
-                  <div className="flex flex-wrap gap-2 text-sm">
-                    <span className="text-muted-foreground">Placed on {formatDate(order.createdAt)}</span>
-                    <span className="mx-2 text-muted-foreground hidden md:inline">•</span>
-                    <Badge
-                      variant={
-                        order.status === "delivered"
-                          ? "success"
-                          : order.status === "shipped"
-                            ? "info"
-                            : order.status === "processing"
-                              ? "warning"
-                              : order.status === "cancelled"
-                                ? "destructive"
-                                : "outline"
-                      }
-                    >
-                      {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                    </Badge>
-                    <Badge
-                      variant={
-                        order.paymentStatus === "paid"
-                          ? "success"
-                          : order.paymentStatus === "failed"
-                            ? "destructive"
-                            : "warning"
-                      }
-                    >
-                      Payment: {order.paymentStatus.charAt(0).toUpperCase() + order.paymentStatus.slice(1)}
-                    </Badge>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="p-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="md:col-span-2">
-                    <h3 className="font-medium mb-2">Items</h3>
-                    <div className="space-y-2">
-                      {order.items.map((item, index) => {
-                        const adjustedPrice = calculateAdjustedPrice(item)
-                        return (
-                          <div key={index} className="flex justify-between border-b pb-2">
-                            <div>
-                              <p className="font-medium">{item.name}</p>
-                              <p className="text-sm text-muted-foreground">{item.category}</p>
-                            </div>
-                            <div className="text-right">
-                              <p>
-                                ₹
-                                {adjustedPrice.toLocaleString(undefined, {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}{" "}
-                                × {item.quantity}
-                              </p>
-                              <p className="font-medium">
-                                ₹
-                                {(adjustedPrice * item.quantity).toLocaleString(undefined, {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}
-                              </p>
-                              {item.basePrice && item.basePrice !== adjustedPrice && (
-                                <p className="text-xs text-muted-foreground">
-                                  Base: ₹{item.basePrice.toLocaleString()}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                    <div className="flex justify-between mt-4 pt-2 font-bold">
-                      <span>Total</span>
-                      <span>
-                        ₹
-                        {calculateAdjustedTotal(order).toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </span>
-                    </div>
-                  </div>
-                  <div>
-                    <h3 className="font-medium mb-2">Shipping Address</h3>
-                    {order.shippingAddress ? (
-                      <div className="text-sm">
-                        <p>{order.shippingAddress.street}</p>
-                        <p>
-                          {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.postalCode}
-                        </p>
-                        <p>{order.shippingAddress.country}</p>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">No shipping address provided</p>
-                    )}
+          {/* Display only the most recent order */}
+          {(() => {
+            // Sort orders by date (newest first) and take the first one
+            const sortedOrders = [...orders].sort(
+              (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+            )
+            const currentOrder = sortedOrders[0]
 
-                    <div className="mt-4">
-                      <Button variant="outline" className="w-full mt-2" size="sm">
-                        <FileText className="h-4 w-4 mr-2" />
-                        View Invoice
-                      </Button>
+            return (
+              <Card key={currentOrder.orderId} className="overflow-hidden">
+                <CardHeader className="bg-muted/20 pb-3">
+                  <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-2">
+                    <CardTitle className="text-lg">Order #{currentOrder.orderId}</CardTitle>
+                    <div className="flex flex-wrap gap-2 text-sm">
+                      <span className="text-muted-foreground">Placed on {formatDate(currentOrder.createdAt)}</span>
+                      <span className="mx-2 text-muted-foreground hidden md:inline">•</span>
+                      <Badge
+                        variant={
+                          currentOrder.status === "delivered"
+                            ? "success"
+                            : currentOrder.status === "shipped"
+                              ? "info"
+                              : currentOrder.status === "processing"
+                                ? "warning"
+                                : currentOrder.status === "cancelled"
+                                  ? "destructive"
+                                  : "outline"
+                        }
+                      >
+                        {currentOrder.status.charAt(0).toUpperCase() + currentOrder.status.slice(1)}
+                      </Badge>
+                      <Badge
+                        variant={
+                          currentOrder.paymentStatus === "paid"
+                            ? "success"
+                            : currentOrder.paymentStatus === "failed"
+                              ? "destructive"
+                              : "warning"
+                        }
+                      >
+                        Payment:{" "}
+                        {currentOrder.paymentStatus.charAt(0).toUpperCase() + currentOrder.paymentStatus.slice(1)}
+                      </Badge>
                     </div>
                   </div>
-                </div>
-              </CardContent>
-              <CardFooter className="bg-muted/10 justify-end py-3">
-                <Button variant="outline" size="sm">
-                  Track Order
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
+                </CardHeader>
+                <CardContent className="p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="md:col-span-2">
+                      <h3 className="font-medium mb-2">Items</h3>
+                      <div className="space-y-2">
+                        {currentOrder.items.map((item, index) => {
+                          const adjustedPrice = calculateAdjustedPrice(item)
+                          return (
+                            <div key={index} className="flex justify-between border-b pb-2">
+                              <div>
+                                <p className="font-medium">{item.name}</p>
+                                <p className="text-sm text-muted-foreground">{item.category}</p>
+                              </div>
+                              <div className="text-right">
+                                <p>
+                                  ₹
+                                  {adjustedPrice.toLocaleString(undefined, {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}{" "}
+                                  × {item.quantity}
+                                </p>
+                                <p className="font-medium">
+                                  ₹
+                                  {(adjustedPrice * item.quantity).toLocaleString(undefined, {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}
+                                </p>
+                                {item.basePrice && item.basePrice !== adjustedPrice && (
+                                  <p className="text-xs text-muted-foreground">
+                                    Base: ₹{item.basePrice.toLocaleString()}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                      <div className="flex justify-between mt-4 pt-2 font-bold">
+                        <span>Total</span>
+                        <span>
+                          ₹
+                          {calculateAdjustedTotal(currentOrder).toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="font-medium mb-2">Shipping Address</h3>
+                      {currentOrder.shippingAddress ? (
+                        <div className="text-sm">
+                          <p>{currentOrder.shippingAddress.street}</p>
+                          <p>
+                            {currentOrder.shippingAddress.city}, {currentOrder.shippingAddress.state}{" "}
+                            {currentOrder.shippingAddress.postalCode}
+                          </p>
+                          <p>{currentOrder.shippingAddress.country}</p>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No shipping address provided</p>
+                      )}
+
+                      <div className="mt-4">
+                        <Button variant="outline" className="w-full mt-2" size="sm">
+                          <FileText className="h-4 w-4 mr-2" />
+                          View Invoice
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+                <CardFooter className="bg-muted/10 justify-end py-3">
+                  <Button variant="outline" size="sm">
+                    Track Order
+                  </Button>
+                </CardFooter>
+              </Card>
+            )
+          })()}
         </div>
       )}
+
+      <div className="mt-8 flex justify-center gap-4">
+        <Button variant="outline" onClick={() => router.push(`/client-dashboard/${clientId}/all-orders`)}>
+          View All Orders
+        </Button>
+      </div>
 
       <div className="mt-8 text-center">
         <Link href={`/client-dashboard/${clientId}`} className="text-primary hover:underline">
