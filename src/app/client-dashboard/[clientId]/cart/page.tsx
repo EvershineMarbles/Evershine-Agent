@@ -102,31 +102,6 @@ export default function CartPage() {
     }
   }
 
-  // Add calculateAdjustedPrice function - only apply base commission, not consultant level
-  const calculateAdjustedPrice = (item: CartItem) => {
-    // Get the default commission rate (from agent or category-specific)
-    let commissionRate = commissionData?.commissionRate || 0
-
-    // Check for category-specific commission
-    if (commissionData?.categoryCommissions && item.category && commissionData.categoryCommissions[item.category]) {
-      commissionRate = commissionData.categoryCommissions[item.category]
-    }
-
-    // DO NOT add the override rate (consultant level) since it's already applied by the backend
-
-    console.log(`CART - Calculating price for ${item.name}:`)
-    console.log(`CART - Original price:`, item.price)
-    console.log(`CART - Commission rate:`, commissionRate)
-
-    // Calculate adjusted price based on the original price
-    const adjustedPrice = item.price * (1 + commissionRate / 100)
-    const roundedPrice = Math.round(adjustedPrice * 100) / 100
-
-    console.log(`CART - Adjusted price:`, roundedPrice)
-
-    return roundedPrice
-  }
-
   // Load saved commission rate from localStorage on component mount
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -412,11 +387,10 @@ export default function CartPage() {
     }
   }
 
-  // Calculate total with adjusted prices
+  // Calculate total with original prices from backend
   const calculateTotal = () => {
     return cartItems.reduce((total, item) => {
-      const adjustedPrice = calculateAdjustedPrice(item)
-      return total + adjustedPrice * item.quantity
+      return total + item.price * item.quantity
     }, 0)
   }
 
@@ -581,9 +555,6 @@ export default function CartPage() {
               </div>
               <div className="divide-y">
                 {cartItems.map((item) => {
-                  // Calculate the adjusted price with ONLY the base commission rate
-                  const adjustedPrice = calculateAdjustedPrice(item)
-
                   return (
                     <div key={item.postId} className="p-6 flex flex-col sm:flex-row items-start sm:items-center gap-4">
                       <div className="relative h-24 w-24 rounded-md overflow-hidden flex-shrink-0 border">
@@ -599,7 +570,7 @@ export default function CartPage() {
                       <div className="flex-grow">
                         <h3 className="font-medium text-lg">{item.name}</h3>
                         <p className="text-sm text-muted-foreground mb-2">{item.category}</p>
-                        <p className="font-semibold text-lg text-primary">₹{adjustedPrice.toLocaleString()}</p>
+                        <p className="font-semibold text-lg text-primary">₹{item.price.toLocaleString()}</p>
                       </div>
                       <div className="flex flex-col sm:flex-row items-center gap-4 mt-2 sm:mt-0">
                         {/* Quantity input */}
