@@ -478,8 +478,13 @@ export default function OrdersPage() {
                         <p className="text-sm text-muted-foreground">No shipping address provided</p>
                       )}
 
-                      <div className="mt-4">
-                        <Button variant="outline" className="w-full mt-2" size="sm">
+                 <div className="mt-4">
+                        <Button
+                          variant="outline"
+                          className="w-full mt-2"
+                          size="sm"
+                          onClick={() => router.push(`/client-dashboard/${clientId}/orders/${currentOrder.orderId}`)}
+                        >
                           <FileText className="h-4 w-4 mr-2" />
                           View Invoice
                         </Button>
@@ -487,11 +492,7 @@ export default function OrdersPage() {
                     </div>
                   </div>
                 </CardContent>
-                <CardFooter className="bg-muted/10 justify-end py-3">
-                  <Button variant="outline" size="sm">
-                    Track Order
-                  </Button>
-                </CardFooter>
+               
               </Card>
             )
           })()}
