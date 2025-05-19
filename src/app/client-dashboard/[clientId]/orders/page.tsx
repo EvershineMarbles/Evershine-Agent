@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Loader2, Package, FileText, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Loader2, Package, FileText, RefreshCw } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import Link from "next/link"
 
@@ -34,10 +34,6 @@ interface Order {
   paymentStatus: string
   createdAt: string
   shippingAddress?: ShippingAddress
-  // Add fields to store commission rates at time of order
-  commissionRate?: number
-  categoryCommissions?: Record<string, number>
-  consultantLevelRate?: number
 }
 
 // Add the CommissionData interface from wishlist page
@@ -182,43 +178,29 @@ export default function OrdersPage() {
     fetchClientData()
   }, [clientId])
 
-  // Calculate adjusted price with commission - FIXED to properly add consultant level rate
-  const calculateAdjustedPrice = (item: OrderItem, order: Order) => {
-    // Always use the item's own price or basePrice if available
+  // Calculate adjusted price with commission (from wishlist page)
+  const calculateAdjustedPrice = (item: OrderItem) => {
+    // Always use basePrice (which should be the original price)
     const basePrice = item.basePrice || item.price
 
-    // IMPORTANT: Use the commission rates stored with the order if available
-    // This ensures each order uses the rates from when it was placed
-    let defaultRate = order.commissionRate !== undefined ? order.commissionRate : commissionData?.commissionRate || 0
+    // Get the default commission rate (from agent or category-specific)
+    let defaultRate = commissionData?.commissionRate || 0
 
-    // Check for category-specific commission stored with the order
-    if (order.categoryCommissions && item.category && order.categoryCommissions[item.category] !== undefined) {
-      defaultRate = order.categoryCommissions[item.category]
-    }
-    // Fall back to current category commissions if order doesn't have them stored
-    else if (
-      commissionData?.categoryCommissions &&
-      item.category &&
-      commissionData.categoryCommissions[item.category]
-    ) {
+    // Check for category-specific commission
+    if (commissionData?.categoryCommissions && item.category && commissionData.categoryCommissions[item.category]) {
       defaultRate = commissionData.categoryCommissions[item.category]
     }
 
-    // Use consultant level rate stored with the order if available
-    // IMPORTANT: Make sure to use the consultant level rate from the order if available
-    const consultantRate =
-      order.consultantLevelRate !== undefined ? order.consultantLevelRate : overrideCommissionRate || 0
+    // Add the override rate to the default rate if an override is set
+    const finalRate = overrideCommissionRate !== null ? defaultRate + overrideCommissionRate : defaultRate
 
-    // Calculate final rate - IMPORTANT: Add both rates together
-    const finalRate = defaultRate + consultantRate
-
-    // FIXED: Calculate adjusted price based on the original basePrice and TOTAL commission rate
+    // Calculate adjusted price based on the original basePrice
     const adjustedPrice = basePrice * (1 + finalRate / 100)
 
-    console.log(`ORDERS - Calculating price for ${item.name} in order ${order.orderId}:`)
+    console.log(`ORDERS - Calculating price for ${item.name}:`)
     console.log(`ORDERS - Base price: ${basePrice}`)
-    console.log(`ORDERS - Order-specific base commission rate: ${defaultRate}`)
-    console.log(`ORDERS - Order-specific consultant rate: ${consultantRate}`)
+    console.log(`ORDERS - Base commission rate: ${defaultRate}`)
+    console.log(`ORDERS - Override commission rate: ${overrideCommissionRate}`)
     console.log(`ORDERS - Final commission rate: ${finalRate}`)
     console.log(`ORDERS - Adjusted price: ${adjustedPrice.toFixed(2)}`)
 
@@ -238,7 +220,7 @@ export default function OrdersPage() {
       }
 
       // First fetch commission data
-      const currentCommissionData = await fetchCommissionData()
+      await fetchCommissionData()
 
       const apiUrl = getApiUrl()
       console.log("Fetching orders with token:", token.substring(0, 15) + "...")
@@ -263,40 +245,15 @@ export default function OrdersPage() {
       const data = await response.json()
       console.log("ORDERS - Full API response:", data)
 
-      // Process orders to include commission rates
-      const processOrders = (ordersData: any[]) => {
-        return ordersData.map((order) => {
-          // Check if the order already has stored commission rates
-          // If not, store the current rates with the order
-          const orderWithRates = {
-            ...order,
-            // Store current commission rates with the order if not already present
-            commissionRate:
-              order.commissionRate !== undefined ? order.commissionRate : currentCommissionData?.commissionRate || 0,
-            categoryCommissions: order.categoryCommissions || currentCommissionData?.categoryCommissions || {},
-            // IMPORTANT: Make sure to store the consultant level rate
-            consultantLevelRate:
-              order.consultantLevelRate !== undefined ? order.consultantLevelRate : overrideCommissionRate || 0,
-            // Ensure each item has basePrice preserved
-            items: order.items.map((item: OrderItem) => ({
-              ...item,
-              basePrice: item.basePrice || item.price,
-            })),
-          }
-
-          return orderWithRates
-        })
-      }
-
       // Your backend returns { message, data } format
       if (data && Array.isArray(data.data)) {
         console.log("ORDERS - Orders data:", data.data)
-        setOrders(processOrders(data.data))
+        setOrders(data.data)
       } else {
         // If data.data is not an array, check if the response itself is an array
         if (Array.isArray(data)) {
           console.log("ORDERS - Orders data (direct array):", data)
-          setOrders(processOrders(data))
+          setOrders(data)
         } else {
           console.warn("ORDERS - Unexpected response format:", data)
           setOrders([])
@@ -335,7 +292,7 @@ export default function OrdersPage() {
   // Calculate order total with adjusted prices
   const calculateAdjustedTotal = (order: Order) => {
     return order.items.reduce((total, item) => {
-      const adjustedPrice = calculateAdjustedPrice(item, order)
+      const adjustedPrice = calculateAdjustedPrice(item)
       return total + adjustedPrice * item.quantity
     }, 0)
   }
@@ -453,7 +410,7 @@ export default function OrdersPage() {
                     <h3 className="font-medium mb-2">Items</h3>
                     <div className="space-y-2">
                       {order.items.map((item, index) => {
-                        const adjustedPrice = calculateAdjustedPrice(item, order)
+                        const adjustedPrice = calculateAdjustedPrice(item)
                         return (
                           <div key={index} className="flex justify-between border-b pb-2">
                             <div>
@@ -476,7 +433,11 @@ export default function OrdersPage() {
                                   maximumFractionDigits: 2,
                                 })}
                               </p>
-                              {/* Removed the base price display for clients */}
+                              {item.basePrice && item.basePrice !== adjustedPrice && (
+                                <p className="text-xs text-muted-foreground">
+                                  Base: ₹{item.basePrice.toLocaleString()}
+                                </p>
+                              )}
                             </div>
                           </div>
                         )
@@ -492,7 +453,6 @@ export default function OrdersPage() {
                         })}
                       </span>
                     </div>
-                    {/* Removed the commission rates display for clients */}
                   </div>
                   <div>
                     <h3 className="font-medium mb-2">Shipping Address</h3>
