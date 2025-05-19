@@ -180,17 +180,8 @@ export default function OrdersPage() {
 
   // Calculate adjusted price with commission (from wishlist page)
   const calculateAdjustedPrice = (item: OrderItem) => {
-    // If the item already has a price, use that directly without recalculating
-    // This preserves historical order prices
-    if (item.price) {
-      return item.price
-    }
-
-    // Only calculate adjusted price for new items without a set price
-    // This code would only run for new orders being created
-
     // Always use basePrice (which should be the original price)
-    const basePrice = item.basePrice || 0
+    const basePrice = item.basePrice || item.price
 
     // Get the default commission rate (from agent or category-specific)
     let defaultRate = commissionData?.commissionRate || 0
@@ -214,20 +205,6 @@ export default function OrdersPage() {
     console.log(`ORDERS - Adjusted price: ${adjustedPrice.toFixed(2)}`)
 
     return Math.round(adjustedPrice * 100) / 100 // Round to 2 decimal places
-  }
-
-  // Calculate order total with adjusted prices
-  const calculateAdjustedTotal = (order: Order) => {
-    // If the order already has a totalAmount, use that directly
-    if (order.totalAmount) {
-      return order.totalAmount
-    }
-
-    // Only calculate for new orders without a set total
-    return order.items.reduce((total, item) => {
-      const itemPrice = item.price || calculateAdjustedPrice(item)
-      return total + itemPrice * item.quantity
-    }, 0)
   }
 
   // Fetch orders
@@ -310,6 +287,14 @@ export default function OrdersPage() {
       month: "short",
       day: "numeric",
     })
+  }
+
+  // Calculate order total with adjusted prices
+  const calculateAdjustedTotal = (order: Order) => {
+    return order.items.reduce((total, item) => {
+      const adjustedPrice = calculateAdjustedPrice(item)
+      return total + adjustedPrice * item.quantity
+    }, 0)
   }
 
   // Handle refresh
@@ -448,6 +433,11 @@ export default function OrdersPage() {
                                   maximumFractionDigits: 2,
                                 })}
                               </p>
+                              {item.basePrice && item.basePrice !== adjustedPrice && (
+                                <p className="text-xs text-muted-foreground">
+                                  Base: ₹{item.basePrice.toLocaleString()}
+                                </p>
+                              )}
                             </div>
                           </div>
                         )
