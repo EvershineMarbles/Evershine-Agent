@@ -9,8 +9,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowLeft, Phone, User, Mail, MapPin, Building, Calendar, Loader2 } from "lucide-react"
-import Link from "next/link"
-import Image from "next/image"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -34,6 +32,9 @@ export default function RegisterClient() {
     gstNumber: "",
     projectType: "",
     dateOfBirth: "",
+    anniversaryDate: "", // Add anniversary date
+    architectDetails: "", // Add architect details
+    consultantLevel: "red", // Update default to "red" instead of "standard"
     agreeToTerms: false,
   })
   const [isLoading, setIsLoading] = useState(false)
@@ -148,7 +149,7 @@ export default function RegisterClient() {
       } else {
         throw new Error(response.data.message || "Failed to send OTP")
       }
-    } catch (error: Error | unknown) {
+    } catch (error: any) {
       console.error("Error sending OTP:", error)
       const errorResponse = error instanceof Error ? error.message : "Failed to send OTP"
       setApiError(errorResponse)
@@ -215,7 +216,7 @@ export default function RegisterClient() {
       } else {
         throw new Error(response.data.message || "Failed to verify OTP")
       }
-    } catch (error: Error | unknown) {
+    } catch (error: any) {
       console.error("Error verifying OTP:", error)
       const errorMessage = error instanceof Error ? error.message : "Failed to verify OTP"
       setApiError(errorMessage)
@@ -229,7 +230,7 @@ export default function RegisterClient() {
     }
   }
 
-  // Updated handleSubmitDetails function
+  // Updated handleSubmitDetails function with client dashboard redirect
   const handleSubmitDetails = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
@@ -272,6 +273,13 @@ export default function RegisterClient() {
           email: formData.email || undefined,
           city: formData.city || undefined,
           profession: formData.profession || undefined,
+          businessName: formData.businessName || undefined,
+          gstNumber: formData.gstNumber || undefined,
+          projectType: formData.projectType || undefined,
+          dateOfBirth: formData.dateOfBirth || undefined,
+          anniversaryDate: formData.anniversaryDate || undefined,
+          architectDetails: formData.architectDetails || undefined,
+          consultantLevel: formData.consultantLevel || undefined, // This will now be "red", "yellow", or "purple"
         }),
       })
 
@@ -284,14 +292,52 @@ export default function RegisterClient() {
       const data = await response.json()
       console.log("Create client response:", data)
 
+      // Get the client ID from the response
+      const clientId = data.data?.client?.clientId
+
+      if (!clientId) {
+        throw new Error("Client ID not found in response")
+      }
+
       toast({
         title: "Success",
         description: "Client registered successfully!",
       })
 
-      // Redirect to dashboard
-      router.push("/dashboard")
-    } catch (error: Error | unknown) {
+      // Generate impersonation token for the new client
+      try {
+        const impersonateResponse = await fetch(
+          `https://evershinebackend-2.onrender.com/api/agent/impersonate/${clientId}`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          },
+        )
+
+        if (!impersonateResponse.ok) {
+          throw new Error("Failed to generate impersonation token")
+        }
+
+        const impersonateData = await impersonateResponse.json()
+
+        if (impersonateData.success && impersonateData.data?.impersonationToken) {
+          // Store the impersonation token
+          localStorage.setItem("clientImpersonationToken", impersonateData.data.impersonationToken)
+
+          // Redirect to client dashboard
+          router.push(`/client-dashboard/${clientId}`)
+        } else {
+          throw new Error("Invalid impersonation token response")
+        }
+      } catch (impersonateError) {
+        console.error("Error generating impersonation token:", impersonateError)
+        // If impersonation fails, still redirect to client dashboard
+        router.push(`/client-dashboard/${clientId}`)
+      }
+    } catch (error: any) {
       console.error("Error creating client:", error)
       const errorMessage = error instanceof Error ? error.message : "An error occurred while creating the client"
       toast({
@@ -305,28 +351,17 @@ export default function RegisterClient() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-6 md:p-12 bg-gray-50">
+    <div className="flex flex-col items-center justify-center">
       <div className="w-full max-w-xl">
-        <div className="w-full flex flex-col items-center relative mb-8">
-          <Link href="/dashboard" className="absolute left-0 top-0 inline-flex items-center text-dark hover:underline">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Dashboard
-          </Link>
-          {/* Fixed image aspect ratio by setting both width and height with auto property */}
-          <Image
-            src="/logo.png"
-            alt="Evershine Logo"
-            width={180}
-            height={90}
-            style={{ height: "auto" }}
-            priority
-            className="mt-8"
-          />
+        <div className="mb-4">
+          <button onClick={() => router.push("/dashboard")} className="p-2 rounded-full hover:bg-gray-100">
+            <ArrowLeft className="h-5 w-5" />
+          </button>
         </div>
 
         {step === "initial" && (
-          <Card className="shadow-lg border-0">
-            <CardHeader className="space-y-1 bg-blue/5 border-b pb-4">
+          <Card className="shadow-sm border">
+            <CardHeader className="space-y-1 border-b pb-4">
               <CardTitle className="text-2xl text-center text-blue">Register New Client</CardTitle>
               <CardDescription className="text-center">Enter basic client information</CardDescription>
             </CardHeader>
@@ -390,8 +425,8 @@ export default function RegisterClient() {
         )}
 
         {step === "otp" && (
-          <Card className="shadow-lg border-0">
-            <CardHeader className="space-y-1 bg-blue/5 border-b pb-4">
+          <Card className="shadow-sm border">
+            <CardHeader className="space-y-1 border-b pb-4">
               <CardTitle className="text-2xl text-center text-blue">Verify OTP</CardTitle>
               <CardDescription className="text-center">Enter the OTP sent to your mobile number</CardDescription>
             </CardHeader>
@@ -443,7 +478,7 @@ export default function RegisterClient() {
                               description: "A new verification code has been sent to your mobile number",
                             })
                           }
-                        } catch (error: Error | unknown) {
+                        } catch (error: any) {
                           const errorMessage = error instanceof Error ? error.message : "Failed to resend OTP"
                           toast({
                             title: "Error",
@@ -488,8 +523,8 @@ export default function RegisterClient() {
         )}
 
         {step === "details" && (
-          <Card className="shadow-lg border-0">
-            <CardHeader className="space-y-1 bg-blue/5 border-b pb-4">
+          <Card className="shadow-sm border">
+            <CardHeader className="space-y-1 border-b pb-4">
               <CardTitle className="text-2xl text-center text-blue">Client Details</CardTitle>
               <CardDescription className="text-center">Complete client registration with all details</CardDescription>
             </CardHeader>
@@ -501,121 +536,204 @@ export default function RegisterClient() {
                     Profession
                   </Label>
                   <Tabs defaultValue="architect" onValueChange={(value) => handleSelectChange("profession", value)}>
-                    <TabsList className="grid grid-cols-4 w-full">
+                    <TabsList className="grid grid-cols-5 w-full">
                       <TabsTrigger value="architect">Architect</TabsTrigger>
                       <TabsTrigger value="contractor">Contractor</TabsTrigger>
                       <TabsTrigger value="builder">Builder</TabsTrigger>
+                      <TabsTrigger value="self_use">Self Use</TabsTrigger>
                       <TabsTrigger value="other">Other</TabsTrigger>
                     </TabsList>
                   </Tabs>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="businessName" className="text-base font-medium">
-                    Business Name
-                  </Label>
-                  <div className="relative">
-                    <Building className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                {/* Business Name and GST Number in one row */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="businessName" className="text-base font-medium">
+                      Business Name
+                    </Label>
+                    <div className="relative">
+                      <Building className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                      <Input
+                        id="businessName"
+                        name="businessName"
+                        placeholder="Enter business name"
+                        value={formData.businessName}
+                        onChange={handleChange}
+                        className="h-12 pl-10 rounded-md"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="gstNumber" className="text-base font-medium">
+                      GST Number
+                    </Label>
                     <Input
-                      id="businessName"
-                      name="businessName"
-                      placeholder="Enter business name"
-                      value={formData.businessName}
+                      id="gstNumber"
+                      name="gstNumber"
+                      placeholder="Enter GST number"
+                      value={formData.gstNumber}
+                      onChange={handleChange}
+                      className="h-12 rounded-md"
+                    />
+                  </div>
+                </div>
+
+                {/* Project Type and Email in one row */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="projectType" className="text-base font-medium">
+                      Project Type
+                    </Label>
+                    <Select
+                      value={formData.projectType}
+                      onValueChange={(value) => handleSelectChange("projectType", value)}
+                    >
+                      <SelectTrigger className="h-12 rounded-md">
+                        <SelectValue placeholder="Select project type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="residential">Residential</SelectItem>
+                        <SelectItem value="commercial">Commercial</SelectItem>
+                        <SelectItem value="industrial">Industrial</SelectItem>
+                        <SelectItem value="infrastructure">Infrastructure</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="text-base font-medium">
+                      Email Address
+                    </Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                      <Input
+                        id="email"
+                        name="email"
+                        type="email"
+                        placeholder="Enter email address"
+                        value={formData.email}
+                        onChange={handleChange}
+                        className="h-12 pl-10 rounded-md"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* City and Architect Details in one row */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="city" className="text-base font-medium">
+                      City
+                    </Label>
+                    <div className="relative">
+                      <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                      <Input
+                        id="city"
+                        name="city"
+                        placeholder="Enter city"
+                        value={formData.city}
+                        onChange={handleChange}
+                        className="h-12 pl-10 rounded-md"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="architectDetails" className="text-base font-medium">
+                      Architect Details
+                    </Label>
+                    <Input
+                      id="architectDetails"
+                      name="architectDetails"
+                      placeholder="Enter architect details"
+                      value={formData.architectDetails}
                       onChange={handleChange}
                       className="h-12 pl-10 rounded-md"
                     />
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="gstNumber" className="text-base font-medium">
-                    GST Number
-                  </Label>
-                  <Input
-                    id="gstNumber"
-                    name="gstNumber"
-                    placeholder="Enter GST number"
-                    value={formData.gstNumber}
-                    onChange={handleChange}
-                    className="h-12 rounded-md"
-                  />
-                </div>
+                {/* Date of Birth and Anniversary Date in one row */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="dateOfBirth" className="text-base font-medium">
+                      Date of Birth
+                    </Label>
+                    <div className="relative">
+                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                      <Input
+                        id="dateOfBirth"
+                        name="dateOfBirth"
+                        type="date"
+                        placeholder="Select date of birth"
+                        value={formData.dateOfBirth}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            dateOfBirth: e.target.value,
+                          }))
+                        }
+                        className="h-12 pl-10 rounded-md"
+                      />
+                    </div>
+                  </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="projectType" className="text-base font-medium">
-                    Project Type
-                  </Label>
-                  <Select
-                    value={formData.projectType}
-                    onValueChange={(value) => handleSelectChange("projectType", value)}
-                  >
-                    <SelectTrigger className="h-12 rounded-md">
-                      <SelectValue placeholder="Select project type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="residential">Residential</SelectItem>
-                      <SelectItem value="commercial">Commercial</SelectItem>
-                      <SelectItem value="industrial">Industrial</SelectItem>
-                      <SelectItem value="infrastructure">Infrastructure</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="city" className="text-base font-medium">
-                    City
-                  </Label>
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                    <Input
-                      id="city"
-                      name="city"
-                      placeholder="Enter city"
-                      value={formData.city}
-                      onChange={handleChange}
-                      className="h-12 pl-10 rounded-md"
-                    />
+                  <div className="space-y-2">
+                    <Label htmlFor="anniversaryDate" className="text-base font-medium">
+                      Anniversary Date
+                    </Label>
+                    <div className="relative">
+                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                      <Input
+                        id="anniversaryDate"
+                        name="anniversaryDate"
+                        type="date"
+                        placeholder="Select anniversary date"
+                        value={formData.anniversaryDate}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            anniversaryDate: e.target.value,
+                          }))
+                        }
+                        className="h-12 pl-10 rounded-md"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="dateOfBirth" className="text-base font-medium">
-                    Date of Birth
+                {/* Consultant Level with colored dots */}
+                <div className="space-y-2 mt-4">
+                  <Label htmlFor="consultantLevel" className="text-base font-medium">
+                    Consultant
                   </Label>
-                  <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                    <Input
-                      id="dateOfBirth"
-                      name="dateOfBirth"
-                      type="date"
-                      placeholder="Select date of birth"
-                      value={formData.dateOfBirth}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          dateOfBirth: e.target.value,
-                        }))
-                      }
-                      className="h-12 pl-10 rounded-md"
+                  <div className="flex items-center gap-6 mt-2">
+                    <button
+                      type="button"
+                      onClick={() => handleSelectChange("consultantLevel", "red")}
+                      className={`w-8 h-8 rounded-full bg-red-500 transition-all ${
+                        formData.consultantLevel === "red" ? "ring-4 ring-red-200 scale-110" : "hover:scale-105"
+                      }`}
+                      aria-label="Red consultant level (+5%)"
                     />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-base font-medium">
-                    Email Address
-                  </Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                    <Input
-                      id="email"
-                      name="email"
-                      type="email"
-                      placeholder="Enter email address"
-                      value={formData.email}
-                      onChange={handleChange}
-                      className="h-12 pl-10 rounded-md"
+                    <button
+                      type="button"
+                      onClick={() => handleSelectChange("consultantLevel", "yellow")}
+                      className={`w-8 h-8 rounded-full bg-yellow-500 transition-all ${
+                        formData.consultantLevel === "yellow" ? "ring-4 ring-yellow-200 scale-110" : "hover:scale-105"
+                      }`}
+                      aria-label="Yellow consultant level (+10%)"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleSelectChange("consultantLevel", "purple")}
+                      className={`w-8 h-8 rounded-full bg-purple-600 transition-all ${
+                        formData.consultantLevel === "purple" ? "ring-4 ring-purple-200 scale-110" : "hover:scale-105"
+                      }`}
+                      aria-label="Purple consultant level (+15%)"
                     />
                   </div>
                 </div>
@@ -635,7 +753,14 @@ export default function RegisterClient() {
                   className="w-full h-12 mt-6 bg-blue hover:bg-blue/90 text-white rounded-md text-base"
                   disabled={!formData.agreeToTerms || isLoading}
                 >
-                  {isLoading ? "Creating Client..." : "Complete Registration"}
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating Client...
+                    </>
+                  ) : (
+                    "Complete Registration"
+                  )}
                 </Button>
               </form>
             </CardContent>

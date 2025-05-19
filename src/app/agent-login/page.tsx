@@ -107,7 +107,7 @@ export default function AgentLogin() {
     <main className="flex min-h-screen flex-col items-center justify-center p-6 md:p-12 bg-gray-50">
       <div className="w-full max-w-md">
         <div className="w-full flex flex-col items-center relative mb-8">
-          <Link href="/" className="absolute left-0 top-0 inline-flex items-center text-dark hover:underline">
+          <Link href="https://evershine-two.vercel.app/" className="absolute left-0 top-0 inline-flex items-center text-dark hover:underline">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Home
           </Link>
@@ -116,8 +116,8 @@ export default function AgentLogin() {
 
         <Card className="w-full shadow-lg border-0">
           <CardHeader className="space-y-1 bg-blue/5 border-b pb-4">
-            <CardTitle className="text-2xl text-center text-blue">Agent Login</CardTitle>
-            <CardDescription className="text-center">Login to access your agent dashboard</CardDescription>
+            <CardTitle className="text-2xl text-center text-blue">Consultant Login</CardTitle>
+            <CardDescription className="text-center">Login to access your consultant dashboard</CardDescription>
           </CardHeader>
           <CardContent className="pt-6">
             {apiError && (
