@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Loader2, Package, Printer, Download, Share2 } from "lucide-react"
+import { ArrowLeft, Loader2, Package, Printer, Download } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import Link from "next/link"
 import { Separator } from "@/components/ui/separator"
@@ -326,68 +326,90 @@ export default function OrderDetailsPage() {
         description: "Please wait while we generate your invoice PDF...",
       })
 
-      // Add a class to prepare the element for PDF generation
-      invoiceRef.current.classList.add("generating-pdf")
-
-      // Create a clone of the invoice element to modify for PDF
-      const invoiceElement = invoiceRef.current.cloneNode(true) as HTMLElement
-
-      // Make sure all content is visible for PDF
-      const hiddenElements = invoiceElement.querySelectorAll(".print\\:block")
-      hiddenElements.forEach((el) => {
-        ;(el as HTMLElement).style.display = "block"
-      })
-
-      // Hide elements that shouldn't be in the PDF
-      const printHiddenElements = invoiceElement.querySelectorAll(".print\\:hidden")
-      printHiddenElements.forEach((el) => {
-        ;(el as HTMLElement).style.display = "none"
-      })
-
-      // Set background color to white
-      invoiceElement.style.backgroundColor = "white"
-      invoiceElement.style.padding = "20px"
-
-      // Temporarily append to document for rendering
-      invoiceElement.style.position = "absolute"
-      invoiceElement.style.left = "-9999px"
-      document.body.appendChild(invoiceElement)
-
-      // Generate canvas from the prepared element
-      const canvas = await html2canvas(invoiceElement, {
-        scale: 2, // Higher scale for better quality
-        useCORS: true,
-        logging: false,
-        backgroundColor: "#ffffff",
-      })
-
-      // Remove the temporary element
-      document.body.removeChild(invoiceElement)
-
-      // Create PDF
-      const imgData = canvas.toDataURL("image/png")
+      // Create a new jsPDF instance
       const pdf = new jsPDF({
         orientation: "portrait",
         unit: "mm",
         format: "a4",
       })
 
-      // Calculate dimensions to fit the image properly on the PDF
-      const imgWidth = 210 // A4 width in mm (portrait)
-      const imgHeight = (canvas.height * imgWidth) / canvas.width
+      // Get the invoice element
+      const element = invoiceRef.current
 
-      pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight)
+      // Temporarily modify the element for better PDF capture
+      const originalStyles = {
+        background: element.style.background,
+        padding: element.style.padding,
+      }
+
+      // Apply styles for PDF generation
+      element.style.background = "white"
+      element.style.padding = "15px"
+
+      // Show print-only elements
+      const printElements = element.querySelectorAll(".print\\:block")
+      const printStyles = Array.from(printElements).map((el) => {
+        const style = (el as HTMLElement).style.display
+        ;(el as HTMLElement).style.display = "block"
+        return style
+      })
+
+      // Hide print-hidden elements
+      const hiddenElements = element.querySelectorAll(".print\\:hidden")
+      const hiddenStyles = Array.from(hiddenElements).map((el) => {
+        const style = (el as HTMLElement).style.display
+        ;(el as HTMLElement).style.display = "none"
+        return style
+      })
+
+      // Generate canvas
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#ffffff",
+      })
+
+      // Restore original styles
+      element.style.background = originalStyles.background
+      element.style.padding = originalStyles.padding
+
+      // Restore print elements
+      printElements.forEach((el, i) => {
+        ;(el as HTMLElement).style.display = printStyles[i]
+      })
+
+      // Restore hidden elements
+      hiddenElements.forEach((el, i) => {
+        ;(el as HTMLElement).style.display = hiddenStyles[i]
+      })
+
+      // Add image to PDF
+      const imgData = canvas.toDataURL("image/jpeg", 1.0)
+      const imgWidth = 210 // A4 width in mm
+      const pageHeight = 297 // A4 height in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+      let heightLeft = imgHeight
+      let position = 0
+
+      // Add first page
+      pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight)
+      heightLeft -= pageHeight
+
+      // Add additional pages if needed
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight
+        pdf.addPage()
+        pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight)
+        heightLeft -= pageHeight
+      }
 
       // Save the PDF
       pdf.save(`Invoice-${order.orderId}.pdf`)
 
-      // Remove the class after PDF generation
-      invoiceRef.current.classList.remove("generating-pdf")
-
       toast({
         title: "PDF Generated",
         description: "Your invoice has been downloaded successfully.",
-        variant: "success",
       })
     } catch (error) {
       console.error("Error generating PDF:", error)
@@ -508,10 +530,6 @@ export default function OrderDetailsPage() {
                   Download PDF
                 </>
               )}
-            </Button>
-            <Button variant="outline" size="sm">
-              <Share2 className="h-4 w-4 mr-2" />
-              Share
             </Button>
           </div>
         </div>
