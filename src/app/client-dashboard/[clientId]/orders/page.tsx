@@ -30,13 +30,6 @@ interface Order {
   }
 }
 
-interface CommissionData {
-  [category: string]: {
-    baseCommissionRate: number
-    overrideRate?: number
-  }
-}
-
 export default function OrdersPage() {
   const params = useParams()
   const router = useRouter()
@@ -46,58 +39,6 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [commissionData, setCommissionData] = useState<CommissionData>({})
-  const [consultantLevel, setConsultantLevel] = useState<number>(0)
-
-  // Fetch commission data
-  useEffect(() => {
-    const fetchCommissionData = async () => {
-      try {
-        const token = localStorage.getItem("clientImpersonationToken")
-        if (!token) return
-
-        // Fetch commission rates
-        const response = await fetch("https://evershinebackend-2.onrender.com/api/commission-rates", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch commission rates")
-        }
-
-        const data = await response.json()
-        console.log("ORDERS - Commission data:", data)
-
-        if (data && data.data) {
-          setCommissionData(data.data)
-        }
-
-        // Fetch consultant level
-        const consultantResponse = await fetch(`https://evershinebackend-2.onrender.com/api/clients/${clientId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
-
-        if (!consultantResponse.ok) {
-          throw new Error("Failed to fetch consultant level")
-        }
-
-        const consultantData = await consultantResponse.json()
-        console.log("ORDERS - Consultant data:", consultantData)
-
-        if (consultantData && consultantData.data && consultantData.data.consultantLevel) {
-          setConsultantLevel(consultantData.data.consultantLevel)
-        }
-      } catch (error) {
-        console.error("Error fetching commission data:", error)
-      }
-    }
-
-    fetchCommissionData()
-  }, [clientId])
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -170,14 +111,9 @@ export default function OrdersPage() {
     // Use basePrice if available, otherwise use price
     const basePrice = item.basePrice || item.price
 
-    // Get commission rate for the item's category
-    const categoryCommission = commissionData[item.category] || { baseCommissionRate: 20 }
-    const baseCommissionRate = categoryCommission.baseCommissionRate
-
-    // Get consultant level commission rate (default to 15% if not available)
-    const consultantCommissionRate = consultantLevel === 2 ? 15 : 0
-
-    // Calculate total commission rate
+    // Hardcoded commission rates (same as in cart and wishlist)
+    const baseCommissionRate = 20
+    const consultantCommissionRate = 15
     const totalCommissionRate = baseCommissionRate + consultantCommissionRate
 
     console.log(`ORDERS - Calculating price for ${item.name}:`)
