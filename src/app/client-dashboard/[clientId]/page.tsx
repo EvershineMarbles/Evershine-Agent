@@ -18,6 +18,7 @@ interface Product {
   name: string
   price: number
   basePrice?: number // Original price before commission
+  updatedPrice?: number // Price after updates
   calculatedPrice?: number // Price with commission applied
   image: string[]
   postId: string
@@ -195,6 +196,7 @@ export default function ProductsPage() {
           console.log(`Product ${index + 1} (${product.name}):`)
           console.log(`  - price: ${product.price}`)
           console.log(`  - basePrice: ${product.basePrice}`)
+          console.log(`  - updatedPrice: ${product.updatedPrice}`)
           console.log(`  - calculatedPrice: ${product.calculatedPrice}`)
           console.log(`  - postId: ${product.postId}`)
         })
@@ -597,28 +599,28 @@ export default function ProductsPage() {
       <div className="p-6 md:p-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <h1 className="text-3xl font-bold">Welcome, {clientData?.name?.split(" ")[0] || "Client"}</h1>
-          // Add this button somewhere in your ProductsPage component
-<button
-  onClick={async () => {
-    const token = localStorage.getItem("clientImpersonationToken");
-    const response = await fetch("https://evershinebackend-2.onrender.com/api/getAllProducts", {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    const data = await response.json();
-    console.log("API Response:", data);
-    
-    if (data.success && data.data && data.data.length > 0) {
-      console.log("First product:", data.data[0]);
-      console.log("Price fields:", {
-        price: data.data[0].price,
-        basePrice: data.data[0].basePrice
-      });
-    }
-  }}
-  className="px-4 py-2 bg-gray-200 rounded-md mb-4"
->
-  Debug API Response
-</button>
+          <button
+            onClick={async () => {
+              const token = localStorage.getItem("clientImpersonationToken")
+              const response = await fetch("https://evershinebackend-2.onrender.com/api/getAllProducts", {
+                headers: { Authorization: `Bearer ${token}` },
+              })
+              const data = await response.json()
+              console.log("API Response:", data)
+
+              if (data.success && data.data && data.data.length > 0) {
+                console.log("First product:", data.data[0])
+                console.log("Price fields:", {
+                  price: data.data[0].price,
+                  basePrice: data.data[0].basePrice,
+                  updatedPrice: data.data[0].updatedPrice,
+                })
+              }
+            }}
+            className="px-4 py-2 bg-gray-200 rounded-md mb-4"
+          >
+            Debug API Response
+          </button>
         </div>
         {error && (
           <Alert variant="destructive" className="mb-4">
@@ -734,12 +736,12 @@ export default function ProductsPage() {
                         {formatPrice(
                           updatedPrices[product.postId]?.price !== undefined
                             ? updatedPrices[product.postId].price
-                            : product.price,
+                            : product.updatedPrice || product.price,
                         )}
                       </p>
                       {((updatedPrices[product.postId]?.basePrice !== undefined &&
                         updatedPrices[product.postId]?.basePrice !== updatedPrices[product.postId]?.price) ||
-                        (product.basePrice && product.basePrice !== product.price)) && (
+                        (product.basePrice && product.basePrice !== (product.updatedPrice || product.price))) && (
                         <p className="text-sm text-muted-foreground line-through">
                           {formatPrice(
                             updatedPrices[product.postId]?.basePrice !== undefined
@@ -755,14 +757,43 @@ export default function ProductsPage() {
                     </p>
 
                     <button
-                      onClick={(e) => toggleWishlist(e, product.postId)}
+                      onClick={(e) => addToCart(e, product.postId, product.name)}
                       className={`mt-4 w-full py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2
+                                ${
+                                  cart.includes(product.postId)
+                                    ? "bg-gray-100 text-gray-600 border border-gray-200"
+                                    : addingToCart[product.postId]
+                                      ? "bg-gray-200 text-gray-700"
+                                      : "bg-primary hover:bg-primary/90 text-primary-foreground"
+                                } 
+                                transition-colors`}
+                      disabled={addingToCart[product.postId] || cart.includes(product.postId)}
+                      type="button"
+                    >
+                      {addingToCart[product.postId] ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                      ) : cart.includes(product.postId) ? (
+                        <>
+                          <ShoppingCart className="h-4 w-4 mr-1" />
+                          Added to Cart
+                        </>
+                      ) : (
+                        <>
+                          <ShoppingCart className="h-4 w-4 mr-1" />
+                          Add to Cart
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={(e) => toggleWishlist(e, product.postId)}
+                      className={`mt-2 w-full py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2
                                 ${
                                   wishlist.includes(product.postId)
                                     ? "bg-gray-100 text-gray-600 border border-gray-200"
                                     : addingToWishlist[product.postId]
                                       ? "bg-gray-200 text-gray-700"
-                                      : "bg-primary hover:bg-primary/90 text-primary-foreground"
+                                      : "bg-white hover:bg-gray-50 text-gray-700 border border-gray-200"
                                 } 
                                 transition-colors`}
                       disabled={addingToWishlist[product.postId]}
@@ -790,7 +821,7 @@ export default function ProductsPage() {
         )}
 
         {/* Add extra space at the bottom to ensure scrolling is possible */}
-        <div className="h-[500px]"></div>
+        <div className="h-[100px]"></div>
       </div>
     </ErrorBoundary>
   )
