@@ -517,11 +517,6 @@ export default function WishlistPage() {
                     <p className="text-sm text-muted-foreground">{item.category || "Uncategorized"}</p>
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2">
                       <span className="font-semibold">₹{adjustedPrice.toLocaleString()}</span>
-                      {Math.abs(adjustedPrice - item.price) > 0.01 && (
-                        <span className="text-sm text-muted-foreground">
-                          <span className="line-through">₹{item.price.toLocaleString()}</span>
-                        </span>
-                      )}
                     </div>
                   </div>
                   <div className="flex flex-col md:flex-row items-center gap-4 mt-4 md:mt-0">
