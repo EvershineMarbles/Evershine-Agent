@@ -342,21 +342,25 @@ export default function WishlistPage() {
 
       // Find the item to get its data
       const item = wishlistItems.find((item) => (item.postId || item._id) === productId)
-      // Calculate adjusted price with commission if item exists
+
+      // IMPORTANT: The backend is not storing our adjusted price, so we need to use the original price
+      // We'll still calculate and display the adjusted price in the UI, but send the original price to the backend
+      const originalPrice = item ? item.basePrice || item.price : 0
       const adjustedPrice = item ? calculateAdjustedPrice(item) : 0
 
       console.log("WISHLIST - Original item:", item)
       console.log("WISHLIST - Base price:", item?.basePrice || item?.price)
       console.log("WISHLIST - Commission rate:", overrideCommissionRate)
-      console.log("WISHLIST - Adjusted price being sent to cart:", adjustedPrice)
+      console.log("WISHLIST - Adjusted price (displayed):", adjustedPrice)
+      console.log("WISHLIST - Original price (sent to backend):", originalPrice)
 
-      // Try with axios - now sending the quantity and adjusted price
+      // Try with axios - now sending the quantity and ORIGINAL price
       const response = await axios.post(
         `${apiUrl}/api/addToCart`,
         {
           productId,
           quantity, // Send the quantity to the API
-          price: adjustedPrice, // Send the adjusted price with commission
+          price: originalPrice, // Send the ORIGINAL price to the backend
         },
         {
           headers: {

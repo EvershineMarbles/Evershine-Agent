@@ -114,18 +114,11 @@ export default function CartPage() {
 
     console.log(`CART - Calculating price for ${item.name}:`)
     console.log(`CART - Original price:`, item.price)
-    console.log(`CART - Base price:`, item.basePrice || item.price)
     console.log(`CART - Commission rate:`, finalRate)
 
-    // The issue is here - we need to apply the commission calculation to all items
-    // regardless of whether they have a basePrice or not
-    const basePrice = item.basePrice || item.price
-    const adjustedPrice = basePrice * (1 + finalRate / 100)
-    const roundedPrice = Math.round(adjustedPrice * 100) / 100
-
-    console.log(`CART - Adjusted price:`, roundedPrice)
-
-    return roundedPrice
+    // IMPORTANT: Since the backend is not storing our adjusted price,
+    // we need to use the price from the backend as is
+    return item.price
   }
 
   // Load saved commission rate from localStorage on component mount
@@ -312,12 +305,8 @@ export default function CartPage() {
       const currentItem = cartItems.find((item) => item.postId === productId)
       if (!currentItem) return
 
-      // Calculate the adjusted price with commission
-      const adjustedPrice = calculateAdjustedPrice(currentItem)
-
       console.log(`CART - Updating quantity for ${currentItem.name}:`)
       console.log(`CART - Original price:`, currentItem.price)
-      console.log(`CART - Adjusted price being sent:`, adjustedPrice)
       console.log(`CART - New quantity:`, newQuantity)
 
       // First remove the item
@@ -330,7 +319,7 @@ export default function CartPage() {
         body: JSON.stringify({ productId }),
       })
 
-      // Then add it back with the new quantity and adjusted price
+      // Then add it back with the new quantity and preserve the original price
       await fetch(`${apiUrl}/api/addToCart`, {
         method: "POST",
         headers: {
@@ -340,7 +329,7 @@ export default function CartPage() {
         body: JSON.stringify({
           productId,
           quantity: newQuantity,
-          price: adjustedPrice, // Use the adjusted price with commission
+          price: currentItem.price, // Preserve the original price
         }),
       })
 
@@ -586,8 +575,8 @@ export default function CartPage() {
               </div>
               <div className="divide-y">
                 {cartItems.map((item) => {
-                  // Calculate the adjusted price with commission
-                  const adjustedPrice = calculateAdjustedPrice(item)
+                  // Use the price directly from the backend
+                  const price = item.price
 
                   return (
                     <div key={item.postId} className="p-6 flex flex-col sm:flex-row items-start sm:items-center gap-4">
@@ -604,8 +593,7 @@ export default function CartPage() {
                       <div className="flex-grow">
                         <h3 className="font-medium text-lg">{item.name}</h3>
                         <p className="text-sm text-muted-foreground mb-2">{item.category}</p>
-                        <p className="font-semibold text-lg text-primary">₹{adjustedPrice.toLocaleString()}</p>
-                        <p className="text-xs text-muted-foreground">Original: ₹{item.price.toLocaleString()}</p>
+                        <p className="font-semibold text-lg text-primary">₹{price.toLocaleString()}</p>
                       </div>
                       <div className="flex flex-col sm:flex-row items-center gap-4 mt-2 sm:mt-0">
                         {/* Quantity input */}
