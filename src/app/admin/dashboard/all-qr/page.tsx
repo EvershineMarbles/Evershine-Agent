@@ -271,7 +271,7 @@ function AllQR() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <div className="flex items-center gap-2 border rounded-lg overflow-hidden">
             <button
-              onClick={() => router.push("/products")}
+              onClick={() => router.push("/admin/dashboard/all-qr")}
               className="flex items-center gap-1 px-4 py-2 text-gray-600 hover:bg-gray-100"
               aria-label="Grid view"
             >
@@ -330,7 +330,7 @@ function AllQR() {
                       <td className="px-4 py-4">
                         <div className="flex items-center">
                           <Link
-                            href={`/single_product/${product.postId}`}
+                            href={`/admin/dashboard/product/${product.postId}`}
                             className="h-10 w-10 flex-shrink-0 mr-3 block"
                           >
                             <Image
