@@ -72,23 +72,23 @@ export default function OrdersPage() {
         }
 
         const data = await response.json()
-        console.log("Full API response:", data)
+        console.log("ORDERS - Full API response:", data)
 
         // Your backend returns { message, data } format
         if (data && Array.isArray(data.data)) {
-          console.log("Orders data:", data.data)
+          console.log("ORDERS - Orders data:", data.data)
           setOrders(data.data)
         } else {
           // If data.data is not an array, check if the response itself is an array
           if (Array.isArray(data)) {
-            console.log("Orders data (direct array):", data)
+            console.log("ORDERS - Orders data (direct array):", data)
             setOrders(data)
           } else {
-            console.warn("Unexpected response format:", data)
+            console.warn("ORDERS - Unexpected response format:", data)
             setOrders([])
           }
         }
-      } catch (error: Error | unknown) {
+      } catch (error: any) {
         const errorMessage = error instanceof Error ? error.message : "Failed to load orders. Please try again."
         console.error("Error fetching orders:", error)
         setError(errorMessage)
@@ -212,20 +212,23 @@ export default function OrdersPage() {
                   <div className="md:col-span-2">
                     <h3 className="font-medium mb-2">Items</h3>
                     <div className="space-y-2">
-                      {order.items.map((item, index) => (
-                        <div key={index} className="flex justify-between border-b pb-2">
-                          <div>
-                            <p className="font-medium">{item.name}</p>
-                            <p className="text-sm text-muted-foreground">{item.category}</p>
+                      {order.items.map((item, index) => {
+                        console.log(`ORDERS - Item ${item.name} - Price from backend: ${item.price}`)
+                        return (
+                          <div key={index} className="flex justify-between border-b pb-2">
+                            <div>
+                              <p className="font-medium">{item.name}</p>
+                              <p className="text-sm text-muted-foreground">{item.category}</p>
+                            </div>
+                            <div className="text-right">
+                              <p>
+                                ₹{item.price.toLocaleString()} × {item.quantity}
+                              </p>
+                              <p className="font-medium">₹{(item.price * item.quantity).toLocaleString()}</p>
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <p>
-                              ₹{item.price.toLocaleString()} × {item.quantity}
-                            </p>
-                            <p className="font-medium">₹{(item.price * item.quantity).toLocaleString()}</p>
-                          </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                     <div className="flex justify-between mt-4 pt-2 font-bold">
                       <span>Total</span>
