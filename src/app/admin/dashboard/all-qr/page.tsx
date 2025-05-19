@@ -1,16 +1,21 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect, useRef } from "react"
 import axios from "axios"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Download, Loader2, Search, Grid, List, Check } from "lucide-react"
+import { ArrowLeft, Download, Loader2, Search, Grid, List, Check, AlertCircle } from 'lucide-react'
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { toast } from "sonner"
 import QRCode from "qrcode"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
@@ -36,27 +41,60 @@ export default function AllQR() {
   const [priceValues, setPriceValues] = useState<Record<string, string>>({})
   const [updatingPrice, setUpdatingPrice] = useState<Record<string, boolean>>({})
   const [generatingQR, setGeneratingQR] = useState<Record<string, boolean>>({})
+  const [previewQR, setPreviewQR] = useState<string | null>(null)
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+  const [templateLoaded, setTemplateLoaded] = useState(false)
+  const [templateError, setTemplateError] = useState(false)
 
-  // Create refs for download links
-  const downloadLinkRef = useRef<HTMLAnchorElement | null>(null)
+  // Create refs for template image
+  const templateImageRef = useRef<HTMLImageElement | null>(null)
+
+  // Preload template image
+  useEffect(() => {
+    const preloadTemplate = async () => {
+      try {
+        const img = new Image()
+        img.crossOrigin = "anonymous"
+        
+        // Promise to handle image loading
+        const loadImage = () => {
+          return new Promise<void>((resolve, reject) => {
+            img.onload = () => {
+              setTemplateLoaded(true)
+              templateImageRef.current = img
+              resolve()
+            }
+            img.onerror = () => reject(new Error("Failed to load template"))
+            // Try the first path
+            img.src = "/assets/qr-template.png"
+          })
+        }
+        
+        try {
+          await loadImage()
+        } catch (error) {
+          // Try alternative path
+          img.src = "/qr-template.png"
+          img.onload = () => {
+            setTemplateLoaded(true)
+            templateImageRef.current = img
+          }
+          img.onerror = () => {
+            console.error("Failed to load QR template from all paths")
+            setTemplateError(true)
+          }
+        }
+      } catch (error) {
+        console.error("Error preloading template:", error)
+        setTemplateError(true)
+      }
+    }
+    
+    preloadTemplate()
+  }, [])
 
   useEffect(() => {
     fetchProducts()
-
-    // Create a hidden download link element that we'll reuse
-    if (!downloadLinkRef.current) {
-      const link = document.createElement("a")
-      link.style.display = "none"
-      document.body.appendChild(link)
-      downloadLinkRef.current = link
-    }
-
-    // Cleanup function to remove the link when component unmounts
-    return () => {
-      if (downloadLinkRef.current) {
-        document.body.removeChild(downloadLinkRef.current)
-      }
-    }
   }, [])
 
   const fetchProducts = async () => {
@@ -73,9 +111,12 @@ export default function AllQR() {
           initialPriceValues[product.postId] = product.price.toString()
         })
         setPriceValues(initialPriceValues)
+      } else {
+        toast.error("Failed to fetch products")
       }
     } catch (error) {
       console.error("Error fetching products:", error)
+      toast.error("Failed to load products. Please try again.")
     } finally {
       setLoading(false)
     }
@@ -132,11 +173,12 @@ export default function AllQR() {
     }
   }
 
-  const generateAndDownloadQR = async (product: Product) => {
+  const generateQRCode = async (product: Product, download = false) => {
     try {
-      setGeneratingQR((prev) => ({ ...prev, [product.postId]: true }))
-      toast.info("Generating QR code...")
-
+      if (download) {
+        setGeneratingQR((prev) => ({ ...prev, [product.postId]: true }))
+      }
+      
       // Generate QR code with our special format for role-based access
       const productData = `ev://product/${product.postId}`
       const qrCodeDataUrl = await QRCode.toDataURL(productData, {
@@ -148,19 +190,30 @@ export default function AllQR() {
         },
       })
 
-      // Load the QR code image first
-      const qrCodeImage = new Image()
-      qrCodeImage.crossOrigin = "anonymous"
+      // If just previewing, return the QR code data URL
+      if (!download) {
+        return qrCodeDataUrl
+      }
 
-      // Create a promise to handle the image loading
-      const qrCodeLoaded = new Promise((resolve, reject) => {
-        qrCodeImage.onload = () => resolve(qrCodeImage)
-        qrCodeImage.onerror = () => reject(new Error("Failed to load QR code"))
-        qrCodeImage.src = qrCodeDataUrl
-      })
+      // Simple direct download function that will work as a fallback
+      const downloadBasicQR = () => {
+        console.log("Falling back to basic QR download")
+        const link = document.createElement("a")
+        link.href = qrCodeDataUrl
+        link.download = `evershine-product-${product.postId}.png`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
 
-      // Wait for QR code to load
-      await qrCodeLoaded
+        setGeneratingQR((prev) => ({ ...prev, [product.postId]: false }))
+        toast.success("Basic QR code downloaded successfully")
+      }
+
+      // If template failed to load, use basic QR
+      if (templateError || !templateLoaded || !templateImageRef.current) {
+        downloadBasicQR()
+        return null
+      }
 
       // Create a canvas element
       const canvas = document.createElement("canvas")
@@ -173,139 +226,125 @@ export default function AllQR() {
       canvas.width = 600
       canvas.height = 900
 
-      // Draw the template directly on the canvas
-      // White background
-      ctx.fillStyle = "#ffffff"
-      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      // Create a new Image for the QR code
+      const qrCode = new Image()
+      qrCode.crossOrigin = "anonymous"
+      
+      try {
+        // Load QR code image
+        await new Promise<void>((resolve, reject) => {
+          qrCode.onload = () => resolve()
+          qrCode.onerror = () => reject(new Error("Failed to load QR code"))
+          qrCode.src = qrCodeDataUrl
+        })
 
-      // Draw a border
-      ctx.strokeStyle = "#194a95"
-      ctx.lineWidth = 10
-      ctx.strokeRect(20, 20, canvas.width - 40, canvas.height - 40)
+        // Draw the template image on the canvas
+        ctx.drawImage(templateImageRef.current, 0, 0, canvas.width, canvas.height)
 
-      // Add Evershine logo/header
-      ctx.fillStyle = "#194a95"
-      ctx.fillRect(20, 20, canvas.width - 40, 120)
+        // Draw the QR code
+        ctx.drawImage(qrCode, 380, 640, 150, 150)
 
-      // Add company name
-      ctx.font = "bold 40px Arial"
-      ctx.fillStyle = "#ffffff"
-      ctx.textAlign = "center"
-      ctx.fillText("EVERSHINE", canvas.width / 2, 90)
+        // Add product name below the QR code
+        ctx.font = "bold 16px Arial"
+        ctx.fillStyle = "#000000"
+        ctx.textAlign = "center"
 
-      // Add product details section
-      ctx.fillStyle = "#f8f8f8"
-      ctx.fillRect(50, 170, canvas.width - 100, 400)
+        // Position the text below the QR code
+        const qrCodeCenterX = 380 + 75 // QR code X position + half width
+        const textY = 810 // Position below the QR code
 
-      // Add product name
-      ctx.font = "bold 30px Arial"
-      ctx.fillStyle = "#194a95"
-      ctx.textAlign = "center"
-      ctx.fillText("PRODUCT", canvas.width / 2, 220)
+        // Capitalize the product name
+        const capitalizedName = product.name
+          .split(" ")
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+          .join(" ")
 
-      // Capitalize the product name
-      const capitalizedName = product.name
-        .split(" ")
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-        .join(" ")
+        // Wrap text for longer product names
+        const maxWidth = 150 // Same width as QR code
+        const words = capitalizedName.split(" ")
+        let line = ""
+        let y = textY
+        let lineCount = 0
+        const maxLines = 3 // Maximum number of lines to display
 
-      // Add product name (wrapped if necessary)
-      ctx.font = "bold 24px Arial"
-      ctx.fillStyle = "#000000"
+        for (let i = 0; i < words.length; i++) {
+          // If we've reached the maximum number of lines, add ellipsis and break
+          if (lineCount >= maxLines - 1 && i < words.length - 1) {
+            ctx.fillText(line + "...", qrCodeCenterX, y)
+            break
+          }
 
-      // Wrap text for longer product names
-      const maxWidth = 500
-      const words = capitalizedName.split(" ")
-      let line = ""
-      let y = 270
+          const testLine = line + words[i] + " "
+          const metrics = ctx.measureText(testLine)
+          const testWidth = metrics.width
 
-      for (let i = 0; i < words.length; i++) {
-        const testLine = line + words[i] + " "
-        const metrics = ctx.measureText(testLine)
-        const testWidth = metrics.width
-
-        if (testWidth > maxWidth && i > 0) {
-          ctx.fillText(line, canvas.width / 2, y)
-          line = words[i] + " "
-          y += 35
-        } else {
-          line = testLine
+          if (testWidth > maxWidth && i > 0) {
+            ctx.fillText(line, qrCodeCenterX, y)
+            line = words[i] + " "
+            y += 20 // Line height
+            lineCount++
+          } else {
+            line = testLine
+          }
         }
+
+        // Draw the last line if we haven't reached the maximum
+        if (lineCount < maxLines) {
+          ctx.fillText(line, qrCodeCenterX, y)
+        }
+
+        // Convert canvas to data URL and download
+        const dataUrl = canvas.toDataURL("image/png")
+
+        if (download) {
+          // Use direct download approach which is more reliable
+          const link = document.createElement("a")
+          link.href = dataUrl
+          link.download = `evershine-product-${product.postId}.png`
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+
+          setGeneratingQR((prev) => ({ ...prev, [product.postId]: false }))
+          toast.success("QR code downloaded successfully")
+        }
+
+        return dataUrl
+      } catch (error) {
+        console.error("Error in fancy QR generation:", error)
+        // Fall back to basic QR download if needed
+        if (download) {
+          downloadBasicQR()
+        }
+        return qrCodeDataUrl
       }
-      ctx.fillText(line, canvas.width / 2, y)
-
-      // Add price
-      ctx.font = "bold 22px Arial"
-      ctx.fillStyle = "#194a95"
-      ctx.fillText(`Price: ₹${product.price}/sqft`, canvas.width / 2, y + 60)
-
-      // Add category if available
-      if (product.category) {
-        ctx.font = "20px Arial"
-        ctx.fillStyle = "#555555"
-        ctx.fillText(`Category: ${product.category}`, canvas.width / 2, y + 100)
-      }
-
-      // Add QR code section
-      ctx.fillStyle = "#194a95"
-      ctx.fillRect(20, canvas.height - 280, canvas.width - 40, 60)
-
-      ctx.font = "bold 24px Arial"
-      ctx.fillStyle = "#ffffff"
-      ctx.fillText("SCAN QR CODE", canvas.width / 2, canvas.height - 240)
-
-      // Draw the QR code (now that we know it's loaded)
-      const qrSize = 200
-      const qrX = (canvas.width - qrSize) / 2
-      const qrY = canvas.height - 220
-      ctx.drawImage(qrCodeImage, qrX, qrY, qrSize, qrSize)
-
-      // Add scan instructions
-      ctx.font = "16px Arial"
-      ctx.fillStyle = "#555555"
-      ctx.fillText("Scan with Evershine Agent App", canvas.width / 2, canvas.height - 40)
-
-      // Convert canvas to data URL
-      const dataUrl = canvas.toDataURL("image/png")
-
-      // Create a blob from the data URL
-      const byteString = atob(dataUrl.split(",")[1])
-      const mimeString = dataUrl.split(",")[0].split(":")[1].split(";")[0]
-      const ab = new ArrayBuffer(byteString.length)
-      const ia = new Uint8Array(ab)
-      for (let i = 0; i < byteString.length; i++) {
-        ia[i] = byteString.charCodeAt(i)
-      }
-      const blob = new Blob([ab], { type: mimeString })
-
-      // Create a download link using the blob
-      const blobUrl = URL.createObjectURL(blob)
-      const downloadLink = document.createElement("a")
-      downloadLink.href = blobUrl
-      downloadLink.download = `evershine-${product.name.replace(/\s+/g, "-").toLowerCase()}-${product.postId.slice(0, 8)}.png`
-
-      // Append to body, click, and clean up
-      document.body.appendChild(downloadLink)
-      downloadLink.click()
-
-      // Clean up after a short delay to ensure download starts
-      setTimeout(() => {
-        document.body.removeChild(downloadLink)
-        URL.revokeObjectURL(blobUrl)
-        setGeneratingQR((prev) => ({ ...prev, [product.postId]: false }))
-        toast.success("QR code downloaded successfully")
-      }, 100)
     } catch (error) {
       console.error("Error generating QR code:", error)
-      toast.error("Failed to generate QR code: " + (error instanceof Error ? error.message : "Unknown error"))
-      setGeneratingQR((prev) => ({ ...prev, [product.postId]: false }))
+      if (download) {
+        toast.error("Failed to generate QR code: " + (error instanceof Error ? error.message : "Unknown error"))
+        setGeneratingQR((prev) => ({ ...prev, [product.postId]: false }))
+      }
+      return null
     }
+  }
+
+  const handlePreviewQR = async (product: Product) => {
+    setSelectedProduct(product)
+    const qrCodeUrl = await generateQRCode(product, false)
+    setPreviewQR(qrCodeUrl)
+  }
+
+  const handleDownloadQR = async (product: Product) => {
+    await generateQRCode(product, true)
   }
 
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <Loader2 className="h-12 w-12 animate-spin text-[#194a95]" />
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-12 w-12 animate-spin text-[#194a95]" />
+          <p className="text-gray-600">Loading products...</p>
+        </div>
       </div>
     )
   }
@@ -315,7 +354,7 @@ export default function AllQR() {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-6">
         {/* Header with Search - Repositioned to top right */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-4">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
@@ -326,10 +365,10 @@ export default function AllQR() {
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <h1 className="text-4xl font-bold text-[#181818]">All Products</h1>
+            <h1 className="text-2xl md:text-4xl font-bold text-[#181818]">All Products</h1>
           </div>
 
-          <div className="relative">
+          <div className="relative w-full md:w-auto">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
               <input
@@ -342,6 +381,7 @@ export default function AllQR() {
             </div>
           </div>
         </div>
+        
         {/* View Toggle and Add Button */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div className="flex items-center gap-2 border rounded-lg overflow-hidden">
@@ -353,7 +393,10 @@ export default function AllQR() {
               <Grid className="h-4 w-4" />
               <span>Grid</span>
             </button>
-            <button className="flex items-center gap-1 px-4 py-2 bg-[#194a95] text-white" aria-label="List view">
+            <button 
+              className="flex items-center gap-1 px-4 py-2 bg-[#194a95] text-white" 
+              aria-label="List view"
+            >
               <List className="h-4 w-4" />
               <span>List</span>
             </button>
@@ -366,14 +409,24 @@ export default function AllQR() {
             Add New Product
           </button>
         </div>
+        
         {/* Products Count */}
-        <p className="text-gray-600 mb-6">
-          Showing {filteredProducts.length} of {products.length} products
-        </p>
+        <div className="flex items-center justify-between mb-6">
+          <p className="text-gray-600">
+            Showing {filteredProducts.length} of {products.length} products
+          </p>
+          
+          {templateError && (
+            <div className="flex items-center text-amber-600 text-sm">
+              <AlertCircle className="h-4 w-4 mr-1" />
+              <span>QR template not found. Basic QR codes will be used.</span>
+            </div>
+          )}
+        </div>
 
         {/* Products Table */}
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
+          <table className="w-full border-collapse border border-gray-200 rounded-lg">
             <thead>
               <tr className="bg-gray-50 border-b">
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">
@@ -388,91 +441,130 @@ export default function AllQR() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredProducts.map((product) => (
-                <tr key={product._id} className="hover:bg-gray-50">
-                  <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <Link href={`/product/${product.postId}`} className="h-10 w-10 flex-shrink-0 mr-3 block">
-                        <Image
-                          src={product.image[0] || "/placeholder.svg"}
-                          alt={product.name}
-                          width={40}
-                          height={40}
-                          className="rounded-md object-cover"
-                          onError={(e) => {
-                            e.currentTarget.src = "/placeholder.svg"
-                          }}
-                        />
-                      </Link>
-                      <div className="ml-2">
-                        <Link
-                          href={`/product/${product.postId}`}
-                          className="text-sm font-medium text-gray-900 hover:text-[#194a95] transition-colors cursor-pointer"
-                        >
-                          {product.name}
+              {filteredProducts.length > 0 ? (
+                filteredProducts.map((product) => (
+                  <tr key={product._id} className="hover:bg-gray-50">
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <Link href={`/product/${product.postId}`} className="h-10 w-10 flex-shrink-0 mr-3 block">
+                          <Image
+                            src={product.image[0] || "/placeholder.svg?height=40&width=40&query=product"}
+                            alt={product.name}
+                            width={40}
+                            height={40}
+                            className="rounded-md object-cover"
+                            onError={(e) => {
+                              e.currentTarget.src = "/placeholder.svg?key=amh3a"
+                            }}
+                          />
                         </Link>
-                        <div className="text-xs text-gray-500">ID: {product.postId.slice(0, 8)}...</div>
+                        <div className="ml-2">
+                          <Link
+                            href={`/product/${product.postId}`}
+                            className="text-sm font-medium text-gray-900 hover:text-[#194a95] transition-colors cursor-pointer"
+                          >
+                            {product.name}
+                          </Link>
+                          <div className="text-xs text-gray-500">ID: {product.postId.slice(0, 8)}...</div>
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="flex items-center space-x-2">
-                      <div className="relative">
-                        <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₹</span>
-                        <input
-                          type="number"
-                          value={priceValues[product.postId] || ""}
-                          onChange={(e) => handlePriceChange(product.postId, e.target.value)}
-                          onKeyDown={(e) => handleKeyDown(e, product.postId)}
-                          className="pl-6 pr-2 py-1 w-24 border rounded focus:outline-none focus:ring-2 focus:ring-[#194a95]"
-                          min="1"
-                          step="any"
-                        />
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <div className="flex items-center space-x-2">
+                        <div className="relative">
+                          <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₹</span>
+                          <input
+                            type="number"
+                            value={priceValues[product.postId] || ""}
+                            onChange={(e) => handlePriceChange(product.postId, e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, product.postId)}
+                            className="pl-6 pr-2 py-1 w-24 border rounded focus:outline-none focus:ring-2 focus:ring-[#194a95]"
+                            min="1"
+                            step="any"
+                          />
+                        </div>
+                        <button
+                          onClick={() => updatePrice(product.postId)}
+                          disabled={updatingPrice[product.postId]}
+                          className="p-1 text-green-600 hover:text-green-800"
+                        >
+                          {updatingPrice[product.postId] ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Check className="h-4 w-4" />
+                          )}
+                        </button>
+                        <span className="text-xs text-gray-500">/per sqft</span>
                       </div>
-                      <button
-                        onClick={() => updatePrice(product.postId)}
-                        disabled={updatingPrice[product.postId]}
-                        className="p-1 text-green-600 hover:text-green-800"
-                      >
-                        {updatingPrice[product.postId] ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Check className="h-4 w-4" />
-                        )}
-                      </button>
-                      <span className="text-xs text-gray-500">/per sqft</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-right">
-                    <div className="flex justify-end space-x-2">
-                      <Button
-                        onClick={() => generateAndDownloadQR(product)}
-                        size="sm"
-                        disabled={!!generatingQR[product.postId]}
-                        className="bg-[#194a95] hover:bg-[#0f3a7a]"
-                      >
-                        {generatingQR[product.postId] ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <>
-                            <Download className="h-4 w-4 mr-1" /> Download QR
-                          </>
-                        )}
-                      </Button>
-                    </div>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-right">
+                      <div className="flex justify-end space-x-2">
+                    
+                        <Button
+                          onClick={() => handleDownloadQR(product)}
+                          size="sm"
+                          disabled={!!generatingQR[product.postId]}
+                          className="bg-[#194a95] hover:bg-[#0f3a7a]"
+                        >
+                          {generatingQR[product.postId] ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <>
+                              <Download className="h-4 w-4 mr-1" /> Download QR
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={3} className="px-4 py-8 text-center">
+                    <p className="text-gray-500 text-lg">No products found</p>
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
 
-        {/* Empty State */}
-        {filteredProducts.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-500 text-lg">No products found</p>
-          </div>
-        )}
+        {/* QR Code Preview Dialog */}
+        <Dialog open={!!previewQR} onOpenChange={(open) => !open && setPreviewQR(null)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>QR Code Preview</DialogTitle>
+              <DialogDescription>
+                {selectedProduct?.name} - ID: {selectedProduct?.postId.slice(0, 8)}...
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col items-center justify-center p-4">
+              {previewQR && (
+                <div className="relative">
+                  <img 
+                    src={previewQR || "/placeholder.svg"} 
+                    alt="QR Code Preview" 
+                    className="max-w-full h-auto border rounded-md"
+                  />
+                </div>
+              )}
+              <div className="mt-4 flex justify-center">
+                <Button
+                  onClick={() => selectedProduct && handleDownloadQR(selectedProduct)}
+                  disabled={!!selectedProduct && !!generatingQR[selectedProduct.postId]}
+                  className="bg-[#194a95] hover:bg-[#0f3a7a]"
+                >
+                  {selectedProduct && generatingQR[selectedProduct.postId] ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Download className="h-4 w-4 mr-2" />
+                  )}
+                  Download QR Code
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )
