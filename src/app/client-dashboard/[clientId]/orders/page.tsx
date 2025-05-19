@@ -14,6 +14,7 @@ interface Order {
     name: string
     category: string
     price: number
+    basePrice?: number
     quantity: number
   }[]
   totalAmount: number
@@ -29,6 +30,13 @@ interface Order {
   }
 }
 
+interface CommissionData {
+  [category: string]: {
+    baseCommissionRate: number
+    overrideRate?: number
+  }
+}
+
 export default function OrdersPage() {
   const params = useParams()
   const router = useRouter()
@@ -38,6 +46,58 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [commissionData, setCommissionData] = useState<CommissionData>({})
+  const [consultantLevel, setConsultantLevel] = useState<number>(0)
+
+  // Fetch commission data
+  useEffect(() => {
+    const fetchCommissionData = async () => {
+      try {
+        const token = localStorage.getItem("clientImpersonationToken")
+        if (!token) return
+
+        // Fetch commission rates
+        const response = await fetch("https://evershinebackend-2.onrender.com/api/commission-rates", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch commission rates")
+        }
+
+        const data = await response.json()
+        console.log("ORDERS - Commission data:", data)
+
+        if (data && data.data) {
+          setCommissionData(data.data)
+        }
+
+        // Fetch consultant level
+        const consultantResponse = await fetch(`https://evershinebackend-2.onrender.com/api/clients/${clientId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+
+        if (!consultantResponse.ok) {
+          throw new Error("Failed to fetch consultant level")
+        }
+
+        const consultantData = await consultantResponse.json()
+        console.log("ORDERS - Consultant data:", consultantData)
+
+        if (consultantData && consultantData.data && consultantData.data.consultantLevel) {
+          setConsultantLevel(consultantData.data.consultantLevel)
+        }
+      } catch (error) {
+        console.error("Error fetching commission data:", error)
+      }
+    }
+
+    fetchCommissionData()
+  }, [clientId])
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -105,6 +165,34 @@ export default function OrdersPage() {
     fetchOrders()
   }, [clientId, toast])
 
+  // Calculate adjusted price with commission
+  const calculateAdjustedPrice = (item: any) => {
+    // Use basePrice if available, otherwise use price
+    const basePrice = item.basePrice || item.price
+
+    // Get commission rate for the item's category
+    const categoryCommission = commissionData[item.category] || { baseCommissionRate: 20 }
+    const baseCommissionRate = categoryCommission.baseCommissionRate
+
+    // Get consultant level commission rate (default to 15% if not available)
+    const consultantCommissionRate = consultantLevel === 2 ? 15 : 0
+
+    // Calculate total commission rate
+    const totalCommissionRate = baseCommissionRate + consultantCommissionRate
+
+    console.log(`ORDERS - Calculating price for ${item.name}:`)
+    console.log(`ORDERS - Base price: ${basePrice}`)
+    console.log(`ORDERS - Base commission rate: ${baseCommissionRate}`)
+    console.log(`ORDERS - Consultant commission rate: ${consultantCommissionRate}`)
+    console.log(`ORDERS - Total commission rate: ${totalCommissionRate}`)
+
+    // Calculate adjusted price
+    const adjustedPrice = basePrice * (1 + totalCommissionRate / 100)
+    console.log(`ORDERS - Adjusted price: ${adjustedPrice.toFixed(2)}`)
+
+    return adjustedPrice
+  }
+
   // Format date
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -141,6 +229,14 @@ export default function OrdersPage() {
       default:
         return "bg-yellow-100 text-yellow-800"
     }
+  }
+
+  // Calculate order total with adjusted prices
+  const calculateAdjustedTotal = (order: Order) => {
+    return order.items.reduce((total, item) => {
+      const adjustedPrice = calculateAdjustedPrice(item)
+      return total + adjustedPrice * item.quantity
+    }, 0)
   }
 
   if (loading) {
@@ -213,7 +309,7 @@ export default function OrdersPage() {
                     <h3 className="font-medium mb-2">Items</h3>
                     <div className="space-y-2">
                       {order.items.map((item, index) => {
-                        console.log(`ORDERS - Item ${item.name} - Price from backend: ${item.price}`)
+                        const adjustedPrice = calculateAdjustedPrice(item)
                         return (
                           <div key={index} className="flex justify-between border-b pb-2">
                             <div>
@@ -222,9 +318,20 @@ export default function OrdersPage() {
                             </div>
                             <div className="text-right">
                               <p>
-                                ₹{item.price.toLocaleString()} × {item.quantity}
+                                ₹
+                                {adjustedPrice.toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}{" "}
+                                × {item.quantity}
                               </p>
-                              <p className="font-medium">₹{(item.price * item.quantity).toLocaleString()}</p>
+                              <p className="font-medium">
+                                ₹
+                                {(adjustedPrice * item.quantity).toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
+                              </p>
                             </div>
                           </div>
                         )
@@ -232,7 +339,13 @@ export default function OrdersPage() {
                     </div>
                     <div className="flex justify-between mt-4 pt-2 font-bold">
                       <span>Total</span>
-                      <span>₹{order.totalAmount.toLocaleString()}</span>
+                      <span>
+                        ₹
+                        {calculateAdjustedTotal(order).toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </span>
                     </div>
                   </div>
                   <div>
