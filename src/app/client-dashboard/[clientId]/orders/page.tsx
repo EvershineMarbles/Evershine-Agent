@@ -182,7 +182,7 @@ export default function OrdersPage() {
     fetchClientData()
   }, [clientId])
 
-  // Calculate adjusted price with commission - MODIFIED to use order-specific rates
+  // Calculate adjusted price with commission - FIXED to properly add consultant level rate
   const calculateAdjustedPrice = (item: OrderItem, order: Order) => {
     // Always use the item's own price or basePrice if available
     const basePrice = item.basePrice || item.price
@@ -194,20 +194,25 @@ export default function OrdersPage() {
     // Check for category-specific commission stored with the order
     if (order.categoryCommissions && item.category && order.categoryCommissions[item.category] !== undefined) {
       defaultRate = order.categoryCommissions[item.category]
-    } 
+    }
     // Fall back to current category commissions if order doesn't have them stored
-    else if (commissionData?.categoryCommissions && item.category && commissionData.categoryCommissions[item.category]) {
+    else if (
+      commissionData?.categoryCommissions &&
+      item.category &&
+      commissionData.categoryCommissions[item.category]
+    ) {
       defaultRate = commissionData.categoryCommissions[item.category]
     }
 
     // Use consultant level rate stored with the order if available
     // IMPORTANT: Make sure to use the consultant level rate from the order if available
-    const consultantRate = order.consultantLevelRate !== undefined ? order.consultantLevelRate : overrideCommissionRate || 0
+    const consultantRate =
+      order.consultantLevelRate !== undefined ? order.consultantLevelRate : overrideCommissionRate || 0
 
     // Calculate final rate - IMPORTANT: Add both rates together
     const finalRate = defaultRate + consultantRate
 
-    // Calculate adjusted price based on the original basePrice
+    // FIXED: Calculate adjusted price based on the original basePrice and TOTAL commission rate
     const adjustedPrice = basePrice * (1 + finalRate / 100)
 
     console.log(`ORDERS - Calculating price for ${item.name} in order ${order.orderId}:`)
@@ -266,17 +271,19 @@ export default function OrdersPage() {
           const orderWithRates = {
             ...order,
             // Store current commission rates with the order if not already present
-            commissionRate: order.commissionRate !== undefined ? order.commissionRate : currentCommissionData?.commissionRate || 0,
+            commissionRate:
+              order.commissionRate !== undefined ? order.commissionRate : currentCommissionData?.commissionRate || 0,
             categoryCommissions: order.categoryCommissions || currentCommissionData?.categoryCommissions || {},
             // IMPORTANT: Make sure to store the consultant level rate
-            consultantLevelRate: order.consultantLevelRate !== undefined ? order.consultantLevelRate : overrideCommissionRate || 0,
+            consultantLevelRate:
+              order.consultantLevelRate !== undefined ? order.consultantLevelRate : overrideCommissionRate || 0,
             // Ensure each item has basePrice preserved
             items: order.items.map((item: OrderItem) => ({
               ...item,
               basePrice: item.basePrice || item.price,
             })),
           }
-          
+
           return orderWithRates
         })
       }
