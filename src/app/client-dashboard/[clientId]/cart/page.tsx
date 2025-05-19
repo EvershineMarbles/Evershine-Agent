@@ -101,10 +101,6 @@ export default function CartPage() {
 
   // Add calculateAdjustedPrice function
   const calculateAdjustedPrice = (item: CartItem) => {
-    // Check if this price already includes commission (from wishlist)
-    // If the item was added from wishlist, it already has commission applied
-    // We can detect this by checking if the price is already higher than what we'd expect
-
     // Get the default commission rate (from agent or category-specific)
     let defaultRate = commissionData?.commissionRate || 0
 
@@ -116,14 +112,20 @@ export default function CartPage() {
     // Add the override rate to the default rate if an override is set
     const finalRate = overrideCommissionRate !== null ? defaultRate + overrideCommissionRate : defaultRate
 
-    // If we have a basePrice, use that for calculation
-    if (item.basePrice) {
-      const adjustedPrice = item.basePrice * (1 + finalRate / 100)
-      return Math.round(adjustedPrice * 100) / 100 // Round to 2 decimal places
-    }
+    console.log(`CART - Calculating price for ${item.name}:`)
+    console.log(`CART - Original price:`, item.price)
+    console.log(`CART - Base price:`, item.basePrice || item.price)
+    console.log(`CART - Commission rate:`, finalRate)
 
-    // If no basePrice, assume the current price already includes commission
-    return item.price
+    // The issue is here - we need to apply the commission calculation to all items
+    // regardless of whether they have a basePrice or not
+    const basePrice = item.basePrice || item.price
+    const adjustedPrice = basePrice * (1 + finalRate / 100)
+    const roundedPrice = Math.round(adjustedPrice * 100) / 100
+
+    console.log(`CART - Adjusted price:`, roundedPrice)
+
+    return roundedPrice
   }
 
   // Load saved commission rate from localStorage on component mount
@@ -228,12 +230,17 @@ export default function CartPage() {
           (item: CartItem) => item.postId && typeof item.postId === "string",
         )
 
+        console.log("CART - Items received from backend:", validItems)
+
         // Ensure all items have valid prices
         const itemsWithValidPrices = validItems.map((item: CartItem) => {
+          console.log(`CART - Item ${item.name} - Price from backend:`, item.price)
+
           // If price is missing or invalid, try to get it from the product
           if (!item.price || item.price <= 0) {
             // We'll fetch the product details to get the correct price
             fetchProductPrice(item.postId).then((price) => {
+              console.log(`CART - Fetched product price for ${item.name}:`, price)
               if (price > 0) {
                 setCartItems((prev) =>
                   prev.map((cartItem) => (cartItem.postId === item.postId ? { ...cartItem, price } : cartItem)),
@@ -305,6 +312,14 @@ export default function CartPage() {
       const currentItem = cartItems.find((item) => item.postId === productId)
       if (!currentItem) return
 
+      // Calculate the adjusted price with commission
+      const adjustedPrice = calculateAdjustedPrice(currentItem)
+
+      console.log(`CART - Updating quantity for ${currentItem.name}:`)
+      console.log(`CART - Original price:`, currentItem.price)
+      console.log(`CART - Adjusted price being sent:`, adjustedPrice)
+      console.log(`CART - New quantity:`, newQuantity)
+
       // First remove the item
       await fetch(`${apiUrl}/api/deleteUserCartItem`, {
         method: "DELETE",
@@ -315,7 +330,7 @@ export default function CartPage() {
         body: JSON.stringify({ productId }),
       })
 
-      // Then add it back with the new quantity but preserve the original price
+      // Then add it back with the new quantity and adjusted price
       await fetch(`${apiUrl}/api/addToCart`, {
         method: "POST",
         headers: {
@@ -325,7 +340,7 @@ export default function CartPage() {
         body: JSON.stringify({
           productId,
           quantity: newQuantity,
-          price: currentItem.price, // Preserve the original price
+          price: adjustedPrice, // Use the adjusted price with commission
         }),
       })
 
@@ -590,6 +605,7 @@ export default function CartPage() {
                         <h3 className="font-medium text-lg">{item.name}</h3>
                         <p className="text-sm text-muted-foreground mb-2">{item.category}</p>
                         <p className="font-semibold text-lg text-primary">₹{adjustedPrice.toLocaleString()}</p>
+                        <p className="text-xs text-muted-foreground">Original: ₹{item.price.toLocaleString()}</p>
                       </div>
                       <div className="flex flex-col sm:flex-row items-center gap-4 mt-2 sm:mt-0">
                         {/* Quantity input */}

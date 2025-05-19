@@ -342,9 +342,13 @@ export default function WishlistPage() {
 
       // Find the item to get its data
       const item = wishlistItems.find((item) => (item.postId || item._id) === productId)
-
       // Calculate adjusted price with commission if item exists
       const adjustedPrice = item ? calculateAdjustedPrice(item) : 0
+
+      console.log("WISHLIST - Original item:", item)
+      console.log("WISHLIST - Base price:", item?.basePrice || item?.price)
+      console.log("WISHLIST - Commission rate:", overrideCommissionRate)
+      console.log("WISHLIST - Adjusted price being sent to cart:", adjustedPrice)
 
       // Try with axios - now sending the quantity and adjusted price
       const response = await axios.post(
