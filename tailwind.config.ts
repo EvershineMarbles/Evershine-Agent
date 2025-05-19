@@ -82,10 +82,6 @@ const config: Config = {
         "accordion-up": "accordion-up 0.2s ease-out",
         scan: "scan 2s ease-in-out infinite",
       },
-      zIndex: {
-        "100": "100",
-        "9999": "9999",
-      },
     },
   },
   plugins: [require("tailwindcss-animate")],

@@ -13,25 +13,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/components/ui/use-toast"
 import { Loader2, Save } from "lucide-react"
 
-// Update the ClientSettings interface to include consultantLevel
 interface ClientSettings {
   name: string
   email: string
   mobile: string
   city: string
   profession: string
-  purpose: string // Kept in interface for API compatibility
-  clientId: string
-  quantityRequired: number // Kept in interface for API compatibility
-  agentAffiliated: string
-  createdAt?: string
-  updatedAt?: string
-  address: string // Kept in interface for API compatibility
-  dateOfBirth: string
-  businessName: string
-  gstNumber: string
-  projectType: string
-  consultantLevel: string
+  purpose: string
 }
 
 export default function SettingsPage() {
@@ -40,7 +28,6 @@ export default function SettingsPage() {
   const { toast } = useToast()
   const clientId = params.clientId as string
 
-  // Update the initial state to include consultantLevel
   const [settings, setSettings] = useState<ClientSettings>({
     name: "",
     email: "",
@@ -48,15 +35,6 @@ export default function SettingsPage() {
     city: "",
     profession: "",
     purpose: "",
-    clientId: "",
-    quantityRequired: 0,
-    agentAffiliated: "",
-    address: "",
-    dateOfBirth: "",
-    businessName: "",
-    gstNumber: "",
-    projectType: "",
-    consultantLevel: "red", // Default to red
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -101,7 +79,7 @@ export default function SettingsPage() {
         const data = await response.json()
 
         if (data.data) {
-          // Set client data to state, ensuring we capture all fields
+          // Set client data to state
           setSettings({
             name: data.data.name || "",
             email: data.data.email || "",
@@ -109,20 +87,6 @@ export default function SettingsPage() {
             city: data.data.city || "",
             profession: data.data.profession || "",
             purpose: data.data.purpose || "",
-            clientId: data.data.clientId || clientId,
-            quantityRequired: data.data.quantityRequired || 0,
-            agentAffiliated: data.data.agentAffiliated || "",
-            createdAt: data.data.createdAt || "",
-            updatedAt: data.data.updatedAt || "",
-            address: data.data.address || "",
-            dateOfBirth: data.data.dateOfBirth ? data.data.dateOfBirth.split("T")[0] : "",
-            businessName: data.data.businessName || "",
-            gstNumber: data.data.gstNumber || "",
-            projectType: data.data.projectType || "",
-            consultantLevel: data.data.consultantLevel || "red",
-            // Add any additional fields that might be in the client data
-            // This ensures we don't lose any data when updating
-            ...data.data,
           })
         } else {
           throw new Error("Invalid response format from server")
@@ -149,11 +113,6 @@ export default function SettingsPage() {
     setSettings((prev) => ({ ...prev, [name]: value }))
   }
 
-  // Add this function to handle consultant level changes
-  const handleConsultantLevelChange = (level: string) => {
-    setSettings((prev) => ({ ...prev, consultantLevel: level }))
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
@@ -167,38 +126,20 @@ export default function SettingsPage() {
         throw new Error("No authentication token found. Please refresh the page and try again.")
       }
 
-      // Log the data being sent for debugging
-      console.log("Updating client with data:", settings)
-
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"}/api/update-client`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(settings),
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"}/api/update-client`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
-      )
+        body: JSON.stringify(settings),
+      })
 
       if (!response.ok) {
-        // Try to get more detailed error information
-        let errorMessage = `API error: ${response.status} ${response.statusText}`
-        try {
-          const errorData = await response.json()
-          if (errorData && errorData.message) {
-            errorMessage = errorData.message
-          }
-        } catch (e) {
-          // If we can't parse the error as JSON, just use the status
-        }
-
-        throw new Error(errorMessage)
+        throw new Error(`API error: ${response.status} ${response.statusText}`)
       }
 
       const data = await response.json()
-      console.log("Update response:", data)
 
       toast({
         title: "Settings Saved",
@@ -306,126 +247,14 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="agentAffiliated">Agent Affiliated</Label>
+                    <Label htmlFor="purpose">Purpose</Label>
                     <Input
-                      id="agentAffiliated"
-                      name="agentAffiliated"
-                      value={settings.agentAffiliated || ""}
-                      onChange={handleChange}
-                      disabled={true} // Agent affiliation should be immutable
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="clientId">Client ID</Label>
-                    <Input
-                      id="clientId"
-                      name="clientId"
-                      value={settings.clientId || clientId}
-                      disabled={true} // Client ID is immutable
-                    />
-                  </div>
-
-                  {settings.createdAt && (
-                    <div className="space-y-2">
-                      <Label htmlFor="createdAt">Created At</Label>
-                      <Input
-                        id="createdAt"
-                        name="createdAt"
-                        value={new Date(settings.createdAt).toLocaleString()}
-                        disabled={true}
-                      />
-                    </div>
-                  )}
-
-                  {settings.updatedAt && (
-                    <div className="space-y-2">
-                      <Label htmlFor="updatedAt">Last Updated</Label>
-                      <Input
-                        id="updatedAt"
-                        name="updatedAt"
-                        value={new Date(settings.updatedAt).toLocaleString()}
-                        disabled={true}
-                      />
-                    </div>
-                  )}
-
-                  <div className="space-y-2">
-                    <Label htmlFor="dateOfBirth">Date of Birth</Label>
-                    <Input
-                      id="dateOfBirth"
-                      name="dateOfBirth"
-                      type="date"
-                      value={settings.dateOfBirth ? settings.dateOfBirth.split("T")[0] : ""}
-                      onChange={handleChange}
-                      disabled={saving}
-                      className="w-full"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="businessName">Business Name</Label>
-                    <Input
-                      id="businessName"
-                      name="businessName"
-                      value={settings.businessName}
+                      id="purpose"
+                      name="purpose"
+                      value={settings.purpose}
                       onChange={handleChange}
                       disabled={saving}
                     />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="gstNumber">GST Number</Label>
-                    <Input
-                      id="gstNumber"
-                      name="gstNumber"
-                      value={settings.gstNumber}
-                      onChange={handleChange}
-                      disabled={saving}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="projectType">Project Type</Label>
-                    <Input
-                      id="projectType"
-                      name="projectType"
-                      value={settings.projectType}
-                      onChange={handleChange}
-                      disabled={saving}
-                    />
-                  </div>
-                  <div className="space-y-2 col-span-1 md:col-span-2">
-                    <Label htmlFor="consultantLevel" className="text-base font-medium">
-                      Consultant Level
-                    </Label>
-                    <div className="flex items-center gap-6 mt-2">
-                      <button
-                        type="button"
-                        onClick={() => handleConsultantLevelChange("red")}
-                        className={`w-8 h-8 rounded-full bg-red-500 transition-all ${
-                          settings.consultantLevel === "red" ? "ring-4 ring-red-200 scale-110" : "hover:scale-105"
-                        }`}
-                        aria-label="Red consultant level (+5%)"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleConsultantLevelChange("yellow")}
-                        className={`w-8 h-8 rounded-full bg-yellow-500 transition-all ${
-                          settings.consultantLevel === "yellow" ? "ring-4 ring-yellow-200 scale-110" : "hover:scale-105"
-                        }`}
-                        aria-label="Yellow consultant level (+10%)"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleConsultantLevelChange("purple")}
-                        className={`w-8 h-8 rounded-full bg-purple-600 transition-all ${
-                          settings.consultantLevel === "purple" ? "ring-4 ring-purple-200 scale-110" : "hover:scale-105"
-                        }`}
-                        aria-label="Purple consultant level (+15%)"
-                      />
-                    </div>
-                    
                   </div>
                 </div>
 

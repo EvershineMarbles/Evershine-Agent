@@ -1,58 +1,33 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Separator } from "@/components/ui/separator"
-import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ArrowLeft, Loader2, FileText, Edit, Package } from "lucide-react"
-import { fetchWithAdminAuth } from "@/lib/admin-auth"
+import { fetchWithAuth } from "@/lib/auth"
 
 interface ClientDetails {
   _id: string
   name: string
   mobile: string
   clientId: string
-  email?: string
-  city?: string
-  profession?: string
-  purpose?: string
-  quantityRequired?: number
-  agentAffiliated?: string
+  quantityRequired: number
+  profession: string
+  purpose: string
+  city: string
+  email: string
+  agentAffiliated: string
   createdAt: string
   updatedAt: string
-  businessName?: string
-  gstNumber?: string
-  projectType?: string
-  dateOfBirth?: string
-  address?: string
-  consultantLevel?: string
-  architectDetails?: {
-    name?: string
-    contact?: string
-    firm?: string
-  }
 }
 
 interface Order {
   orderId: string
-  clientId: string
-  agentId: string
   items: any[]
   totalAmount: number
   status: string
   paymentStatus: string
   createdAt: string
-  shippingAddress?: {
-    street?: string
-    city?: string
-    state?: string
-    postalCode?: string
-    country?: string
-  }
 }
 
 interface ClientDetailsProps {
@@ -60,321 +35,210 @@ interface ClientDetailsProps {
 }
 
 export default function ClientDetails({ clientId }: ClientDetailsProps) {
-  const router = useRouter()
   const [client, setClient] = useState<ClientDetails | null>(null)
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState("details")
+  const [impersonationToken, setImpersonationToken] = useState<string | null>(null)
 
   useEffect(() => {
-    const fetchClientData = async () => {
-      setLoading(true)
-      setError(null)
-
+    const fetchClientDetails = async () => {
       try {
-        // Fetch client details
-        const clientResponse = await fetchWithAdminAuth(`/api/admin/clients/${clientId}`)
+        setLoading(true)
+        const response = await fetchWithAuth(`/api/getClientDetails/${clientId}`)
+        const data = await response.json()
 
-        if (!clientResponse.ok) {
-          throw new Error(`Failed to fetch client details: ${clientResponse.status}`)
+        if (data.data) {
+          setClient(Array.isArray(data.data) ? data.data[0] : data.data)
         }
 
-        const clientData = await clientResponse.json()
+        // Fetch client orders
+        const ordersResponse = await fetchWithAuth(`/api/clients/${clientId}/orders`)
+        const ordersData = await ordersResponse.json()
 
-        if (clientData.success && clientData.data) {
-          setClient(clientData.data)
-
-          // Fetch client orders
-          const ordersResponse = await fetchWithAdminAuth(`/api/admin/orders?clientId=${clientId}`)
-
-          if (ordersResponse.ok) {
-            const ordersData = await ordersResponse.json()
-            if (ordersData.success && ordersData.data) {
-              setOrders(ordersData.data.orders)
-            }
-          }
-        } else {
-          throw new Error(clientData.message || "Failed to fetch client details")
+        if (ordersData.data) {
+          setOrders(ordersData.data)
         }
-      } catch (err: any) {
-        console.error("Error fetching client data:", err)
-        setError(err.message || "Failed to fetch client data")
+      } catch (err) {
+        console.error("Error fetching client details:", err)
+        setError("Failed to load client details. Please try again.")
       } finally {
         setLoading(false)
       }
     }
 
-    fetchClientData()
+    fetchClientDetails()
   }, [clientId])
 
-  // Format date
-  const formatDate = (dateString: string) => {
-    if (!dateString) return "-"
-    const date = new Date(dateString)
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    })
-  }
+  const handleImpersonate = async () => {
+    try {
+      const response = await fetchWithAuth(`/api/agent/impersonate/${clientId}`, {
+        method: "POST",
+      })
 
-  // Get status badge color
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "delivered":
-        return "bg-green-100 text-green-800"
-      case "shipped":
-        return "bg-blue-100 text-blue-800"
-      case "processing":
-        return "bg-yellow-100 text-yellow-800"
-      case "cancelled":
-        return "bg-red-100 text-red-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
-  }
+      const data = await response.json()
 
-  // Get payment status badge color
-  const getPaymentStatusColor = (status: string) => {
-    switch (status) {
-      case "paid":
-        return "bg-green-100 text-green-800"
-      case "failed":
-        return "bg-red-100 text-red-800"
-      default:
-        return "bg-yellow-100 text-yellow-800"
-    }
-  }
+      if (data.success && data.data.impersonationToken) {
+        setImpersonationToken(data.data.impersonationToken)
 
-  // Get consultant level color
-  const getConsultantLevelColor = (level?: string) => {
-    switch (level) {
-      case "red":
-        return "bg-red-500"
-      case "yellow":
-        return "bg-yellow-500"
-      case "purple":
-        return "bg-purple-600"
-      default:
-        return "bg-gray-300"
+        // Store the impersonation token
+        sessionStorage.setItem("impersonationToken", data.data.impersonationToken)
+
+        // Redirect to client dashboard
+        window.location.href = `/client-dashboard/${clientId}`
+      }
+    } catch (err) {
+      console.error("Error generating impersonation token:", err)
+      setError("Failed to impersonate client. Please try again.")
     }
   }
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="flex justify-center items-center min-h-[200px]">
+        <p>Loading client details...</p>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px]">
+      <div className="flex flex-col justify-center items-center min-h-[200px]">
         <p className="text-red-500 mb-4">{error}</p>
-        <Button onClick={() => router.back()}>Go Back</Button>
+        <Button onClick={() => window.location.reload()}>Retry</Button>
       </div>
     )
   }
 
   if (!client) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px]">
-        <p className="text-muted-foreground mb-4">Client not found</p>
-        <Button onClick={() => router.back()}>Go Back</Button>
+      <div className="flex justify-center items-center min-h-[200px]">
+        <p>Client not found</p>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center">
-          <Button variant="ghost" size="sm" onClick={() => router.back()} className="mr-2">
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Back
-          </Button>
-          <h1 className="text-3xl font-bold">{client.name}</h1>
-        </div>
-
+    <div className="container mx-auto p-4">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Client Details</h1>
+        <Button onClick={handleImpersonate}>Impersonate Client</Button>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList>
-          <TabsTrigger value="details">Client Details</TabsTrigger>
+      <Tabs defaultValue="details" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="details">Details</TabsTrigger>
           <TabsTrigger value="orders">Orders</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="details" className="mt-6">
+        <TabsContent value="details">
           <Card>
             <CardHeader>
-              <CardTitle>Client Information</CardTitle>
+              <CardTitle>{client.name}</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Full Name</h3>
-                    <p className="text-lg font-medium">{client.name}</p>
-                  </div>
-                  <Separator />
-
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Mobile Number</h3>
-                    <p className="text-lg font-medium">{client.mobile}</p>
-                  </div>
-                  <Separator />
-
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Email Address</h3>
-                    <p className="text-lg font-medium">{client.email || "-"}</p>
-                  </div>
-                  <Separator />
-
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">City</h3>
-                    <p className="text-lg font-medium">{client.city || "-"}</p>
-                  </div>
-                  <Separator />
-
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Date of Birth</h3>
-                    <p className="text-lg font-medium">{client.dateOfBirth ? formatDate(client.dateOfBirth) : "-"}</p>
-                  </div>
-                  <Separator />
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Profession</h3>
-                    <p className="text-lg font-medium">{client.profession || "-"}</p>
-                  </div>
-                  <Separator />
-
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Affiliated Agent</h3>
-                    <p className="text-lg font-medium">{client.agentAffiliated || "-"}</p>
-                  </div>
-                  <Separator />
-
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Business Name</h3>
-                    <p className="text-lg font-medium">{client.businessName || "-"}</p>
-                  </div>
-                  <Separator />
-
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">GST Number</h3>
-                    <p className="text-lg font-medium">{client.gstNumber || "-"}</p>
-                  </div>
-                  <Separator />
-                </div>
-              </div>
-
-              <div className="mt-6 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <h3 className="text-sm font-medium text-muted-foreground">Project Type</h3>
-                  <p className="text-lg font-medium">{client.projectType || "-"}</p>
+                  <h3 className="font-medium text-gray-500">Contact Information</h3>
+                  <p className="mt-2">
+                    <span className="font-medium">Mobile:</span> {client.mobile}
+                  </p>
+                  <p>
+                    <span className="font-medium">Email:</span> {client.email || "Not provided"}
+                  </p>
+                  <p>
+                    <span className="font-medium">City:</span> {client.city || "Not provided"}
+                  </p>
                 </div>
-                <Separator />
-
                 <div>
-                  <h3 className="text-sm font-medium text-muted-foreground">Consultant Level</h3>
-                  <div className="flex items-center mt-2">
-                    <div
-                      className={`w-6 h-6 rounded-full ${getConsultantLevelColor(client.consultantLevel)} mr-2`}
-                    ></div>
-                    <p className="text-lg font-medium capitalize">
-                      {client.consultantLevel || "Not Set"}
-                      {client.consultantLevel && (
-                        <span className="text-sm text-muted-foreground ml-2">
-                          (
-                          {client.consultantLevel === "red"
-                            ? "+5%"
-                            : client.consultantLevel === "yellow"
-                              ? "+10%"
-                              : "+15%"}
-                          )
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                </div>
-                <Separator />
-
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground">Registration Date</h3>
-                  <p className="text-lg font-medium">{formatDate(client.createdAt)}</p>
-                </div>
-                <Separator />
-
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground">Last Updated</h3>
-                  <p className="text-lg font-medium">{formatDate(client.updatedAt)}</p>
+                  <h3 className="font-medium text-gray-500">Additional Information</h3>
+                  <p className="mt-2">
+                    <span className="font-medium">Profession:</span> {client.profession || "Not provided"}
+                  </p>
+                  <p>
+                    <span className="font-medium">Purpose:</span> {client.purpose || "Not provided"}
+                  </p>
+                  <p>
+                    <span className="font-medium">Quantity Required:</span> {client.quantityRequired || "Not specified"}
+                  </p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="orders" className="mt-6">
+        <TabsContent value="orders">
           <Card>
             <CardHeader>
-              <CardTitle>Client Orders</CardTitle>
+              <CardTitle>Orders</CardTitle>
             </CardHeader>
             <CardContent>
               {orders.length === 0 ? (
-                <div className="text-center py-8">
-                  <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-lg font-medium mb-2">No Orders Found</p>
-                  <p className="text-muted-foreground mb-6">This client hasn't placed any orders yet.</p>
-                </div>
+                <p className="text-center py-4">No orders found for this client.</p>
               ) : (
                 <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Order ID</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Items</TableHead>
-                        <TableHead>Total Amount</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Payment</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-2 px-4">Order ID</th>
+                        <th className="text-left py-2 px-4">Date</th>
+                        <th className="text-left py-2 px-4">Items</th>
+                        <th className="text-left py-2 px-4">Total</th>
+                        <th className="text-left py-2 px-4">Status</th>
+                        <th className="text-left py-2 px-4">Payment</th>
+                        <th className="text-left py-2 px-4">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
                       {orders.map((order) => (
-                        <TableRow key={order.orderId}>
-                          <TableCell className="font-medium">{order.orderId}</TableCell>
-                          <TableCell>{formatDate(order.createdAt)}</TableCell>
-                          <TableCell>{order.items.length}</TableCell>
-                          <TableCell>₹{order.totalAmount.toLocaleString()}</TableCell>
-                          <TableCell>
-                            <Badge className={getStatusColor(order.status)}>
+                        <tr key={order.orderId} className="border-b hover:bg-gray-50">
+                          <td className="py-2 px-4">{order.orderId}</td>
+                          <td className="py-2 px-4">{new Date(order.createdAt).toLocaleDateString()}</td>
+                          <td className="py-2 px-4">{order.items.length}</td>
+                          <td className="py-2 px-4">₹{order.totalAmount.toFixed(2)}</td>
+                          <td className="py-2 px-4">
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs ${
+                                order.status === "delivered"
+                                  ? "bg-green-100 text-green-800"
+                                  : order.status === "shipped"
+                                    ? "bg-blue-100 text-blue-800"
+                                    : order.status === "processing"
+                                      ? "bg-yellow-100 text-yellow-800"
+                                      : order.status === "cancelled"
+                                        ? "bg-red-100 text-red-800"
+                                        : "bg-gray-100 text-gray-800"
+                              }`}
+                            >
                               {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge className={getPaymentStatusColor(order.paymentStatus)}>
+                            </span>
+                          </td>
+                          <td className="py-2 px-4">
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs ${
+                                order.paymentStatus === "paid"
+                                  ? "bg-green-100 text-green-800"
+                                  : order.paymentStatus === "failed"
+                                    ? "bg-red-100 text-red-800"
+                                    : "bg-yellow-100 text-yellow-800"
+                              }`}
+                            >
                               {order.paymentStatus.charAt(0).toUpperCase() + order.paymentStatus.slice(1)}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
+                            </span>
+                          </td>
+                          <td className="py-2 px-4">
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => router.push(`/admin/dashboard/orders/${order.orderId}`)}
+                              onClick={() => (window.location.href = `/orders/${order.orderId}`)}
                             >
-                              <FileText className="h-4 w-4 mr-1" />
                               View
                             </Button>
-                          </TableCell>
-                        </TableRow>
+                          </td>
+                        </tr>
                       ))}
-                    </TableBody>
-                  </Table>
+                    </tbody>
+                  </table>
                 </div>
               )}
             </CardContent>
