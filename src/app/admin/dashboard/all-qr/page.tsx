@@ -5,11 +5,10 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import axios from "axios"
 import { useRouter } from "next/navigation"
-import { Download, Loader2, Search, Grid, List, Check } from "lucide-react"
+import { Download, Loader2, Search, Grid, List, Check, ArrowLeft } from "lucide-react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { toast } from "sonner"
 import QRCode from "qrcode"
 
 
@@ -80,7 +79,6 @@ function AllQR() {
       const newPrice = priceValues[productId]
 
       if (!newPrice || isNaN(Number(newPrice)) || Number(newPrice) <= 0) {
-        toast.error("Please enter a valid price")
         return
       }
 
@@ -97,13 +95,10 @@ function AllQR() {
           products.map((product) => (product.postId === productId ? { ...product, price: Number(newPrice) } : product)),
         )
 
-        toast.success("Price updated successfully")
       } else {
-        toast.error(response.data.msg || "Failed to update price")
       }
     } catch (error) {
       console.error("Error updating price:", error)
-      toast.error("Failed to update price. Please try again.")
     } finally {
       setUpdatingPrice((prev) => ({ ...prev, [productId]: false }))
     }
@@ -219,7 +214,6 @@ function AllQR() {
 
         qrCode.onerror = () => {
           setGeneratingQR((prev) => ({ ...prev, [product.postId]: false }))
-          toast.error("Failed to generate QR code")
         }
 
         qrCode.src = qrCodeDataUrl
@@ -227,13 +221,11 @@ function AllQR() {
 
       templateImage.onerror = () => {
         setGeneratingQR((prev) => ({ ...prev, [product.postId]: false }))
-        toast.error("Failed to load template image")
       }
 
       templateImage.src = "/assets/qr-template.png"
     } catch (error) {
       console.error("Error generating QR code:", error)
-      toast.error("Failed to generate QR code")
       setGeneratingQR((prev) => ({ ...prev, [product.postId]: false }))
     }
   }
