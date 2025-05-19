@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter, useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
 import { ArrowLeft, Trash2, Loader2, ShoppingBag } from "lucide-react"
@@ -9,11 +9,22 @@ import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
+import axios from "axios"
+
+// Add the CommissionData interface
+interface CommissionData {
+  agentId: string
+  name: string
+  email: string
+  commissionRate: number
+  categoryCommissions?: Record<string, number>
+}
 
 interface CartItem {
   _id: string
   name: string
   price: number
+  basePrice?: number
   image: string[]
   postId: string
   category: string
@@ -32,6 +43,10 @@ export default function CartPage() {
   const [updating, setUpdating] = useState<Record<string, boolean>>({})
   const [isCheckingOut, setIsCheckingOut] = useState(false)
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
+
+  // Add commission data state
+  const [commissionData, setCommissionData] = useState<CommissionData | null>(null)
+  const [overrideCommissionRate, setOverrideCommissionRate] = useState<number | null>(null)
 
   // Get API URL from environment or use default
   const getApiUrl = () => {
@@ -62,6 +77,112 @@ export default function CartPage() {
     }
   }
 
+  // Add fetchCommissionData function
+  const fetchCommissionData = async () => {
+    try {
+      const token = getToken()
+      if (!token) return null
+
+      const apiUrl = getApiUrl()
+      const response = await axios.get(`${apiUrl}/api/client/agent-commission`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (response.data.success && response.data.data) {
+        setCommissionData(response.data.data)
+        return response.data.data
+      }
+      return null
+    } catch (error) {
+      console.error("Error fetching commission data:", error)
+      return null
+    }
+  }
+
+  // Add calculateAdjustedPrice function
+  const calculateAdjustedPrice = (item: CartItem) => {
+    // Always use basePrice (which should be the original price)
+    const basePrice = item.basePrice || item.price
+
+    // Get the default commission rate (from agent or category-specific)
+    let defaultRate = commissionData?.commissionRate || 0
+
+    // Check for category-specific commission
+    if (commissionData?.categoryCommissions && item.category && commissionData.categoryCommissions[item.category]) {
+      defaultRate = commissionData.categoryCommissions[item.category]
+    }
+
+    // Add the override rate to the default rate if an override is set
+    const finalRate = overrideCommissionRate !== null ? defaultRate + overrideCommissionRate : defaultRate
+
+    // Calculate adjusted price based on the original basePrice
+    const adjustedPrice = basePrice * (1 + finalRate / 100)
+    return Math.round(adjustedPrice * 100) / 100 // Round to 2 decimal places
+  }
+
+  // Load saved commission rate from localStorage on component mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      // Use a client-specific key for commission rate
+      const savedRate = localStorage.getItem(`commission-override-${clientId}`)
+      if (savedRate) {
+        setOverrideCommissionRate(Number(savedRate))
+      } else {
+        // Reset to null if no saved rate for this client
+        setOverrideCommissionRate(null)
+      }
+    }
+  }, [clientId])
+
+  // Fetch client data to get consultant level
+  useEffect(() => {
+    const fetchClientData = async () => {
+      try {
+        const token = getToken()
+        if (!token) return
+
+        const apiUrl = getApiUrl()
+        const response = await axios.get(`${apiUrl}/api/getClientDetails/${clientId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+
+        if (response.data.success && response.data.data) {
+          // Set commission rate based on consultant level color
+          if (response.data.data.consultantLevel) {
+            const consultantLevel = response.data.data.consultantLevel
+            console.log("Client consultant level:", consultantLevel)
+
+            // Map color to commission rate
+            let commissionRate = null
+            switch (consultantLevel) {
+              case "red":
+                commissionRate = 5
+                break
+              case "yellow":
+                commissionRate = 10
+                break
+              case "purple":
+                commissionRate = 15
+                break
+              default:
+                commissionRate = null
+            }
+
+            // Set the override commission rate
+            setOverrideCommissionRate(commissionRate)
+            console.log(`Setting commission rate to ${commissionRate}% based on consultant level ${consultantLevel}`)
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching client data:", error)
+      }
+    }
+
+    fetchClientData()
+  }, [clientId])
+
   // Fetch cart items from server
   useEffect(() => {
     fetchCart()
@@ -76,6 +197,9 @@ export default function CartPage() {
         setLoading(false)
         return
       }
+
+      // First fetch commission data
+      await fetchCommissionData()
 
       const apiUrl = getApiUrl()
 
@@ -171,9 +295,12 @@ export default function CartPage() {
 
       const apiUrl = getApiUrl()
 
-      // Get the current item to preserve its price
+      // Get the current item
       const currentItem = cartItems.find((item) => item.postId === productId)
       if (!currentItem) return
+
+      // Calculate the adjusted price with commission
+      const adjustedPrice = calculateAdjustedPrice(currentItem)
 
       // First remove the item
       await fetch(`${apiUrl}/api/deleteUserCartItem`, {
@@ -185,7 +312,7 @@ export default function CartPage() {
         body: JSON.stringify({ productId }),
       })
 
-      // Then add it back with the new quantity and preserve the price
+      // Then add it back with the new quantity and adjusted price
       await fetch(`${apiUrl}/api/addToCart`, {
         method: "POST",
         headers: {
@@ -195,7 +322,7 @@ export default function CartPage() {
         body: JSON.stringify({
           productId,
           quantity: newQuantity,
-          price: currentItem.price, // Preserve the price
+          price: adjustedPrice, // Use the adjusted price with commission
         }),
       })
 
@@ -272,9 +399,12 @@ export default function CartPage() {
     }
   }
 
-  // Calculate total
+  // Calculate total with adjusted prices
   const calculateTotal = () => {
-    return cartItems.reduce((total, item) => total + item.price * item.quantity, 0)
+    return cartItems.reduce((total, item) => {
+      const adjustedPrice = calculateAdjustedPrice(item)
+      return total + adjustedPrice * item.quantity
+    }, 0)
   }
 
   // Handle checkout
@@ -423,7 +553,7 @@ export default function CartPage() {
             Looks like you haven't added any products to your cart yet.
           </p>
           <Button
-            onClick={() => router.push("/products")}
+            onClick={() => router.push(`/client-dashboard/${clientId}/products`)}
             className="bg-primary hover:bg-primary/90 px-8 py-6 h-auto text-lg"
           >
             Browse Products
@@ -437,51 +567,56 @@ export default function CartPage() {
                 <h2 className="font-semibold text-lg">Cart Items ({cartItems.length})</h2>
               </div>
               <div className="divide-y">
-                {cartItems.map((item) => (
-                  <div key={item.postId} className="p-6 flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                    <div className="relative h-24 w-24 rounded-md overflow-hidden flex-shrink-0 border">
-                      <Image
-                        src={
-                          item.image && item.image.length > 0 ? item.image[0] : "/placeholder.svg?height=96&width=96"
-                        }
-                        alt={item.name}
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                    <div className="flex-grow">
-                      <h3 className="font-medium text-lg">{item.name}</h3>
-                      <p className="text-sm text-muted-foreground mb-2">{item.category}</p>
-                      <p className="font-semibold text-lg text-primary">₹{item.price.toLocaleString()}</p>
-                    </div>
-                    <div className="flex flex-col sm:flex-row items-center gap-4 mt-2 sm:mt-0">
-                      {/* Quantity input */}
-                      <div className="flex items-center border rounded-md">
-                        <Input
-                          type="number"
-                          min="1"
-                          value={item.quantity}
-                          onChange={(e) => handleQuantityChange(item.postId, e.target.value)}
-                          className="h-10 w-20 text-center"
-                          disabled={updating[item.postId]}
+                {cartItems.map((item) => {
+                  // Calculate the adjusted price with commission
+                  const adjustedPrice = calculateAdjustedPrice(item)
+
+                  return (
+                    <div key={item.postId} className="p-6 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                      <div className="relative h-24 w-24 rounded-md overflow-hidden flex-shrink-0 border">
+                        <Image
+                          src={
+                            item.image && item.image.length > 0 ? item.image[0] : "/placeholder.svg?height=96&width=96"
+                          }
+                          alt={item.name}
+                          fill
+                          className="object-cover"
                         />
                       </div>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => removeFromCart(item.postId)}
-                        disabled={removing[item.postId]}
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50 h-10 w-10"
-                      >
-                        {removing[item.postId] ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
-                      </Button>
+                      <div className="flex-grow">
+                        <h3 className="font-medium text-lg">{item.name}</h3>
+                        <p className="text-sm text-muted-foreground mb-2">{item.category}</p>
+                        <p className="font-semibold text-lg text-primary">₹{adjustedPrice.toLocaleString()}</p>
+                      </div>
+                      <div className="flex flex-col sm:flex-row items-center gap-4 mt-2 sm:mt-0">
+                        {/* Quantity input */}
+                        <div className="flex items-center border rounded-md">
+                          <Input
+                            type="number"
+                            min="1"
+                            value={item.quantity}
+                            onChange={(e) => handleQuantityChange(item.postId, e.target.value)}
+                            className="h-10 w-20 text-center"
+                            disabled={updating[item.postId]}
+                          />
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => removeFromCart(item.postId)}
+                          disabled={removing[item.postId]}
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50 h-10 w-10"
+                        >
+                          {removing[item.postId] ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           </div>
@@ -529,7 +664,10 @@ export default function CartPage() {
                 </Button>
 
                 <div className="mt-6 text-center">
-                  <Link href="/products" className="text-primary hover:underline font-medium">
+                  <Link
+                    href={`/client-dashboard/${clientId}/products`}
+                    className="text-primary hover:underline font-medium"
+                  >
                     Continue Shopping
                   </Link>
                 </div>
