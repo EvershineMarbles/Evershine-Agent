@@ -148,6 +148,20 @@ export default function AllQR() {
         },
       })
 
+      // Load the QR code image first
+      const qrCodeImage = new Image()
+      qrCodeImage.crossOrigin = "anonymous"
+
+      // Create a promise to handle the image loading
+      const qrCodeLoaded = new Promise((resolve, reject) => {
+        qrCodeImage.onload = () => resolve(qrCodeImage)
+        qrCodeImage.onerror = () => reject(new Error("Failed to load QR code"))
+        qrCodeImage.src = qrCodeDataUrl
+      })
+
+      // Wait for QR code to load
+      await qrCodeLoaded
+
       // Create a canvas element
       const canvas = document.createElement("canvas")
       const ctx = canvas.getContext("2d")
@@ -159,17 +173,8 @@ export default function AllQR() {
       canvas.width = 600
       canvas.height = 900
 
-      // Create a new Image for the QR code
-      const qrCode = new Image()
-      qrCode.crossOrigin = "anonymous"
-      qrCode.src = qrCodeDataUrl
-
-      // Create a new Image for the template
-      const templateImage = new Image()
-      templateImage.crossOrigin = "anonymous"
-
-      // Generate the template image directly in the canvas instead of loading it
-      // This ensures we always have a template and never fall back to the basic QR
+      // Draw the template directly on the canvas
+      // White background
       ctx.fillStyle = "#ffffff"
       ctx.fillRect(0, 0, canvas.width, canvas.height)
 
@@ -249,38 +254,47 @@ export default function AllQR() {
       ctx.fillStyle = "#ffffff"
       ctx.fillText("SCAN QR CODE", canvas.width / 2, canvas.height - 240)
 
-      // Draw the QR code
-      qrCode.onload = () => {
-        // Draw the QR code centered
-        const qrSize = 200
-        const qrX = (canvas.width - qrSize) / 2
-        const qrY = canvas.height - 220
-        ctx.drawImage(qrCode, qrX, qrY, qrSize, qrSize)
+      // Draw the QR code (now that we know it's loaded)
+      const qrSize = 200
+      const qrX = (canvas.width - qrSize) / 2
+      const qrY = canvas.height - 220
+      ctx.drawImage(qrCodeImage, qrX, qrY, qrSize, qrSize)
 
-        // Add scan instructions
-        ctx.font = "16px Arial"
-        ctx.fillStyle = "#555555"
-        ctx.fillText("Scan with Evershine Agent App", canvas.width / 2, canvas.height - 40)
+      // Add scan instructions
+      ctx.font = "16px Arial"
+      ctx.fillStyle = "#555555"
+      ctx.fillText("Scan with Evershine Agent App", canvas.width / 2, canvas.height - 40)
 
-        // Convert canvas to data URL and download
-        const dataUrl = canvas.toDataURL("image/png")
+      // Convert canvas to data URL
+      const dataUrl = canvas.toDataURL("image/png")
 
-        // Use direct download approach
-        const link = document.createElement("a")
-        link.href = dataUrl
-        link.download = `evershine-${product.name.replace(/\s+/g, "-").toLowerCase()}-${product.postId.slice(0, 8)}.png`
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
+      // Create a blob from the data URL
+      const byteString = atob(dataUrl.split(",")[1])
+      const mimeString = dataUrl.split(",")[0].split(":")[1].split(";")[0]
+      const ab = new ArrayBuffer(byteString.length)
+      const ia = new Uint8Array(ab)
+      for (let i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i)
+      }
+      const blob = new Blob([ab], { type: mimeString })
 
+      // Create a download link using the blob
+      const blobUrl = URL.createObjectURL(blob)
+      const downloadLink = document.createElement("a")
+      downloadLink.href = blobUrl
+      downloadLink.download = `evershine-${product.name.replace(/\s+/g, "-").toLowerCase()}-${product.postId.slice(0, 8)}.png`
+
+      // Append to body, click, and clean up
+      document.body.appendChild(downloadLink)
+      downloadLink.click()
+
+      // Clean up after a short delay to ensure download starts
+      setTimeout(() => {
+        document.body.removeChild(downloadLink)
+        URL.revokeObjectURL(blobUrl)
         setGeneratingQR((prev) => ({ ...prev, [product.postId]: false }))
         toast.success("QR code downloaded successfully")
-      }
-
-      // Handle errors in QR code loading
-      qrCode.onerror = () => {
-        throw new Error("Failed to load QR code image")
-      }
+      }, 100)
     } catch (error) {
       console.error("Error generating QR code:", error)
       toast.error("Failed to generate QR code: " + (error instanceof Error ? error.message : "Unknown error"))

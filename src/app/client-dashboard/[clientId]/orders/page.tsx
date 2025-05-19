@@ -3,38 +3,46 @@
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Loader2, Package, FileText } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { ArrowLeft, Loader2, Package, FileText, RefreshCw } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import Link from "next/link"
 
+// Define interfaces for type safety
+interface OrderItem {
+  name: string
+  category: string
+  price: number
+  basePrice?: number
+  quantity: number
+}
+
+interface ShippingAddress {
+  street?: string
+  city?: string
+  state?: string
+  postalCode?: string
+  country?: string
+}
+
 interface Order {
   orderId: string
-  items: {
-    name: string
-    category: string
-    price: number
-    basePrice?: number
-    quantity: number
-  }[]
+  items: OrderItem[]
   totalAmount: number
   status: string
   paymentStatus: string
   createdAt: string
-  shippingAddress?: {
-    street?: string
-    city?: string
-    state?: string
-    postalCode?: string
-    country?: string
-  }
+  shippingAddress?: ShippingAddress
 }
 
+// Add the CommissionData interface from wishlist page
 interface CommissionData {
-  [category: string]: {
-    baseCommissionRate: number
-    overrideRate?: number
-  }
+  agentId: string
+  name: string
+  email: string
+  commissionRate: number
+  categoryCommissions?: Record<string, number>
 }
 
 export default function OrdersPage() {
@@ -46,164 +54,230 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [commissionData, setCommissionData] = useState<CommissionData>({})
-  const [consultantLevel, setConsultantLevel] = useState<number>(0)
+  const [refreshing, setRefreshing] = useState(false)
 
-  // Fetch commission data and consultant level
+  // Add commission-related state from wishlist page
+  const [commissionData, setCommissionData] = useState<CommissionData | null>(null)
+  const [overrideCommissionRate, setOverrideCommissionRate] = useState<number | null>(null)
+
+  // Get API URL from environment or use default
+  const getApiUrl = () => {
+    return process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
+  }
+
+  // Get token from localStorage
+  const getToken = () => {
+    try {
+      // Try both token storage options
+      const token = localStorage.getItem("clientImpersonationToken") || localStorage.getItem("token")
+      if (!token) {
+        setError("No authentication token found. Please log in again.")
+        return null
+      }
+      return token
+    } catch (e) {
+      setError("Error accessing authentication. Please refresh the page.")
+      return null
+    }
+  }
+
+  // Add fetchCommissionData function from wishlist page
+  const fetchCommissionData = async () => {
+    try {
+      const token = getToken()
+      if (!token) return null
+
+      const apiUrl = getApiUrl()
+      const response = await fetch(`${apiUrl}/api/client/agent-commission`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (!response.ok) {
+        console.error("Failed to fetch commission data:", response.status)
+        return null
+      }
+
+      const data = await response.json()
+      if (data.success && data.data) {
+        setCommissionData(data.data)
+        return data.data
+      }
+      return null
+    } catch (error) {
+      console.error("Error fetching commission data:", error)
+      return null
+    }
+  }
+
+  // Load saved commission rate from localStorage on component mount
   useEffect(() => {
-    const fetchCommissionData = async () => {
+    if (typeof window !== "undefined") {
+      // Use a client-specific key for commission rate
+      const savedRate = localStorage.getItem(`commission-override-${clientId}`)
+      if (savedRate) {
+        setOverrideCommissionRate(Number(savedRate))
+      } else {
+        // Reset to null if no saved rate for this client
+        setOverrideCommissionRate(null)
+      }
+    }
+  }, [clientId])
+
+  // Fetch client data to get consultant level
+  useEffect(() => {
+    const fetchClientData = async () => {
       try {
-        const token = localStorage.getItem("clientImpersonationToken")
+        const token = getToken()
         if (!token) return
 
-        // Fetch consultant level
-        const consultantResponse = await fetch(`https://evershinebackend-2.onrender.com/api/clients/${clientId}`, {
+        const apiUrl = getApiUrl()
+        const response = await fetch(`${apiUrl}/api/getClientDetails/${clientId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         })
 
-        if (!consultantResponse.ok) {
-          console.error("Failed to fetch consultant level:", consultantResponse.status)
-          // Default to level 2 if we can't fetch it
-          setConsultantLevel(2)
+        if (!response.ok) {
+          console.error("Failed to fetch client data:", response.status)
           return
         }
 
-        const consultantData = await consultantResponse.json()
-        console.log("ORDERS - Consultant data:", consultantData)
+        const data = await response.json()
+        if (data.success && data.data) {
+          // Set commission rate based on consultant level color
+          if (data.data.consultantLevel) {
+            const consultantLevel = data.data.consultantLevel
+            console.log("Client consultant level:", consultantLevel)
 
-        if (consultantData && consultantData.data && consultantData.data.consultantLevel) {
-          setConsultantLevel(consultantData.data.consultantLevel)
-        } else {
-          // Default to level 2 if we can't get it from the response
-          setConsultantLevel(2)
+            // Map color to commission rate
+            let commissionRate = null
+            switch (consultantLevel) {
+              case "red":
+                commissionRate = 5
+                break
+              case "yellow":
+                commissionRate = 10
+                break
+              case "purple":
+                commissionRate = 15
+                break
+              default:
+                commissionRate = null
+            }
+
+            // Set the override commission rate
+            setOverrideCommissionRate(commissionRate)
+            console.log(`Setting commission rate to ${commissionRate}% based on consultant level ${consultantLevel}`)
+          }
         }
       } catch (error) {
-        console.error("Error fetching consultant level:", error)
-        // Default to level 2 if there's an error
-        setConsultantLevel(2)
+        console.error("Error fetching client data:", error)
       }
     }
 
-    fetchCommissionData()
+    fetchClientData()
   }, [clientId])
 
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-
-        // Get the token
-        const token = localStorage.getItem("clientImpersonationToken")
-
-        if (!token) {
-          throw new Error("No authentication token found. Please refresh the page and try again.")
-        }
-
-        console.log("Fetching orders with token:", token.substring(0, 15) + "...")
-
-        const response = await fetch(`https://evershinebackend-2.onrender.com/api/clients/${clientId}/orders`, {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        })
-
-        // Check for errors
-        if (!response.ok) {
-          if (response.status === 401) {
-            throw new Error("Authentication failed. Please refresh the token and try again.")
-          } else {
-            throw new Error(`API error: ${response.status} ${response.statusText}`)
-          }
-        }
-
-        const data = await response.json()
-        console.log("ORDERS - Full API response:", data)
-
-        // Your backend returns { message, data } format
-        if (data && Array.isArray(data.data)) {
-          console.log("ORDERS - Orders data:", data.data)
-          setOrders(data.data)
-        } else {
-          // If data.data is not an array, check if the response itself is an array
-          if (Array.isArray(data)) {
-            console.log("ORDERS - Orders data (direct array):", data)
-            setOrders(data)
-          } else {
-            console.warn("ORDERS - Unexpected response format:", data)
-            setOrders([])
-          }
-        }
-      } catch (error: any) {
-        const errorMessage = error instanceof Error ? error.message : "Failed to load orders. Please try again."
-        console.error("Error fetching orders:", error)
-        setError(errorMessage)
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-        })
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchOrders()
-  }, [clientId, toast])
-
-  // Get commission rate for a category
-  const getBaseCommissionRate = (category: string) => {
-    // Check if we have commission data for this category
-    if (commissionData[category]) {
-      return commissionData[category].baseCommissionRate
-    }
-
-    // Default commission rates by category if we don't have data from the API
-    const defaultRates: { [key: string]: number } = {
-      Exotics: 20,
-      Fruits: 15,
-      Vegetables: 10,
-      Herbs: 25,
-      "Leafy Greens": 18,
-    }
-
-    return defaultRates[category] || 20 // Default to 20% if category not found
-  }
-
-  // Get consultant level commission rate
-  const getConsultantCommissionRate = () => {
-    // Consultant level 2 gets 15% commission
-    return consultantLevel === 2 ? 15 : 0
-  }
-
-  // Calculate adjusted price with commission
-  const calculateAdjustedPrice = (item: any) => {
-    // Use basePrice if available, otherwise use price
+  // Calculate adjusted price with commission (from wishlist page)
+  const calculateAdjustedPrice = (item: OrderItem) => {
+    // Always use basePrice (which should be the original price)
     const basePrice = item.basePrice || item.price
 
-    // Get commission rates
-    const baseCommissionRate = getBaseCommissionRate(item.category)
-    const consultantCommissionRate = getConsultantCommissionRate()
+    // Get the default commission rate (from agent or category-specific)
+    let defaultRate = commissionData?.commissionRate || 0
 
-    // Calculate total commission rate
-    const totalCommissionRate = baseCommissionRate + consultantCommissionRate
+    // Check for category-specific commission
+    if (commissionData?.categoryCommissions && item.category && commissionData.categoryCommissions[item.category]) {
+      defaultRate = commissionData.categoryCommissions[item.category]
+    }
+
+    // Add the override rate to the default rate if an override is set
+    const finalRate = overrideCommissionRate !== null ? defaultRate + overrideCommissionRate : defaultRate
+
+    // Calculate adjusted price based on the original basePrice
+    const adjustedPrice = basePrice * (1 + finalRate / 100)
 
     console.log(`ORDERS - Calculating price for ${item.name}:`)
     console.log(`ORDERS - Base price: ${basePrice}`)
-    console.log(`ORDERS - Base commission rate: ${baseCommissionRate}`)
-    console.log(`ORDERS - Consultant commission rate: ${consultantCommissionRate}`)
-    console.log(`ORDERS - Total commission rate: ${totalCommissionRate}`)
-
-    // Calculate adjusted price
-    const adjustedPrice = basePrice * (1 + totalCommissionRate / 100)
+    console.log(`ORDERS - Base commission rate: ${defaultRate}`)
+    console.log(`ORDERS - Override commission rate: ${overrideCommissionRate}`)
+    console.log(`ORDERS - Final commission rate: ${finalRate}`)
     console.log(`ORDERS - Adjusted price: ${adjustedPrice.toFixed(2)}`)
 
-    return adjustedPrice
+    return Math.round(adjustedPrice * 100) / 100 // Round to 2 decimal places
   }
+
+  // Fetch orders
+  const fetchOrders = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      const token = getToken()
+      if (!token) {
+        setLoading(false)
+        return
+      }
+
+      // First fetch commission data
+      await fetchCommissionData()
+
+      const apiUrl = getApiUrl()
+      console.log("Fetching orders with token:", token.substring(0, 15) + "...")
+
+      const response = await fetch(`${apiUrl}/api/clients/${clientId}/orders`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      // Check for errors
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error("Authentication failed. Please refresh the token and try again.")
+        } else {
+          throw new Error(`API error: ${response.status} ${response.statusText}`)
+        }
+      }
+
+      const data = await response.json()
+      console.log("ORDERS - Full API response:", data)
+
+      // Your backend returns { message, data } format
+      if (data && Array.isArray(data.data)) {
+        console.log("ORDERS - Orders data:", data.data)
+        setOrders(data.data)
+      } else {
+        // If data.data is not an array, check if the response itself is an array
+        if (Array.isArray(data)) {
+          console.log("ORDERS - Orders data (direct array):", data)
+          setOrders(data)
+        } else {
+          console.warn("ORDERS - Unexpected response format:", data)
+          setOrders([])
+        }
+      }
+    } catch (error: any) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to load orders. Please try again."
+      console.error("Error fetching orders:", error)
+      setError(errorMessage)
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
+  }
+
+  // Initialize data on component mount
+  useEffect(() => {
+    fetchOrders()
+  }, [clientId, toast])
 
   // Format date
   const formatDate = (dateString: string) => {
@@ -215,34 +289,6 @@ export default function OrdersPage() {
     })
   }
 
-  // Get status badge color
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "delivered":
-        return "bg-green-100 text-green-800"
-      case "shipped":
-        return "bg-blue-100 text-blue-800"
-      case "processing":
-        return "bg-yellow-100 text-yellow-800"
-      case "cancelled":
-        return "bg-red-100 text-red-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
-  }
-
-  // Get payment status badge color
-  const getPaymentStatusColor = (status: string) => {
-    switch (status) {
-      case "paid":
-        return "bg-green-100 text-green-800"
-      case "failed":
-        return "bg-red-100 text-red-800"
-      default:
-        return "bg-yellow-100 text-yellow-800"
-    }
-  }
-
   // Calculate order total with adjusted prices
   const calculateAdjustedTotal = (order: Order) => {
     return order.items.reduce((total, item) => {
@@ -251,6 +297,13 @@ export default function OrdersPage() {
     }, 0)
   }
 
+  // Handle refresh
+  const handleRefresh = () => {
+    setRefreshing(true)
+    fetchOrders()
+  }
+
+  // Loading state
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-[80vh]">
@@ -262,11 +315,25 @@ export default function OrdersPage() {
 
   return (
     <div className="p-6 md:p-8">
-      <div className="flex items-center mb-8">
-        <Button variant="ghost" size="icon" onClick={() => router.back()} className="mr-4">
-          <ArrowLeft className="h-5 w-5" />
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center">
+          <Button variant="ghost" size="icon" onClick={() => router.back()} className="mr-4">
+            <ArrowLeft className="h-5 w-5" />
+            <span className="sr-only">Go back</span>
+          </Button>
+          <h1 className="text-3xl font-bold">Your Orders</h1>
+        </div>
+
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="relative"
+          aria-label="Refresh orders"
+        >
+          <RefreshCw className={`h-5 w-5 ${refreshing ? "animate-spin" : ""}`} />
         </Button>
-        <h1 className="text-3xl font-bold">Your Orders</h1>
       </div>
 
       {error && (
@@ -276,7 +343,7 @@ export default function OrdersPage() {
             <Button
               variant="outline"
               className="mt-2 border-red-300 text-red-800 hover:bg-red-100"
-              onClick={() => window.location.reload()}
+              onClick={() => fetchOrders()}
             >
               Try Again
             </Button>
@@ -285,17 +352,19 @@ export default function OrdersPage() {
       )}
 
       {orders.length === 0 ? (
-        <div className="text-center py-12 bg-muted/20 rounded-lg">
-          <Package className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-          <p className="text-xl font-medium mb-4">No orders found</p>
-          <p className="text-muted-foreground mb-6">You haven&apos;t placed any orders yet</p>
-          <Button
-            onClick={() => router.push(`/client-dashboard/${clientId}/products`)}
-            className="bg-primary hover:bg-primary/90"
-          >
-            Browse Products
-          </Button>
-        </div>
+        <Card className="text-center py-12">
+          <CardContent className="pt-6">
+            <Package className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+            <h2 className="text-xl font-medium mb-4">No orders found</h2>
+            <p className="text-muted-foreground mb-6">You haven&apos;t placed any orders yet</p>
+            <Button
+              onClick={() => router.push(`/client-dashboard/${clientId}/products`)}
+              className="bg-primary hover:bg-primary/90"
+            >
+              Browse Products
+            </Button>
+          </CardContent>
+        </Card>
       ) : (
         <div className="space-y-6">
           {orders.map((order) => (
@@ -306,12 +375,32 @@ export default function OrdersPage() {
                   <div className="flex flex-wrap gap-2 text-sm">
                     <span className="text-muted-foreground">Placed on {formatDate(order.createdAt)}</span>
                     <span className="mx-2 text-muted-foreground hidden md:inline">•</span>
-                    <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(order.status)}`}>
+                    <Badge
+                      variant={
+                        order.status === "delivered"
+                          ? "success"
+                          : order.status === "shipped"
+                            ? "info"
+                            : order.status === "processing"
+                              ? "warning"
+                              : order.status === "cancelled"
+                                ? "destructive"
+                                : "outline"
+                      }
+                    >
                       {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                    </span>
-                    <span className={`px-2 py-1 rounded-full text-xs ${getPaymentStatusColor(order.paymentStatus)}`}>
+                    </Badge>
+                    <Badge
+                      variant={
+                        order.paymentStatus === "paid"
+                          ? "success"
+                          : order.paymentStatus === "failed"
+                            ? "destructive"
+                            : "warning"
+                      }
+                    >
                       Payment: {order.paymentStatus.charAt(0).toUpperCase() + order.paymentStatus.slice(1)}
-                    </span>
+                    </Badge>
                   </div>
                 </div>
               </CardHeader>
@@ -344,6 +433,11 @@ export default function OrdersPage() {
                                   maximumFractionDigits: 2,
                                 })}
                               </p>
+                              {item.basePrice && item.basePrice !== adjustedPrice && (
+                                <p className="text-xs text-muted-foreground">
+                                  Base: ₹{item.basePrice.toLocaleString()}
+                                </p>
+                              )}
                             </div>
                           </div>
                         )
@@ -383,6 +477,11 @@ export default function OrdersPage() {
                   </div>
                 </div>
               </CardContent>
+              <CardFooter className="bg-muted/10 justify-end py-3">
+                <Button variant="outline" size="sm">
+                  Track Order
+                </Button>
+              </CardFooter>
             </Card>
           ))}
         </div>
