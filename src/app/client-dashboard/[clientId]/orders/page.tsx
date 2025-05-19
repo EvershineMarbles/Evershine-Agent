@@ -60,6 +60,9 @@ export default function OrdersPage() {
   const [commissionData, setCommissionData] = useState<CommissionData | null>(null)
   const [overrideCommissionRate, setOverrideCommissionRate] = useState<number | null>(null)
 
+  // Add a state to store calculated prices for each order
+  const [orderPrices, setOrderPrices] = useState<Record<string, Record<string, number>>>({})
+
   // Get API URL from environment or use default
   const getApiUrl = () => {
     return process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
@@ -120,6 +123,16 @@ export default function OrdersPage() {
         // Reset to null if no saved rate for this client
         setOverrideCommissionRate(null)
       }
+
+      // Load saved order prices from localStorage
+      const savedPrices = localStorage.getItem(`order-prices-${clientId}`)
+      if (savedPrices) {
+        try {
+          setOrderPrices(JSON.parse(savedPrices))
+        } catch (e) {
+          console.error("Error parsing saved order prices:", e)
+        }
+      }
     }
   }, [clientId])
 
@@ -179,7 +192,12 @@ export default function OrdersPage() {
   }, [clientId])
 
   // Calculate adjusted price with commission (from wishlist page)
-  const calculateAdjustedPrice = (item: OrderItem) => {
+  const calculateAdjustedPrice = (item: OrderItem, orderId: string) => {
+    // Check if we already have a calculated price for this item in this order
+    if (orderPrices[orderId] && orderPrices[orderId][item.name]) {
+      return orderPrices[orderId][item.name]
+    }
+
     // Always use basePrice (which should be the original price)
     const basePrice = item.basePrice || item.price
 
@@ -197,7 +215,7 @@ export default function OrdersPage() {
     // Calculate adjusted price based on the original basePrice
     const adjustedPrice = basePrice * (1 + finalRate / 100)
 
-    console.log(`ORDERS - Calculating price for ${item.name}:`)
+    console.log(`ORDERS - Calculating price for ${item.name} in order ${orderId}:`)
     console.log(`ORDERS - Base price: ${basePrice}`)
     console.log(`ORDERS - Base commission rate: ${defaultRate}`)
     console.log(`ORDERS - Override commission rate: ${overrideCommissionRate}`)
@@ -245,15 +263,53 @@ export default function OrdersPage() {
       const data = await response.json()
       console.log("ORDERS - Full API response:", data)
 
+      // Process orders and calculate prices for new orders
+      const processOrders = (ordersData: any[]) => {
+        // Create a copy of the current order prices
+        const newOrderPrices = { ...orderPrices }
+
+        // Process each order
+        const processedOrders = ordersData.map((order) => {
+          // Ensure each item has basePrice preserved
+          const orderWithBasePrices = {
+            ...order,
+            items: order.items.map((item: OrderItem) => ({
+              ...item,
+              basePrice: item.basePrice || item.price,
+            })),
+          }
+
+          // If this is a new order (not in orderPrices), calculate and store prices
+          if (!newOrderPrices[order.orderId]) {
+            newOrderPrices[order.orderId] = {}
+
+            // Calculate prices for each item
+            orderWithBasePrices.items.forEach((item: OrderItem) => {
+              newOrderPrices[order.orderId][item.name] = calculateAdjustedPrice(item, order.orderId)
+            })
+          }
+
+          return orderWithBasePrices
+        })
+
+        // Save the updated prices to state and localStorage
+        setOrderPrices(newOrderPrices)
+        if (typeof window !== "undefined") {
+          localStorage.setItem(`order-prices-${clientId}`, JSON.stringify(newOrderPrices))
+        }
+
+        return processedOrders
+      }
+
       // Your backend returns { message, data } format
       if (data && Array.isArray(data.data)) {
         console.log("ORDERS - Orders data:", data.data)
-        setOrders(data.data)
+        setOrders(processOrders(data.data))
       } else {
         // If data.data is not an array, check if the response itself is an array
         if (Array.isArray(data)) {
           console.log("ORDERS - Orders data (direct array):", data)
-          setOrders(data)
+          setOrders(processOrders(data))
         } else {
           console.warn("ORDERS - Unexpected response format:", data)
           setOrders([])
@@ -292,7 +348,11 @@ export default function OrdersPage() {
   // Calculate order total with adjusted prices
   const calculateAdjustedTotal = (order: Order) => {
     return order.items.reduce((total, item) => {
-      const adjustedPrice = calculateAdjustedPrice(item)
+      // Use the stored price if available, otherwise calculate it
+      const adjustedPrice =
+        orderPrices[order.orderId] && orderPrices[order.orderId][item.name]
+          ? orderPrices[order.orderId][item.name]
+          : calculateAdjustedPrice(item, order.orderId)
       return total + adjustedPrice * item.quantity
     }, 0)
   }
@@ -410,7 +470,12 @@ export default function OrdersPage() {
                     <h3 className="font-medium mb-2">Items</h3>
                     <div className="space-y-2">
                       {order.items.map((item, index) => {
-                        const adjustedPrice = calculateAdjustedPrice(item)
+                        // Use the stored price if available, otherwise calculate it
+                        const adjustedPrice =
+                          orderPrices[order.orderId] && orderPrices[order.orderId][item.name]
+                            ? orderPrices[order.orderId][item.name]
+                            : calculateAdjustedPrice(item, order.orderId)
+
                         return (
                           <div key={index} className="flex justify-between border-b pb-2">
                             <div>
