@@ -498,17 +498,7 @@ export default function OrdersPage() {
         </div>
       )}
 
-      <div className="mt-8 flex justify-center gap-4">
-        <Button variant="outline" onClick={() => router.push(`/client-dashboard/${clientId}/all-orders`)}>
-          View All Orders
-        </Button>
-      </div>
-
-      <div className="mt-8 text-center">
-        <Link href={`/client-dashboard/${clientId}`} className="text-primary hover:underline">
-          Back to Dashboard
-        </Link>
-      </div>
+ 
     </div>
   )
 }
