@@ -46,6 +46,9 @@ export default function CartPage() {
 
   // Add commission data state
   const [commissionData, setCommissionData] = useState<CommissionData | null>(null)
+
+  // We'll still fetch the commission data but NOT use the override rate
+  // since it's already applied by the backend
   const [overrideCommissionRate, setOverrideCommissionRate] = useState<number | null>(null)
 
   // Get API URL from environment or use default
@@ -99,26 +102,29 @@ export default function CartPage() {
     }
   }
 
-  // Add calculateAdjustedPrice function
+  // Add calculateAdjustedPrice function - only apply base commission, not consultant level
   const calculateAdjustedPrice = (item: CartItem) => {
     // Get the default commission rate (from agent or category-specific)
-    let defaultRate = commissionData?.commissionRate || 0
+    let commissionRate = commissionData?.commissionRate || 0
 
     // Check for category-specific commission
     if (commissionData?.categoryCommissions && item.category && commissionData.categoryCommissions[item.category]) {
-      defaultRate = commissionData.categoryCommissions[item.category]
+      commissionRate = commissionData.categoryCommissions[item.category]
     }
 
-    // Add the override rate to the default rate if an override is set
-    const finalRate = overrideCommissionRate !== null ? defaultRate + overrideCommissionRate : defaultRate
+    // DO NOT add the override rate (consultant level) since it's already applied by the backend
 
     console.log(`CART - Calculating price for ${item.name}:`)
     console.log(`CART - Original price:`, item.price)
-    console.log(`CART - Commission rate:`, finalRate)
+    console.log(`CART - Commission rate:`, commissionRate)
 
-    // IMPORTANT: Since the backend is not storing our adjusted price,
-    // we need to use the price from the backend as is
-    return item.price
+    // Calculate adjusted price based on the original price
+    const adjustedPrice = item.price * (1 + commissionRate / 100)
+    const roundedPrice = Math.round(adjustedPrice * 100) / 100
+
+    console.log(`CART - Adjusted price:`, roundedPrice)
+
+    return roundedPrice
   }
 
   // Load saved commission rate from localStorage on component mount
@@ -135,7 +141,7 @@ export default function CartPage() {
     }
   }, [clientId])
 
-  // Fetch client data to get consultant level
+  // Fetch client data to get consultant level - we still fetch it but don't use it for calculations
   useEffect(() => {
     const fetchClientData = async () => {
       try {
@@ -575,8 +581,8 @@ export default function CartPage() {
               </div>
               <div className="divide-y">
                 {cartItems.map((item) => {
-                  // Use the price directly from the backend
-                  const price = item.price
+                  // Calculate the adjusted price with ONLY the base commission rate
+                  const adjustedPrice = calculateAdjustedPrice(item)
 
                   return (
                     <div key={item.postId} className="p-6 flex flex-col sm:flex-row items-start sm:items-center gap-4">
@@ -593,7 +599,7 @@ export default function CartPage() {
                       <div className="flex-grow">
                         <h3 className="font-medium text-lg">{item.name}</h3>
                         <p className="text-sm text-muted-foreground mb-2">{item.category}</p>
-                        <p className="font-semibold text-lg text-primary">₹{price.toLocaleString()}</p>
+                        <p className="font-semibold text-lg text-primary">₹{adjustedPrice.toLocaleString()}</p>
                       </div>
                       <div className="flex flex-col sm:flex-row items-center gap-4 mt-2 sm:mt-0">
                         {/* Quantity input */}
