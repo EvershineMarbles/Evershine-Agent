@@ -148,139 +148,138 @@ export default function AllQR() {
         },
       })
 
-      // Simple direct download function that will work as a fallback
-      const downloadBasicQR = () => {
-        console.log("Falling back to basic QR download")
-        // Create a temporary link element
-        const tempLink = document.createElement("a")
-        tempLink.href = qrCodeDataUrl
-        tempLink.download = `evershine-product-${product.postId}.png`
-        document.body.appendChild(tempLink)
-        tempLink.click()
-        document.body.removeChild(tempLink)
-
-        setGeneratingQR((prev) => ({ ...prev, [product.postId]: false }))
-        toast.success("QR code downloaded successfully")
+      // Create a canvas element
+      const canvas = document.createElement("canvas")
+      const ctx = canvas.getContext("2d")
+      if (!ctx) {
+        throw new Error("Could not get canvas context")
       }
 
-      // Try to create a fancy QR with template, but fall back to basic if needed
-      try {
-        // Create a canvas element
-        const canvas = document.createElement("canvas")
-        const ctx = canvas.getContext("2d")
-        if (!ctx) {
-          throw new Error("Could not get canvas context")
+      // Set canvas dimensions
+      canvas.width = 600
+      canvas.height = 900
+
+      // Create a new Image for the QR code
+      const qrCode = new Image()
+      qrCode.crossOrigin = "anonymous"
+      qrCode.src = qrCodeDataUrl
+
+      // Create a new Image for the template
+      const templateImage = new Image()
+      templateImage.crossOrigin = "anonymous"
+
+      // Generate the template image directly in the canvas instead of loading it
+      // This ensures we always have a template and never fall back to the basic QR
+      ctx.fillStyle = "#ffffff"
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+      // Draw a border
+      ctx.strokeStyle = "#194a95"
+      ctx.lineWidth = 10
+      ctx.strokeRect(20, 20, canvas.width - 40, canvas.height - 40)
+
+      // Add Evershine logo/header
+      ctx.fillStyle = "#194a95"
+      ctx.fillRect(20, 20, canvas.width - 40, 120)
+
+      // Add company name
+      ctx.font = "bold 40px Arial"
+      ctx.fillStyle = "#ffffff"
+      ctx.textAlign = "center"
+      ctx.fillText("EVERSHINE", canvas.width / 2, 90)
+
+      // Add product details section
+      ctx.fillStyle = "#f8f8f8"
+      ctx.fillRect(50, 170, canvas.width - 100, 400)
+
+      // Add product name
+      ctx.font = "bold 30px Arial"
+      ctx.fillStyle = "#194a95"
+      ctx.textAlign = "center"
+      ctx.fillText("PRODUCT", canvas.width / 2, 220)
+
+      // Capitalize the product name
+      const capitalizedName = product.name
+        .split(" ")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(" ")
+
+      // Add product name (wrapped if necessary)
+      ctx.font = "bold 24px Arial"
+      ctx.fillStyle = "#000000"
+
+      // Wrap text for longer product names
+      const maxWidth = 500
+      const words = capitalizedName.split(" ")
+      let line = ""
+      let y = 270
+
+      for (let i = 0; i < words.length; i++) {
+        const testLine = line + words[i] + " "
+        const metrics = ctx.measureText(testLine)
+        const testWidth = metrics.width
+
+        if (testWidth > maxWidth && i > 0) {
+          ctx.fillText(line, canvas.width / 2, y)
+          line = words[i] + " "
+          y += 35
+        } else {
+          line = testLine
         }
+      }
+      ctx.fillText(line, canvas.width / 2, y)
 
-        // Set canvas dimensions
-        canvas.width = 600
-        canvas.height = 900
+      // Add price
+      ctx.font = "bold 22px Arial"
+      ctx.fillStyle = "#194a95"
+      ctx.fillText(`Price: ₹${product.price}/sqft`, canvas.width / 2, y + 60)
 
-        // Create a new Image for the QR code
-        const qrCode = new Image()
-        qrCode.crossOrigin = "anonymous"
-        qrCode.src = qrCodeDataUrl
+      // Add category if available
+      if (product.category) {
+        ctx.font = "20px Arial"
+        ctx.fillStyle = "#555555"
+        ctx.fillText(`Category: ${product.category}`, canvas.width / 2, y + 100)
+      }
 
-        // Create a new Image for the template
-        const templateImage = new Image()
-        templateImage.crossOrigin = "anonymous"
+      // Add QR code section
+      ctx.fillStyle = "#194a95"
+      ctx.fillRect(20, canvas.height - 280, canvas.width - 40, 60)
 
-        // Promise-based image loading to handle both success and failure cases
-        const loadImage = (img: HTMLImageElement, src: string) => {
-          return new Promise<HTMLImageElement>((resolve, reject) => {
-            img.onload = () => resolve(img)
-            img.onerror = () => reject(new Error(`Failed to load image from ${src}`))
-            img.src = src
-          })
-        }
+      ctx.font = "bold 24px Arial"
+      ctx.fillStyle = "#ffffff"
+      ctx.fillText("SCAN QR CODE", canvas.width / 2, canvas.height - 240)
 
-        // Try to load the template image
-        try {
-          await loadImage(templateImage, "/assets/qr-template.png")
-        } catch (error) {
-          console.log("First template path failed, trying alternative...")
-          try {
-            await loadImage(templateImage, "/qr-template.png")
-          } catch (error) {
-            console.error("All template paths failed, falling back to basic QR")
-            downloadBasicQR()
-            return
-          }
-        }
+      // Draw the QR code
+      qrCode.onload = () => {
+        // Draw the QR code centered
+        const qrSize = 200
+        const qrX = (canvas.width - qrSize) / 2
+        const qrY = canvas.height - 220
+        ctx.drawImage(qrCode, qrX, qrY, qrSize, qrSize)
 
-        // Draw the template image on the canvas
-        ctx.drawImage(templateImage, 0, 0, canvas.width, canvas.height)
-
-        // Load and draw the QR code
-        await loadImage(qrCode, qrCodeDataUrl)
-        ctx.drawImage(qrCode, 380, 640, 150, 150)
-
-        // Add product name below the QR code
-        ctx.font = "bold 16px Arial"
-        ctx.fillStyle = "#000000"
-        ctx.textAlign = "center"
-
-        // Position the text below the QR code
-        const qrCodeCenterX = 380 + 75 // QR code X position + half width
-        const textY = 810 // Position below the QR code
-
-        // Capitalize the product name
-        const capitalizedName = product.name
-          .split(" ")
-          .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-          .join(" ")
-
-        // Wrap text for longer product names
-        const maxWidth = 150 // Same width as QR code
-        const words = capitalizedName.split(" ")
-        let line = ""
-        let y = textY
-        let lineCount = 0
-        const maxLines = 3 // Maximum number of lines to display
-
-        for (let i = 0; i < words.length; i++) {
-          // If we've reached the maximum number of lines, add ellipsis and break
-          if (lineCount >= maxLines - 1 && i < words.length - 1) {
-            ctx.fillText(line + "...", qrCodeCenterX, y)
-            break
-          }
-
-          const testLine = line + words[i] + " "
-          const metrics = ctx.measureText(testLine)
-          const testWidth = metrics.width
-
-          if (testWidth > maxWidth && i > 0) {
-            ctx.fillText(line, qrCodeCenterX, y)
-            line = words[i] + " "
-            y += 20 // Line height
-            lineCount++
-          } else {
-            line = testLine
-          }
-        }
-
-        // Draw the last line if we haven't reached the maximum
-        if (lineCount < maxLines) {
-          ctx.fillText(line, qrCodeCenterX, y)
-        }
+        // Add scan instructions
+        ctx.font = "16px Arial"
+        ctx.fillStyle = "#555555"
+        ctx.fillText("Scan with Evershine Agent App", canvas.width / 2, canvas.height - 40)
 
         // Convert canvas to data URL and download
         const dataUrl = canvas.toDataURL("image/png")
 
-        // Use direct download approach which is more reliable
+        // Use direct download approach
         const link = document.createElement("a")
         link.href = dataUrl
-        link.download = `evershine-product-${product.postId}.png`
+        link.download = `evershine-${product.name.replace(/\s+/g, "-").toLowerCase()}-${product.postId.slice(0, 8)}.png`
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
 
         setGeneratingQR((prev) => ({ ...prev, [product.postId]: false }))
         toast.success("QR code downloaded successfully")
-      } catch (error) {
-        console.error("Error in fancy QR generation:", error)
-        // Fall back to basic QR download
-        downloadBasicQR()
+      }
+
+      // Handle errors in QR code loading
+      qrCode.onerror = () => {
+        throw new Error("Failed to load QR code image")
       }
     } catch (error) {
       console.error("Error generating QR code:", error)

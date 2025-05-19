@@ -30,6 +30,13 @@ interface Order {
   }
 }
 
+interface CommissionData {
+  [category: string]: {
+    baseCommissionRate: number
+    overrideRate?: number
+  }
+}
+
 export default function OrdersPage() {
   const params = useParams()
   const router = useRouter()
@@ -39,6 +46,48 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [commissionData, setCommissionData] = useState<CommissionData>({})
+  const [consultantLevel, setConsultantLevel] = useState<number>(0)
+
+  // Fetch commission data and consultant level
+  useEffect(() => {
+    const fetchCommissionData = async () => {
+      try {
+        const token = localStorage.getItem("clientImpersonationToken")
+        if (!token) return
+
+        // Fetch consultant level
+        const consultantResponse = await fetch(`https://evershinebackend-2.onrender.com/api/clients/${clientId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+
+        if (!consultantResponse.ok) {
+          console.error("Failed to fetch consultant level:", consultantResponse.status)
+          // Default to level 2 if we can't fetch it
+          setConsultantLevel(2)
+          return
+        }
+
+        const consultantData = await consultantResponse.json()
+        console.log("ORDERS - Consultant data:", consultantData)
+
+        if (consultantData && consultantData.data && consultantData.data.consultantLevel) {
+          setConsultantLevel(consultantData.data.consultantLevel)
+        } else {
+          // Default to level 2 if we can't get it from the response
+          setConsultantLevel(2)
+        }
+      } catch (error) {
+        console.error("Error fetching consultant level:", error)
+        // Default to level 2 if there's an error
+        setConsultantLevel(2)
+      }
+    }
+
+    fetchCommissionData()
+  }, [clientId])
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -106,14 +155,41 @@ export default function OrdersPage() {
     fetchOrders()
   }, [clientId, toast])
 
+  // Get commission rate for a category
+  const getBaseCommissionRate = (category: string) => {
+    // Check if we have commission data for this category
+    if (commissionData[category]) {
+      return commissionData[category].baseCommissionRate
+    }
+
+    // Default commission rates by category if we don't have data from the API
+    const defaultRates: { [key: string]: number } = {
+      Exotics: 20,
+      Fruits: 15,
+      Vegetables: 10,
+      Herbs: 25,
+      "Leafy Greens": 18,
+    }
+
+    return defaultRates[category] || 20 // Default to 20% if category not found
+  }
+
+  // Get consultant level commission rate
+  const getConsultantCommissionRate = () => {
+    // Consultant level 2 gets 15% commission
+    return consultantLevel === 2 ? 15 : 0
+  }
+
   // Calculate adjusted price with commission
   const calculateAdjustedPrice = (item: any) => {
     // Use basePrice if available, otherwise use price
     const basePrice = item.basePrice || item.price
 
-    // Hardcoded commission rates (same as in cart and wishlist)
-    const baseCommissionRate = 20
-    const consultantCommissionRate = 15
+    // Get commission rates
+    const baseCommissionRate = getBaseCommissionRate(item.category)
+    const consultantCommissionRate = getConsultantCommissionRate()
+
+    // Calculate total commission rate
     const totalCommissionRate = baseCommissionRate + consultantCommissionRate
 
     console.log(`ORDERS - Calculating price for ${item.name}:`)
