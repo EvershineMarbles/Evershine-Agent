@@ -246,14 +246,27 @@ function AllQR() {
     )
   }
 
+ 
   return (
     <div className="min-h-screen bg-white">
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-6">
-        {/* Header with Search */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold text-[#181818]">All Products</h1>
-          <div className="relative w-full sm:w-auto">
+        {/* Header with Search - Repositioned to top right */}
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => router.push(`/admin/dashboard`)}
+              className="hover:bg-gray-100"
+              aria-label="Go back"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <h1 className="text-4xl font-bold text-[#181818]">All Products</h1>
+          </div>
+
+          <div className="relative">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
               <input
@@ -261,17 +274,16 @@ function AllQR() {
                 placeholder="Search Product..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-3 w-full sm:w-[250px] md:w-[300px] rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#194a95] focus:border-transparent [&::placeholder]:text-black"
+                className="pl-10 pr-4 py-3 w-full md:w-[300px] rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#194a95] focus:border-transparent [&::placeholder]:text-gray-500"
               />
             </div>
           </div>
         </div>
-
         {/* View Toggle and Add Button */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div className="flex items-center gap-2 border rounded-lg overflow-hidden">
             <button
-              onClick={() => router.push("/admin/dashboard/all-qr")}
+              onClick={() => router.push("/admin/dashboard/products")}
               className="flex items-center gap-1 px-4 py-2 text-gray-600 hover:bg-gray-100"
               aria-label="Grid view"
             >
@@ -285,17 +297,17 @@ function AllQR() {
           </div>
           <button
             onClick={() => router.push("/add-product")}
-            className="px-6 py-3 rounded-lg bg-[#194a95] text-white w-full sm:w-auto justify-center
+            className="px-6 py-3 rounded-lg bg-[#194a95] text-white w-full md:w-auto justify-center
                      hover:bg-[#0f3a7a] transition-colors active:transform active:scale-95"
           >
             Add New Product
           </button>
         </div>
-
         {/* Products Count */}
         <p className="text-gray-600 mb-6">
           Showing {filteredProducts.length} of {products.length} products
         </p>
+
 
         {/* Products Table - Tablet Responsive */}
         <div className="overflow-x-auto -mx-4 sm:mx-0">
@@ -329,10 +341,8 @@ function AllQR() {
                     <tr key={product._id} className="hover:bg-gray-50">
                       <td className="px-4 py-4">
                         <div className="flex items-center">
-                          <Link
-                            href={`/admin/dashboard/product/${product.postId}`}
-                            className="h-10 w-10 flex-shrink-0 mr-3 block"
-                          >
+                        <Link href={`/product/${product.postId}`} className="h-10 w-10 flex-shrink-0 mr-3 block">
+                      
                             <Image
                               src={
                                 product.image[0] ||
@@ -350,9 +360,10 @@ function AllQR() {
                           </Link>
                           <div className="ml-2 min-w-0">
                             <Link
-                              href={`/single_product/${product.postId}`}
+                              href={`/product/${product.postId}`}
                               className="text-sm font-medium text-gray-900 hover:text-[#194a95] transition-colors cursor-pointer truncate block"
                             >
+
                               {product.name}
                             </Link>
                             <div className="text-xs text-gray-500">ID: {product.postId.slice(0, 8)}...</div>
