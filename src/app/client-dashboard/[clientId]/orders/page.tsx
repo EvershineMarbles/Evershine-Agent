@@ -180,7 +180,7 @@ export default function OrdersPage() {
 
   // Calculate adjusted price with commission (from wishlist page)
   const calculateAdjustedPrice = (item: OrderItem) => {
-    // Always use basePrice (which should be the original price)
+    // Always use the item's own price or basePrice if available
     const basePrice = item.basePrice || item.price
 
     // Get the default commission rate (from agent or category-specific)
@@ -248,12 +248,30 @@ export default function OrdersPage() {
       // Your backend returns { message, data } format
       if (data && Array.isArray(data.data)) {
         console.log("ORDERS - Orders data:", data.data)
-        setOrders(data.data)
+        // Ensure each order item has its original price data preserved
+        const ordersWithPrices = data.data.map((order) => ({
+          ...order,
+          items: order.items.map((item) => ({
+            ...item,
+            // Ensure basePrice is preserved if it exists
+            basePrice: item.basePrice || item.price,
+          })),
+        }))
+        setOrders(ordersWithPrices)
       } else {
         // If data.data is not an array, check if the response itself is an array
         if (Array.isArray(data)) {
           console.log("ORDERS - Orders data (direct array):", data)
-          setOrders(data)
+          // Ensure each order item has its original price data preserved
+          const ordersWithPrices = data.map((order) => ({
+            ...order,
+            items: order.items.map((item) => ({
+              ...item,
+              // Ensure basePrice is preserved if it exists
+              basePrice: item.basePrice || item.price,
+            })),
+          }))
+          setOrders(ordersWithPrices)
         } else {
           console.warn("ORDERS - Unexpected response format:", data)
           setOrders([])
@@ -433,7 +451,7 @@ export default function OrdersPage() {
                                   maximumFractionDigits: 2,
                                 })}
                               </p>
-                              {item.basePrice && item.basePrice !== adjustedPrice && (
+                              {item.basePrice && item.basePrice !== item.price && (
                                 <p className="text-xs text-muted-foreground">
                                   Base: ₹{item.basePrice.toLocaleString()}
                                 </p>
