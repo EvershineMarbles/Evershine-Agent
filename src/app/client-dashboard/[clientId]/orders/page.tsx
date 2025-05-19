@@ -201,9 +201,10 @@ export default function OrdersPage() {
     }
 
     // Use consultant level rate stored with the order if available
+    // IMPORTANT: Make sure to use the consultant level rate from the order if available
     const consultantRate = order.consultantLevelRate !== undefined ? order.consultantLevelRate : overrideCommissionRate || 0
 
-    // Calculate final rate
+    // Calculate final rate - IMPORTANT: Add both rates together
     const finalRate = defaultRate + consultantRate
 
     // Calculate adjusted price based on the original basePrice
@@ -267,6 +268,7 @@ export default function OrdersPage() {
             // Store current commission rates with the order if not already present
             commissionRate: order.commissionRate !== undefined ? order.commissionRate : currentCommissionData?.commissionRate || 0,
             categoryCommissions: order.categoryCommissions || currentCommissionData?.categoryCommissions || {},
+            // IMPORTANT: Make sure to store the consultant level rate
             consultantLevelRate: order.consultantLevelRate !== undefined ? order.consultantLevelRate : overrideCommissionRate || 0,
             // Ensure each item has basePrice preserved
             items: order.items.map((item: OrderItem) => ({
@@ -467,11 +469,7 @@ export default function OrdersPage() {
                                   maximumFractionDigits: 2,
                                 })}
                               </p>
-                              {item.basePrice && item.basePrice !== item.price && (
-                                <p className="text-xs text-muted-foreground">
-                                  Base: ₹{item.basePrice.toLocaleString()}
-                                </p>
-                              )}
+                              {/* Removed the base price display for clients */}
                             </div>
                           </div>
                         )
@@ -487,10 +485,7 @@ export default function OrdersPage() {
                         })}
                       </span>
                     </div>
-                    {/* Display the commission rates used for this order */}
-                    <div className="mt-4 pt-2 text-xs text-muted-foreground">
-                      <p>Commission: {order.commissionRate}% + Consultant: {order.consultantLevelRate}%</p>
-                    </div>
+                    {/* Removed the commission rates display for clients */}
                   </div>
                   <div>
                     <h3 className="font-medium mb-2">Shipping Address</h3>
