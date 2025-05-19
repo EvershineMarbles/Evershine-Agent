@@ -101,8 +101,9 @@ export default function CartPage() {
 
   // Add calculateAdjustedPrice function
   const calculateAdjustedPrice = (item: CartItem) => {
-    // Always use basePrice (which should be the original price)
-    const basePrice = item.basePrice || item.price
+    // Check if this price already includes commission (from wishlist)
+    // If the item was added from wishlist, it already has commission applied
+    // We can detect this by checking if the price is already higher than what we'd expect
 
     // Get the default commission rate (from agent or category-specific)
     let defaultRate = commissionData?.commissionRate || 0
@@ -115,9 +116,14 @@ export default function CartPage() {
     // Add the override rate to the default rate if an override is set
     const finalRate = overrideCommissionRate !== null ? defaultRate + overrideCommissionRate : defaultRate
 
-    // Calculate adjusted price based on the original basePrice
-    const adjustedPrice = basePrice * (1 + finalRate / 100)
-    return Math.round(adjustedPrice * 100) / 100 // Round to 2 decimal places
+    // If we have a basePrice, use that for calculation
+    if (item.basePrice) {
+      const adjustedPrice = item.basePrice * (1 + finalRate / 100)
+      return Math.round(adjustedPrice * 100) / 100 // Round to 2 decimal places
+    }
+
+    // If no basePrice, assume the current price already includes commission
+    return item.price
   }
 
   // Load saved commission rate from localStorage on component mount
@@ -299,9 +305,6 @@ export default function CartPage() {
       const currentItem = cartItems.find((item) => item.postId === productId)
       if (!currentItem) return
 
-      // Calculate the adjusted price with commission
-      const adjustedPrice = calculateAdjustedPrice(currentItem)
-
       // First remove the item
       await fetch(`${apiUrl}/api/deleteUserCartItem`, {
         method: "DELETE",
@@ -312,7 +315,7 @@ export default function CartPage() {
         body: JSON.stringify({ productId }),
       })
 
-      // Then add it back with the new quantity and adjusted price
+      // Then add it back with the new quantity but preserve the original price
       await fetch(`${apiUrl}/api/addToCart`, {
         method: "POST",
         headers: {
@@ -322,7 +325,7 @@ export default function CartPage() {
         body: JSON.stringify({
           productId,
           quantity: newQuantity,
-          price: adjustedPrice, // Use the adjusted price with commission
+          price: currentItem.price, // Preserve the original price
         }),
       })
 
