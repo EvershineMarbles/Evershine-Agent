@@ -256,7 +256,7 @@ export default function WishlistPage() {
     }
   }, [toast, clientId, fetchCommissionData])
 
-  // Fetch wishlist items on component mount
+  // Fetch wishlist items on component ount
   useEffect(() => {
     fetchWishlistItems()
   }, [fetchWishlistItems])
