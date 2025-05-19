@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Loader2, Package, FileText, Printer, Download, Share2 } from 'lucide-react'
+import { ArrowLeft, Loader2, Package, Printer, Download, Share2 } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import Link from "next/link"
 import { Separator } from "@/components/ui/separator"
@@ -202,7 +202,7 @@ export default function OrderDetailsPage() {
     return Math.round(adjustedPrice * 100) / 100 // Round to 2 decimal places
   }
 
-  // Fetch specific order
+  // Update the fetchOrder function to use the correct API endpoint
   const fetchOrder = async () => {
     try {
       setLoading(true)
@@ -220,8 +220,8 @@ export default function OrderDetailsPage() {
       const apiUrl = getApiUrl()
       console.log(`Fetching order ${orderId} with token:`, token.substring(0, 15) + "...")
 
-      // First try to fetch a specific order if your API supports it
-      const response = await fetch(`${apiUrl}/api/clients/${clientId}/orders/${orderId}`, {
+      // Use the direct order endpoint from your backend
+      const response = await fetch(`${apiUrl}/api/orders/${orderId}`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -255,11 +255,14 @@ export default function OrderDetailsPage() {
       if (data && data.data && !Array.isArray(data.data)) {
         // Single order response
         setOrder(data.data)
+      } else if (data && !Array.isArray(data) && data.orderId) {
+        // Direct order object response
+        setOrder(data)
       } else {
         // Array of orders response - find the specific order
-        let ordersArray = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : []
+        const ordersArray = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : []
         const foundOrder = ordersArray.find((o: Order) => o.orderId === orderId)
-        
+
         if (foundOrder) {
           setOrder(foundOrder)
         } else {
@@ -329,7 +332,7 @@ export default function OrderDetailsPage() {
           </Button>
           <h1 className="text-3xl font-bold">Order Details</h1>
         </div>
-        
+
         <Card className="mb-6 border-red-200 bg-red-50">
           <CardContent className="p-4 text-red-800">
             <p>{error}</p>
@@ -342,7 +345,7 @@ export default function OrderDetailsPage() {
             </Button>
           </CardContent>
         </Card>
-        
+
         <Button variant="outline" onClick={() => router.back()}>
           Back to Orders
         </Button>
@@ -361,7 +364,7 @@ export default function OrderDetailsPage() {
           </Button>
           <h1 className="text-3xl font-bold">Order Details</h1>
         </div>
-        
+
         <Card className="text-center py-12">
           <CardContent className="pt-6">
             <Package className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
@@ -386,7 +389,7 @@ export default function OrderDetailsPage() {
         <h1 className="text-3xl font-bold text-center">INVOICE</h1>
         <p className="text-center text-muted-foreground">Order #{order.orderId}</p>
       </div>
-      
+
       {/* Regular header that hides when printing */}
       <div className="flex items-center justify-between mb-8 print:hidden">
         <div className="flex items-center">
@@ -450,7 +453,7 @@ export default function OrderDetailsPage() {
             </div>
           </div>
         </CardHeader>
-        
+
         <CardContent className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
             <div>
@@ -470,7 +473,7 @@ export default function OrderDetailsPage() {
                 )}
               </div>
             </div>
-            
+
             <div>
               <h3 className="font-medium text-lg mb-2">Shipping Information</h3>
               <div className="text-sm">
@@ -488,9 +491,9 @@ export default function OrderDetailsPage() {
               </div>
             </div>
           </div>
-          
+
           <Separator className="my-6" />
-          
+
           <h3 className="font-medium text-lg mb-4">Order Items</h3>
           <Table>
             <TableHeader>
@@ -510,14 +513,16 @@ export default function OrderDetailsPage() {
                     <TableCell className="font-medium">{item.name}</TableCell>
                     <TableCell>{item.category}</TableCell>
                     <TableCell className="text-right">
-                      ₹{adjustedPrice.toLocaleString(undefined, {
+                      ₹
+                      {adjustedPrice.toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       })}
                     </TableCell>
                     <TableCell className="text-right">{item.quantity}</TableCell>
                     <TableCell className="text-right">
-                      ₹{(adjustedPrice * item.quantity).toLocaleString(undefined, {
+                      ₹
+                      {(adjustedPrice * item.quantity).toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       })}
@@ -527,13 +532,14 @@ export default function OrderDetailsPage() {
               })}
             </TableBody>
           </Table>
-          
+
           <div className="mt-6 flex flex-col items-end">
             <div className="w-full md:w-1/3 space-y-2">
               <div className="flex justify-between">
                 <span>Subtotal:</span>
                 <span>
-                  ₹{calculateAdjustedTotal(order).toLocaleString(undefined, {
+                  ₹
+                  {calculateAdjustedTotal(order).toLocaleString(undefined, {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}
@@ -551,7 +557,8 @@ export default function OrderDetailsPage() {
               <div className="flex justify-between font-bold">
                 <span>Total:</span>
                 <span>
-                  ₹{calculateAdjustedTotal(order).toLocaleString(undefined, {
+                  ₹
+                  {calculateAdjustedTotal(order).toLocaleString(undefined, {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}
@@ -560,17 +567,15 @@ export default function OrderDetailsPage() {
             </div>
           </div>
         </CardContent>
-        
+
         <CardFooter className="bg-muted/10 justify-between py-4 print:hidden">
           <Button variant="outline" onClick={() => router.back()}>
             Back to Orders
           </Button>
-          <Button variant="default">
-            Track Order
-          </Button>
+          <Button variant="default">Track Order</Button>
         </CardFooter>
       </Card>
-      
+
       <div className="text-center text-sm text-muted-foreground mt-8 print:mt-16">
         <p>Thank you for your business!</p>
         <p className="mt-1">If you have any questions, please contact our support team.</p>
@@ -580,7 +585,7 @@ export default function OrderDetailsPage() {
           </Link>
         </p>
       </div>
-      
+
       {/* Print-only footer */}
       <div className="hidden print:block mt-16 pt-8 border-t text-center text-sm text-muted-foreground">
         <p>This is an electronically generated invoice and does not require a signature.</p>
