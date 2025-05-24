@@ -11,8 +11,10 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/components/ui/use-toast"
 import { ToastAction } from "@/components/ui/toast"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import ProductVisualizer from "@/components/ProductVisualizer"
-
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
 
@@ -27,9 +29,10 @@ interface Product {
   postId: string
   quantityAvailable: number
   size?: string
+  sizeUnit?: string
   numberOfPieces?: number | null
   thickness?: string
-  basePrice?: number
+  finishes?: string
 }
 
 interface CommissionData {
@@ -64,10 +67,13 @@ export default function ProductDetail() {
   const [commissionLoading, setCommissionLoading] = useState(false)
   const [basePrice, setBasePrice] = useState<number | null>(null)
   const [showFullDescription, setShowFullDescription] = useState(false)
-  // Gallery state
   const [galleryOpen, setGalleryOpen] = useState(false)
   const [showVisualizer, setShowVisualizer] = useState(false)
 
+  // New state for custom fields
+  const [customQuantity, setCustomQuantity] = useState<number | undefined>(undefined)
+  const [customFinish, setCustomFinish] = useState<string | undefined>(undefined)
+  const [customThickness, setCustomThickness] = useState<string | undefined>(undefined)
 
   // Load saved commission rate from localStorage on component mount
   useEffect(() => {
@@ -353,8 +359,9 @@ export default function ProductDetail() {
           },
           body: JSON.stringify({
             productId: product.postId,
-            // Include the current price with commission applied
-            price: calculateAdjustedPrice(product.price, product.category),
+            customQuantity,
+            customFinish,
+            customThickness,
           }),
         })
 
@@ -559,7 +566,7 @@ export default function ProductDetail() {
 
             {/* Quantity Available */}
             <div className="pb-4 border-b border-gray-200">
-              <p className="text-gray-500">Quality Available (in sqft)</p>
+              <p className="text-gray-500">Quantity Available (in sqft)</p>
               <p className="text-xl font-bold mt-1">{product.quantityAvailable}</p>
             </div>
 
@@ -586,6 +593,50 @@ export default function ProductDetail() {
                     ? product.thickness
                     : "-"}
                 </p>
+              </div>
+            </div>
+
+            {/* Custom Fields */}
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="customQuantity">Quantity (sqft)</Label>
+                <Input
+                  type="number"
+                  id="customQuantity"
+                  placeholder="Enter quantity"
+                  value={customQuantity}
+                  onChange={(e) => setCustomQuantity(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="customFinish">Finish</Label>
+                <Select onValueChange={(value) => setCustomFinish(value)} defaultValue={customFinish}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select finish" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="polish">Polish</SelectItem>
+                    <SelectItem value="leather">Leather</SelectItem>
+                    <SelectItem value="flute">Flute</SelectItem>
+                    <SelectItem value="river">River</SelectItem>
+                    <SelectItem value="satin">Satin</SelectItem>
+                    <SelectItem value="dual">Dual</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="customThickness">Thickness (mm)</Label>
+                <Input
+                  type="text"
+                  id="customThickness"
+                  placeholder="Enter thickness"
+                  value={customThickness}
+                  onChange={(e) => setCustomThickness(e.target.value)}
+                  className="w-full"
+                />
               </div>
             </div>
 
@@ -648,110 +699,106 @@ export default function ProductDetail() {
                 {wishlistLoading ? "Processing..." : "Add to Wishlist"}
               </Button>
             </div>
-            
-          
-
           </div>
         </div>
-            {/* Visualizer Button */}
-            <div className="pb-4 border-b border-gray-200 mt-4">
-              <Button
-                onClick={() => setShowVisualizer(!showVisualizer)}
-                className="w-full bg-[#194a95] hover:bg-[#0f3a7a] py-3 text-white"
+        {/* Visualizer Button */}
+        <div className="pb-4 border-b border-gray-200 mt-4">
+          <Button
+            onClick={() => setShowVisualizer(!showVisualizer)}
+            className="w-full bg-[#194a95] hover:bg-[#0f3a7a] py-3 text-white"
+          >
+            {showVisualizer ? "Hide Visualizer" : "Show Product Visualizer"}
+          </Button>
+        </div>
+        {/* Product Visualizer Section */}
+        {showVisualizer && product.image.length > 0 && (
+          <div className="mt-4">
+            <ProductVisualizer productImage={product.image[0]} productName={product.name} />
+          </div>
+        )}
+
+        {/* Image Gallery Modal */}
+        {galleryOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center">
+            <div className="relative w-full h-full flex flex-col">
+              {/* Close button */}
+              <button
+                onClick={closeGallery}
+                className="absolute top-4 right-4 z-10 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+                aria-label="Close gallery"
               >
-                {showVisualizer ? "Hide Visualizer" : "Show Product Visualizer"}
-              </Button>
-            </div>
-          {/* Product Visualizer Section */}
-          {showVisualizer && product.image.length > 0 && (
-            <div className="mt-4">
-              <ProductVisualizer productImage={product.image[0]} productName={product.name}  />
-            </div>
-          )}
+                <X className="h-6 w-6" />
+              </button>
 
-      </div>
-
-      {/* Image Gallery Modal */}
-      {galleryOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center">
-          <div className="relative w-full h-full flex flex-col">
-            {/* Close button */}
-            <button
-              onClick={closeGallery}
-              className="absolute top-4 right-4 z-10 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
-              aria-label="Close gallery"
-            >
-              <X className="h-6 w-6" />
-            </button>
-
-            {/* Main image container */}
-            <div className="flex-1 flex items-center justify-center p-4">
-              <div className="relative w-full h-full max-w-4xl max-h-[80vh] mx-auto">
-                <Image
-                  src={
-                    imageLoadError[currentImageIndex]
-                      ? "/placeholder.svg"
-                      : product.image[currentImageIndex] || "/placeholder.svg"
-                  }
-                  alt={`${product.name} - Image ${currentImageIndex + 1}`}
-                  fill
-                  className="object-contain"
-                  onError={() => handleImageError(currentImageIndex)}
-                  priority
-                />
-              </div>
-            </div>
-
-            {/* Navigation controls */}
-            {product.image.length > 1 && (
-              <>
-                <button
-                  onClick={previousImage}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 p-3 rounded-full text-white transition-colors"
-                  aria-label="Previous image"
-                >
-                  <ChevronLeft className="h-8 w-8" />
-                </button>
-                <button
-                  onClick={nextImage}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 p-3 rounded-full text-white transition-colors"
-                  aria-label="Next image"
-                >
-                  <ChevronRight className="h-8 w-8" />
-                </button>
-              </>
-            )}
-
-            {/* Thumbnails at bottom */}
-            {product.image.length > 1 && (
-              <div className="p-4 bg-black/70">
-                <div className="flex justify-center gap-2 overflow-x-auto py-2 max-w-4xl mx-auto">
-                  {product.image.map((img, index) => (
-                    <button
-                      key={index}
-                      onClick={() => handleThumbnailClick(index)}
-                      className={`relative rounded-md overflow-hidden flex-shrink-0 w-16 h-16 md:w-20 md:h-20 ${
-                        selectedThumbnail === index ? "ring-2 ring-white" : "opacity-70"
-                      }`}
-                    >
-                      <Image
-                        src={imageLoadError[index] ? "/placeholder.svg" : img || "/placeholder.svg"}
-                        alt={`${product.name} thumbnail ${index + 1}`}
-                        fill
-                        className="object-cover"
-                        onError={() => handleImageError(index)}
-                      />
-                    </button>
-                  ))}
+              {/* Main image container */}
+              <div className="flex-1 flex items-center justify-center p-4">
+                <div className="relative w-full h-full max-w-4xl max-h-[80vh] mx-auto">
+                  <Image
+                    src={
+                      imageLoadError[currentImageIndex]
+                        ? "/placeholder.svg"
+                        : product.image[currentImageIndex] || "/placeholder.svg"
+                    }
+                    alt={`${product.name} - Image ${currentImageIndex + 1}`}
+                    fill
+                    className="object-contain"
+                    onError={() => handleImageError(currentImageIndex)}
+                    priority
+                  />
                 </div>
-                <p className="text-white text-center mt-2 text-sm">
-                  {currentImageIndex + 1} / {product.image.length}
-                </p>
               </div>
-            )}
+
+              {/* Navigation controls */}
+              {product.image.length > 1 && (
+                <>
+                  <button
+                    onClick={previousImage}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 p-3 rounded-full text-white transition-colors"
+                    aria-label="Previous image"
+                  >
+                    <ChevronLeft className="h-8 w-8" />
+                  </button>
+                  <button
+                    onClick={nextImage}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 p-3 rounded-full text-white transition-colors"
+                    aria-label="Next image"
+                  >
+                    <ChevronRight className="h-8 w-8" />
+                  </button>
+                </>
+              )}
+
+              {/* Thumbnails at bottom */}
+              {product.image.length > 1 && (
+                <div className="p-4 bg-black/70">
+                  <div className="flex justify-center gap-2 overflow-x-auto py-2 max-w-4xl mx-auto">
+                    {product.image.map((img, index) => (
+                      <button
+                        key={index}
+                        onClick={() => handleThumbnailClick(index)}
+                        className={`relative rounded-md overflow-hidden flex-shrink-0 w-16 h-16 md:w-20 md:h-20 ${
+                          selectedThumbnail === index ? "ring-2 ring-white" : "opacity-70"
+                        }`}
+                      >
+                        <Image
+                          src={imageLoadError[index] ? "/placeholder.svg" : img || "/placeholder.svg"}
+                          alt={`${product.name} thumbnail ${index + 1}`}
+                          fill
+                          className="object-cover"
+                          onError={() => handleImageError(index)}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-white text-center mt-2 text-sm">
+                    {currentImageIndex + 1} / {product.image.length}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }
