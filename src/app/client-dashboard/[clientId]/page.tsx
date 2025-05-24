@@ -152,7 +152,7 @@ export default function ProductsPage() {
     }
   }, [cart, clientId])
 
-  // Fetch products function
+  // Fetch products function with better timeout handling
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true)
@@ -171,67 +171,97 @@ export default function ProductsPage() {
         headers["Authorization"] = `Bearer ${token}`
       }
 
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 8000) // 8 second timeout
+      // Try multiple times with increasing timeouts
+      let response
+      let lastError
 
-      try {
-        const response = await fetch(`${apiUrl}/api/getAllProducts`, {
-          method: "GET",
-          headers,
-          signal: controller.signal,
-        })
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          console.log(`Attempt ${attempt} to fetch products...`)
 
-        clearTimeout(timeoutId)
+          const controller = new AbortController()
+          const timeout = attempt * 15000 // 15s, 30s, 45s
+          const timeoutId = setTimeout(() => controller.abort(), timeout)
 
-        if (!response.ok) {
-          throw new Error(`API request failed with status ${response.status}`)
-        }
+          response = await fetch(`${apiUrl}/api/getAllProducts`, {
+            method: "GET",
+            headers,
+            signal: controller.signal,
+          })
 
-        const data = await response.json()
+          clearTimeout(timeoutId)
 
-        if (data.success && Array.isArray(data.data)) {
-          console.log("Products fetched successfully:", data.data)
-
-          // Filter out products with missing or invalid postId
-          const validProducts = data.data.filter(
-            (product: Product) => product.postId && typeof product.postId === "string",
-          )
-
-          if (validProducts.length < data.data.length) {
-            console.warn(`Filtered out ${data.data.length - validProducts.length} products with invalid postId`)
+          if (response.ok) {
+            break // Success, exit retry loop
+          } else {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`)
           }
+        } catch (fetchError: any) {
+          lastError = fetchError
+          console.log(`Attempt ${attempt} failed:`, fetchError.message)
 
-          // Process the image URLs to ensure they're valid
-          const processedProducts = validProducts.map((product: Product) => ({
-            ...product,
-            image:
-              Array.isArray(product.image) && product.image.length > 0
-                ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
-                : ["/placeholder.svg"],
-          }))
-
-          setProducts(processedProducts)
-        } else {
-          throw new Error(data.msg || "Invalid API response format")
+          if (attempt < 3) {
+            console.log(`Waiting 2 seconds before retry...`)
+            await new Promise((resolve) => setTimeout(resolve, 2000))
+          }
         }
-      } catch (fetchError: any) {
-        clearTimeout(timeoutId)
+      }
 
-        if (fetchError.name === "AbortError") {
-          throw new Error("Request timed out. The server might be slow to respond.")
+      if (!response || !response.ok) {
+        throw lastError || new Error("All retry attempts failed")
+      }
+
+      const data = await response.json()
+
+      if (data.success && Array.isArray(data.data)) {
+        console.log("Products fetched successfully:", data.data)
+
+        // Filter out products with missing or invalid postId
+        const validProducts = data.data.filter(
+          (product: Product) => product.postId && typeof product.postId === "string",
+        )
+
+        if (validProducts.length < data.data.length) {
+          console.warn(`Filtered out ${data.data.length - validProducts.length} products with invalid postId`)
         }
-        throw fetchError
+
+        // Process the image URLs to ensure they're valid
+        const processedProducts = validProducts.map((product: Product) => ({
+          ...product,
+          image:
+            Array.isArray(product.image) && product.image.length > 0
+              ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
+              : ["/placeholder.svg"],
+        }))
+
+        setProducts(processedProducts)
+      } else {
+        throw new Error(data.msg || "Invalid API response format")
       }
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : "Failed to load products"
       console.error("Error fetching products:", error)
       setError(errorMessage)
 
-      // Show error toast
+      // Show error toast with retry button
       toast({
         title: "Error fetching products",
-        description: "Could not load products from the server. Please try again later.",
+        description: (
+          <div className="flex flex-col gap-2">
+            <p>Could not load products from the server.</p>
+            <button
+              onClick={() => {
+                toast.dismiss()
+                fetchProducts()
+              }}
+              className="text-sm bg-white text-black px-2 py-1 rounded hover:bg-gray-100"
+            >
+              Try Again
+            </button>
+          </div>
+        ),
         variant: "destructive",
+        duration: 10000,
       })
 
       // Set empty products array
@@ -536,6 +566,7 @@ export default function ProductsPage() {
       <div className="flex flex-col items-center justify-center h-[80vh]">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
         <p className="text-muted-foreground">Loading products...</p>
+        <p className="text-sm text-muted-foreground mt-2">This may take up to 45 seconds...</p>
       </div>
     )
   }
@@ -563,7 +594,12 @@ export default function ProductsPage() {
         {error && (
           <Alert variant="destructive" className="mb-4">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription>
+              {error}
+              <button onClick={fetchProducts} className="ml-2 underline hover:no-underline">
+                Try again
+              </button>
+            </AlertDescription>
           </Alert>
         )}
 
