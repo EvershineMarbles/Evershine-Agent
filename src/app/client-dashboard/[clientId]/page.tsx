@@ -11,16 +11,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { Button } from "@/components/ui/button"
 
-// Define the Product interface with new backend price fields
+// Define the Product interface
 interface Product {
   _id: string
   name: string
-  price: number // ✅ MAIN PRICE - Use this for display (includes all commissions)
-  basePrice?: number // ✅ Original price (before commissions)
-  adjustedPrice?: number // ✅ Same as 'price' - fully calculated price
-  originalPrice?: number // Legacy field
-  priceWithAgentCommission?: number // Price + agent commission only
-  priceWithFullCommission?: number // Price + agent + consultant level
+  price: number
+  basePrice?: number // Original price before any adjustments
+  originalPrice?: number // Alternative field for original price
   image: string[]
   postId: string
   category: string
@@ -28,13 +25,6 @@ interface Product {
   status?: "draft" | "pending" | "approved"
   applicationAreas?: string
   quantityAvailable?: number
-  // Commission info (for transparency)
-  commissionInfo?: {
-    agentCommission: number
-    consultantLevel: string
-    consultantCommission: number
-    totalCommission: number
-  }
 }
 
 // Define the WishlistItem interface
@@ -71,17 +61,6 @@ export default function ProductsPage() {
   const [error, setError] = useState<string | null>(null)
   const [clientData, setClientData] = useState<any>(null)
   const [wishlistLoading, setWishlistLoading] = useState(false)
-
-  // Debug scroll event
-  useEffect(() => {
-    console.log("Setting up scroll debug in ProductsPage")
-    const logScroll = () => {
-      console.log("Scroll event detected in ProductsPage, window.scrollY:", window.scrollY)
-    }
-
-    window.addEventListener("scroll", logScroll)
-    return () => window.removeEventListener("scroll", logScroll)
-  }, [])
 
   // Fetch wishlist from backend
   const fetchWishlist = useCallback(async () => {
@@ -181,86 +160,54 @@ export default function ProductsPage() {
         headers["Authorization"] = `Bearer ${token}`
       }
 
-      // Create AbortController for timeout
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+      const response = await fetch(`${apiUrl}/api/getAllProducts`, {
+        method: "GET",
+        headers,
+        // Add a timeout to prevent long waiting times
+        signal: AbortSignal.timeout(8000), // 8 second timeout
+      })
 
-      try {
-        const response = await fetch(`${apiUrl}/api/getAllProducts`, {
-          method: "GET",
-          headers,
-          signal: controller.signal,
-        })
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`)
+      }
 
-        clearTimeout(timeoutId)
+      const data = await response.json()
 
-        if (!response.ok) {
-          throw new Error(`API request failed with status ${response.status}`)
+      if (data.success && Array.isArray(data.data)) {
+        console.log("Products fetched successfully:", data.data)
+
+        // Filter out products with missing or invalid postId
+        const validProducts = data.data.filter(
+          (product: Product) => product.postId && typeof product.postId === "string",
+        )
+
+        if (validProducts.length < data.data.length) {
+          console.warn(`Filtered out ${data.data.length - validProducts.length} products with invalid postId`)
         }
 
-        const data = await response.json()
+        // Process the image URLs to ensure they're valid
+        const processedProducts = validProducts.map((product: Product) => ({
+          ...product,
+          image:
+            Array.isArray(product.image) && product.image.length > 0
+              ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
+              : ["/placeholder.svg"],
+        }))
 
-        if (data.success && Array.isArray(data.data)) {
-          console.log("Products fetched successfully:", data.data)
-
-          // Log first product to check price structure
-          if (data.data.length > 0) {
-            console.log("First product price structure:", {
-              price: data.data[0].price,
-              basePrice: data.data[0].basePrice,
-              adjustedPrice: data.data[0].adjustedPrice,
-              commissionInfo: data.data[0].commissionInfo,
-            })
-          }
-
-          // Filter out products with missing or invalid postId
-          const validProducts = data.data.filter(
-            (product: Product) => product.postId && typeof product.postId === "string",
-          )
-
-          if (validProducts.length < data.data.length) {
-            console.warn(`Filtered out ${data.data.length - validProducts.length} products with invalid postId`)
-          }
-
-          // Process the image URLs to ensure they're valid
-          const processedProducts = validProducts.map((product: Product) => ({
-            ...product,
-            image:
-              Array.isArray(product.image) && product.image.length > 0
-                ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
-                : ["/placeholder.svg"],
-          }))
-
-          setProducts(processedProducts)
-        } else {
-          throw new Error(data.msg || "Invalid API response format")
-        }
-      } catch (fetchError: any) {
-        clearTimeout(timeoutId)
-
-        if (fetchError.name === "AbortError") {
-          throw new Error("Request timed out. The server might be slow to respond.")
-        }
-        throw fetchError
+        setProducts(processedProducts)
+      } else {
+        throw new Error(data.msg || "Invalid API response format")
       }
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : "Failed to load products"
       console.error("Error fetching products:", error)
       setError(errorMessage)
 
-      // Show error toast with retry option
+      // Show error toast
       toast({
         title: "Error fetching products",
-        description: (
-          <div className="flex flex-col gap-2">
-            <p>{errorMessage}</p>
-            <button onClick={fetchProducts} className="text-sm bg-white text-black px-2 py-1 rounded hover:bg-gray-100">
-              Retry
-            </button>
-          </div>
-        ),
+        description: "Could not load products from the server. Please try again later.",
         variant: "destructive",
-        duration: 10000, // Show for 10 seconds
       })
 
       // Set empty products array
@@ -363,12 +310,10 @@ export default function ProductsPage() {
             },
             body: JSON.stringify({
               productId,
-              // ✅ Use the price directly from the product (backend calculated)
+              // Use the price directly from the product (backend calculated)
               price: product.price,
             }),
           })
-
-          console.log("Adding to wishlist with backend price:", product.price)
 
           if (!response.ok) {
             throw new Error(`API error: ${response.status} ${response.statusText}`)
@@ -470,12 +415,10 @@ export default function ProductsPage() {
         },
         body: JSON.stringify({
           productId,
-          // ✅ Use the price directly from the product (backend calculated)
+          // Use the price directly from the product (backend calculated)
           price: product.price,
         }),
       })
-
-      console.log("Adding to cart with backend price:", product.price)
 
       if (!response.ok) {
         throw new Error(`API error: ${response.status} ${response.statusText}`)
@@ -660,18 +603,6 @@ export default function ProductsPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             {filteredProducts.map((product) => {
-              // ✅ Use backend calculated prices directly
-              const displayPrice = product.price // Main price (includes all commissions)
-              const originalPrice = product.basePrice // Original price before commissions
-
-              // 🔍 Debug logging for price structure
-              console.log(`Product ${product.name} prices:`, {
-                displayPrice,
-                originalPrice,
-                adjustedPrice: product.adjustedPrice,
-                commissionInfo: product.commissionInfo,
-              })
-
               return (
                 <div
                   key={product._id}
@@ -713,20 +644,16 @@ export default function ProductsPage() {
                   <div className="p-4">
                     <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
 
-                    {/* ✅ Display backend calculated prices */}
+                    {/* Display price directly from backend */}
                     <div className="mt-2">
-                      <p className="text-lg font-bold">₹{displayPrice.toLocaleString()}/sqft</p>
+                      <p className="text-lg font-bold">₹{product.price.toLocaleString()}/sqft</p>
                       {/* Show original price if different from current price */}
-                      {originalPrice && originalPrice !== displayPrice && (
-                        <p className="text-sm text-gray-500 line-through">₹{originalPrice.toLocaleString()}/sqft</p>
-                      )}
-                      {/* 🔍 Debug info - remove in production */}
-                      {product.commissionInfo && (
-                        <p className="text-xs text-blue-600 mt-1">
-                          Commission: {product.commissionInfo.totalCommission}% | Level:{" "}
-                          {product.commissionInfo.consultantLevel}
-                        </p>
-                      )}
+                      {(product.basePrice || product.originalPrice) &&
+                        (product.basePrice !== product.price || product.originalPrice !== product.price) && (
+                          <p className="text-sm text-muted-foreground line-through">
+                            ₹{(product.basePrice || product.originalPrice)?.toLocaleString()}/sqft
+                          </p>
+                        )}
                     </div>
 
                     <p className="text-sm text-muted-foreground mt-1">
@@ -736,14 +663,14 @@ export default function ProductsPage() {
                     <button
                       onClick={(e) => toggleWishlist(e, product.postId)}
                       className={`mt-4 w-full py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2
-                                ${
-                                  wishlist.includes(product.postId)
-                                    ? "bg-gray-100 text-gray-600 border border-gray-200"
-                                    : addingToWishlist[product.postId]
-                                      ? "bg-gray-200 text-gray-700"
-                                      : "bg-primary hover:bg-primary/90 text-primary-foreground"
-                                } 
-                                transition-colors`}
+                               ${
+                                 wishlist.includes(product.postId)
+                                   ? "bg-gray-100 text-gray-600 border border-gray-200"
+                                   : addingToWishlist[product.postId]
+                                     ? "bg-gray-200 text-gray-700"
+                                     : "bg-primary hover:bg-primary/90 text-primary-foreground"
+                               } 
+                               transition-colors`}
                       disabled={addingToWishlist[product.postId]}
                       type="button"
                     >
