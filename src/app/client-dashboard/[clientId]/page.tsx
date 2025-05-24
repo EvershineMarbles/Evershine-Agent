@@ -171,54 +171,76 @@ export default function ProductsPage() {
         headers["Authorization"] = `Bearer ${token}`
       }
 
-      const response = await fetch(`${apiUrl}/api/getAllProducts`, {
-        method: "GET",
-        headers,
-        // Add a timeout to prevent long waiting times
-        signal: AbortSignal.timeout(8000), // 8 second timeout
-      })
+      // Create AbortController for timeout
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
 
-      if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`)
-      }
+      try {
+        const response = await fetch(`${apiUrl}/api/getAllProducts`, {
+          method: "GET",
+          headers,
+          signal: controller.signal,
+        })
 
-      const data = await response.json()
+        clearTimeout(timeoutId)
 
-      if (data.success && Array.isArray(data.data)) {
-        console.log("Products fetched successfully:", data.data)
-
-        // Filter out products with missing or invalid postId
-        const validProducts = data.data.filter(
-          (product: Product) => product.postId && typeof product.postId === "string",
-        )
-
-        if (validProducts.length < data.data.length) {
-          console.warn(`Filtered out ${data.data.length - validProducts.length} products with invalid postId`)
+        if (!response.ok) {
+          throw new Error(`API request failed with status ${response.status}`)
         }
 
-        // Process the image URLs to ensure they're valid
-        const processedProducts = validProducts.map((product: Product) => ({
-          ...product,
-          image:
-            Array.isArray(product.image) && product.image.length > 0
-              ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
-              : ["/placeholder.svg"],
-        }))
+        const data = await response.json()
 
-        setProducts(processedProducts)
-      } else {
-        throw new Error(data.msg || "Invalid API response format")
+        if (data.success && Array.isArray(data.data)) {
+          console.log("Products fetched successfully:", data.data)
+
+          // Filter out products with missing or invalid postId
+          const validProducts = data.data.filter(
+            (product: Product) => product.postId && typeof product.postId === "string",
+          )
+
+          if (validProducts.length < data.data.length) {
+            console.warn(`Filtered out ${data.data.length - validProducts.length} products with invalid postId`)
+          }
+
+          // Process the image URLs to ensure they're valid
+          const processedProducts = validProducts.map((product: Product) => ({
+            ...product,
+            image:
+              Array.isArray(product.image) && product.image.length > 0
+                ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
+                : ["/placeholder.svg"],
+          }))
+
+          setProducts(processedProducts)
+        } else {
+          throw new Error(data.msg || "Invalid API response format")
+        }
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId)
+
+        if (fetchError.name === "AbortError") {
+          throw new Error("Request timed out. The server might be slow to respond.")
+        }
+        throw fetchError
       }
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : "Failed to load products"
       console.error("Error fetching products:", error)
       setError(errorMessage)
 
-      // Show error toast
+      // Show error toast with retry option
       toast({
         title: "Error fetching products",
-        description: "Could not load products from the server. Please try again later.",
+        description: (
+          <div className="flex flex-col gap-2">
+            <p>{errorMessage}</p>
+            <button onClick={fetchProducts} className="text-sm bg-white text-black px-2 py-1 rounded hover:bg-gray-100">
+              Retry
+            </button>
+          </div>
+        ),
         variant: "destructive",
+        duration: 10000, // Show for 10 seconds
       })
 
       // Set empty products array
