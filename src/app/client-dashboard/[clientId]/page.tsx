@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode } from 'lucide-react'
+import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode } from "lucide-react"
 import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -171,9 +171,8 @@ export default function ProductsPage() {
         headers["Authorization"] = `Bearer ${token}`
       }
 
-      // Create AbortController for timeout
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 8000) // 8 second timeout
 
       try {
         const response = await fetch(`${apiUrl}/api/getAllProducts`, {
@@ -217,8 +216,8 @@ export default function ProductsPage() {
         }
       } catch (fetchError: any) {
         clearTimeout(timeoutId)
-        
-        if (fetchError.name === 'AbortError') {
+
+        if (fetchError.name === "AbortError") {
           throw new Error("Request timed out. The server might be slow to respond.")
         }
         throw fetchError
@@ -228,22 +227,11 @@ export default function ProductsPage() {
       console.error("Error fetching products:", error)
       setError(errorMessage)
 
-      // Show error toast with retry option
+      // Show error toast
       toast({
         title: "Error fetching products",
-        description: (
-          <div className="flex flex-col gap-2">
-            <p>{errorMessage}</p>
-            <button 
-              onClick={fetchProducts}
-              className="text-sm bg-white text-black px-2 py-1 rounded hover:bg-gray-100"
-            >
-              Retry
-            </button>
-          </div>
-        ),
+        description: "Could not load products from the server. Please try again later.",
         variant: "destructive",
-        duration: 10000, // Show for 10 seconds
       })
 
       // Set empty products array
