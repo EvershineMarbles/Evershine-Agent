@@ -4,12 +4,13 @@ import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode } from "lucide-react"
+import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode, Info, RefreshCw } from "lucide-react"
 import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 
 // Define the Product interface with new backend price fields
 interface Product {
@@ -21,6 +22,7 @@ interface Product {
   originalPrice?: number // Legacy field
   priceWithAgentCommission?: number // Price + agent commission only
   priceWithFullCommission?: number // Price + agent + consultant level
+  displayPrice?: number // For display purposes
   image: string[]
   postId: string
   category: string
@@ -34,6 +36,8 @@ interface Product {
     consultantLevel: string
     consultantCommission: number
     totalCommission: number
+    agentCommissionAmount?: number
+    consultantCommissionAmount?: number
   }
 }
 
@@ -179,6 +183,9 @@ export default function ProductsPage() {
 
       if (token) {
         headers["Authorization"] = `Bearer ${token}`
+        console.log("🔑 Using authentication token for price calculations")
+      } else {
+        console.log("⚠️ No authentication token - will receive base prices only")
       }
 
       // Create AbortController for timeout
@@ -201,16 +208,26 @@ export default function ProductsPage() {
         const data = await response.json()
 
         if (data.success && Array.isArray(data.data)) {
-          console.log("Products fetched successfully:", data.data)
+          console.log("✅ Products fetched successfully:", data.data.length, "products")
 
           // Log first product to check price structure
           if (data.data.length > 0) {
-            console.log("First product price structure:", {
-              price: data.data[0].price,
-              basePrice: data.data[0].basePrice,
-              adjustedPrice: data.data[0].adjustedPrice,
-              commissionInfo: data.data[0].commissionInfo,
+            const firstProduct = data.data[0]
+            console.log("🔍 First product price structure:", {
+              name: firstProduct.name,
+              price: firstProduct.price,
+              basePrice: firstProduct.basePrice,
+              adjustedPrice: firstProduct.adjustedPrice,
+              displayPrice: firstProduct.displayPrice,
+              commissionInfo: firstProduct.commissionInfo,
             })
+
+            // Check if prices are calculated
+            if (firstProduct.commissionInfo) {
+              console.log("✅ Commission calculations detected in API response")
+            } else {
+              console.log("⚠️ No commission info - may be receiving base prices only")
+            }
           }
 
           // Filter out products with missing or invalid postId
@@ -245,7 +262,7 @@ export default function ProductsPage() {
       }
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : "Failed to load products"
-      console.error("Error fetching products:", error)
+      console.error("❌ Error fetching products:", error)
       setError(errorMessage)
 
       // Show error toast with retry option
@@ -299,7 +316,8 @@ export default function ProductsPage() {
       setAddingToWishlist((prev) => ({ ...prev, [productId]: true }))
 
       // Optimistically update UI
-      if (wishlist.includes(productId)) {
+      const isCurrentlyInWishlist = wishlist.includes(productId)
+      if (isCurrentlyInWishlist) {
         // Remove from wishlist
         setWishlist((prev) => prev.filter((id) => id !== productId))
       } else {
@@ -315,7 +333,7 @@ export default function ProductsPage() {
           throw new Error("No authentication token found. Please refresh the token using the debug panel above")
         }
 
-        if (wishlist.includes(productId)) {
+        if (isCurrentlyInWishlist) {
           // Remove from wishlist
           const response = await fetch("https://evershinebackend-2.onrender.com/api/deleteUserWishlistItem", {
             method: "DELETE",
@@ -363,12 +381,12 @@ export default function ProductsPage() {
             },
             body: JSON.stringify({
               productId,
-              // ✅ Use the price directly from the product (backend calculated)
-              price: product.price,
+              // ✅ Use the calculated price from the product (backend calculated)
+              price: product.price || product.displayPrice || product.adjustedPrice,
             }),
           })
 
-          console.log("Adding to wishlist with backend price:", product.price)
+          console.log("Adding to wishlist with backend calculated price:", product.price)
 
           if (!response.ok) {
             throw new Error(`API error: ${response.status} ${response.statusText}`)
@@ -404,7 +422,7 @@ export default function ProductsPage() {
         console.error("Error updating wishlist:", error)
 
         // Revert the optimistic update
-        if (wishlist.includes(productId)) {
+        if (isCurrentlyInWishlist) {
           // We were trying to remove, but failed, so add it back
           setWishlist((prev) => [...prev, productId])
         } else {
@@ -470,12 +488,12 @@ export default function ProductsPage() {
         },
         body: JSON.stringify({
           productId,
-          // ✅ Use the price directly from the product (backend calculated)
-          price: product.price,
+          // ✅ Use the calculated price from the product (backend calculated)
+          price: product.price || product.displayPrice || product.adjustedPrice,
         }),
       })
 
-      console.log("Adding to cart with backend price:", product.price)
+      console.log("Adding to cart with backend calculated price:", product.price)
 
       if (!response.ok) {
         throw new Error(`API error: ${response.status} ${response.statusText}`)
@@ -569,6 +587,7 @@ export default function ProductsPage() {
       <div className="flex flex-col items-center justify-center h-[80vh]">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
         <p className="text-muted-foreground">Loading products...</p>
+        <p className="text-sm text-gray-500 mt-2">Calculating prices with commissions...</p>
       </div>
     )
   }
@@ -587,12 +606,69 @@ export default function ProductsPage() {
     router.push(`/client-dashboard/${clientId}/product/${productId}`)
   }
 
+  // Helper function to get consultant level color
+  const getConsultantLevelColor = (level: string) => {
+    switch (level?.toLowerCase()) {
+      case "red":
+        return "bg-red-100 text-red-800"
+      case "yellow":
+        return "bg-yellow-100 text-yellow-800"
+      case "purple":
+        return "bg-purple-100 text-purple-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
+  }
+
   return (
     <ErrorBoundary>
       <div className="p-6 md:p-8">
+        {/* Debug Panel - Development Only */}
+        {process.env.NODE_ENV === "development" && (
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <Info className="h-4 w-4 text-blue-600" />
+              <h3 className="font-medium text-blue-900">Debug Info (Development Only)</h3>
+            </div>
+            <div className="text-sm text-blue-800 space-y-1">
+              <p>
+                <strong>Token Status:</strong>{" "}
+                {localStorage.getItem("clientImpersonationToken") ? "✅ Present" : "❌ Missing"}
+              </p>
+              <p>
+                <strong>Products Loaded:</strong> {products.length}
+              </p>
+              {products.length > 0 && (
+                <div>
+                  <p>
+                    <strong>First Product Price:</strong> ₹{products[0].price} (Base: ₹{products[0].basePrice || "N/A"})
+                  </p>
+                  {products[0].commissionInfo && (
+                    <p>
+                      <strong>Commission Info:</strong> Agent: {products[0].commissionInfo.agentCommission}%, Level:{" "}
+                      {products[0].commissionInfo.consultantLevel} ({products[0].commissionInfo.consultantCommission}
+                      %)
+                    </p>
+                  )}
+                </div>
+              )}
+              <Button onClick={fetchProducts} size="sm" variant="outline" className="mt-2">
+                <RefreshCw className="h-3 w-3 mr-1" />
+                Refresh Products
+              </Button>
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <h1 className="text-3xl font-bold">Welcome, {clientData?.name?.split(" ")[0] || "Client"}</h1>
+          {clientData?.consultantLevel && (
+            <Badge className={getConsultantLevelColor(clientData.consultantLevel)}>
+              {clientData.consultantLevel.toUpperCase()} Level
+            </Badge>
+          )}
         </div>
+
         {error && (
           <Alert variant="destructive" className="mb-4">
             <AlertCircle className="h-4 w-4" />
@@ -661,8 +737,9 @@ export default function ProductsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             {filteredProducts.map((product) => {
               // ✅ Use backend calculated prices directly
-              const displayPrice = product.price // Main price (includes all commissions)
-              const originalPrice = product.basePrice // Original price before commissions
+              const displayPrice = product.price || product.displayPrice || product.adjustedPrice // Main price (includes all commissions)
+              const originalPrice = product.basePrice || product.originalPrice // Original price before commissions
+              const hasCommissions = product.commissionInfo && displayPrice !== originalPrice
 
               // 🔍 Debug logging for price structure
               console.log(`Product ${product.name} prices:`, {
@@ -670,6 +747,7 @@ export default function ProductsPage() {
                 originalPrice,
                 adjustedPrice: product.adjustedPrice,
                 commissionInfo: product.commissionInfo,
+                hasCommissions,
               })
 
               return (
@@ -707,25 +785,56 @@ export default function ProductsPage() {
                           />
                         )}
                       </button>
+
+                      {/* Commission indicator */}
+                      {hasCommissions && (
+                        <div className="absolute top-2 left-2">
+                          <Badge className="bg-green-100 text-green-800 text-xs">Calculated Price</Badge>
+                        </div>
+                      )}
                     </div>
                   </div>
 
                   <div className="p-4">
                     <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
 
-                    {/* ✅ Display backend calculated prices */}
+                    {/* ✅ Enhanced price display with commission info */}
                     <div className="mt-2">
-                      <p className="text-lg font-bold">₹{displayPrice.toLocaleString()}/sqft</p>
-                      {/* Show original price if different from current price */}
-                      {originalPrice && originalPrice !== displayPrice && (
-                        <p className="text-sm text-gray-500 line-through">₹{originalPrice.toLocaleString()}/sqft</p>
-                      )}
-                      {/* 🔍 Debug info - remove in production */}
-                      {product.commissionInfo && (
-                        <p className="text-xs text-blue-600 mt-1">
-                          Commission: {product.commissionInfo.totalCommission}% | Level:{" "}
-                          {product.commissionInfo.consultantLevel}
+                      <div className="flex items-center gap-2">
+                        <p className={`text-lg font-bold ${hasCommissions ? "text-green-600" : ""}`}>
+                          ₹{displayPrice.toLocaleString()}/sqft
                         </p>
+                        {/* Show original price if different from current price */}
+                        {originalPrice && originalPrice !== displayPrice && (
+                          <p className="text-sm text-gray-500 line-through">₹{originalPrice.toLocaleString()}/sqft</p>
+                        )}
+                      </div>
+
+                      {/* Commission breakdown */}
+                      {product.commissionInfo && (
+                        <div className="mt-2 space-y-1">
+                          <div className="flex flex-wrap gap-1">
+                            <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700">
+                              Agent: {product.commissionInfo.agentCommission}%
+                            </Badge>
+                            <Badge
+                              variant="outline"
+                              className={`text-xs ${getConsultantLevelColor(product.commissionInfo.consultantLevel)}`}
+                            >
+                              {product.commissionInfo.consultantLevel}: {product.commissionInfo.consultantCommission}%
+                            </Badge>
+                          </div>
+                          {originalPrice && originalPrice !== displayPrice && (
+                            <p className="text-xs text-gray-600">
+                              Additional cost: ₹{(displayPrice - originalPrice).toLocaleString()}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Base pricing indicator */}
+                      {!hasCommissions && (
+                        <p className="text-xs text-gray-500 mt-1">Base pricing (no commissions applied)</p>
                       )}
                     </div>
 

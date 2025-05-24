@@ -27,6 +27,9 @@ interface WishlistItem {
   basePrice?: number
   image: string[]
   category: string
+  customQuantity?: number
+  customFinish?: string
+  customThickness?: string
 }
 
 export default function WishlistPage() {
@@ -42,10 +45,22 @@ export default function WishlistPage() {
   const [cartCount, setCartCount] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
   const [quantities, setQuantities] = useState<Record<string, number>>({})
+  const [editingCustomFields, setEditingCustomFields] = useState<
+    Record<
+      string,
+      {
+        customQuantity?: number
+        customFinish?: string
+        customThickness?: string
+      }
+    >
+  >({})
 
   // Add commission data state
   const [commissionData, setCommissionData] = useState<CommissionData | null>(null)
   const [overrideCommissionRate, setOverrideCommissionRate] = useState<number | null>(null)
+
+  const finishOptions = ["Polish", "Leather", "Flute", "River", "Satin", "Dual"]
 
   // Get API URL from environment or use default
   const getApiUrl = () => {
@@ -207,7 +222,8 @@ export default function WishlistPage() {
         items.forEach((item: WishlistItem) => {
           const itemId = item.postId || item._id
           initialState[itemId] = { removing: false, addingToCart: false }
-          initialQuantities[itemId] = 1000 // Default quantity is now 1000
+          // Use customQuantity if available, otherwise default to 1000
+          initialQuantities[itemId] = item.customQuantity || 1000
         })
 
         setActionLoading(initialState)
@@ -324,6 +340,81 @@ export default function WishlistPage() {
     }
   }
 
+  // Handle custom field changes
+  const handleCustomFieldChange = (itemId: string, field: string, value: string | number) => {
+    setEditingCustomFields((prev) => ({
+      ...prev,
+      [itemId]: {
+        ...prev[itemId],
+        [field]: value,
+      },
+    }))
+  }
+
+  // Save custom field changes
+  const saveCustomFields = async (productId: string) => {
+    try {
+      const token = getToken()
+      if (!token) return
+
+      const apiUrl = getApiUrl()
+      const customFields = editingCustomFields[productId]
+
+      if (!customFields) return
+
+      const response = await axios.put(
+        `${apiUrl}/api/updateWishlistItem`,
+        {
+          productId,
+          customQuantity: customFields.customQuantity,
+          customFinish: customFields.customFinish,
+          customThickness: customFields.customThickness,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+
+      if (response.data.success) {
+        // Update local state
+        setWishlistItems((prev) =>
+          prev.map((item) => {
+            const itemId = item.postId || item._id
+            if (itemId === productId) {
+              return {
+                ...item,
+                customQuantity: customFields.customQuantity,
+                customFinish: customFields.customFinish,
+                customThickness: customFields.customThickness,
+              }
+            }
+            return item
+          }),
+        )
+
+        // Clear editing state
+        setEditingCustomFields((prev) => {
+          const newState = { ...prev }
+          delete newState[productId]
+          return newState
+        })
+
+        toast({
+          title: "Custom fields updated",
+          description: "Your custom specifications have been saved",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update custom fields",
+        variant: "destructive",
+      })
+    }
+  }
+
   // Add item to cart
   const addToCart = async (productId: string) => {
     try {
@@ -343,24 +434,27 @@ export default function WishlistPage() {
       // Find the item to get its data
       const item = wishlistItems.find((item) => (item.postId || item._id) === productId)
 
-      // IMPORTANT: The backend is not storing our adjusted price, so we need to use the original price
-      // We'll still calculate and display the adjusted price in the UI, but send the original price to the backend
+      // Get custom fields (either from editing state or original item)
+      const customFields = editingCustomFields[productId] || {
+        customQuantity: item?.customQuantity,
+        customFinish: item?.customFinish,
+        customThickness: item?.customThickness,
+      }
+
       const originalPrice = item ? item.basePrice || item.price : 0
       const adjustedPrice = item ? calculateAdjustedPrice(item) : 0
 
-      console.log("WISHLIST - Original item:", item)
-      console.log("WISHLIST - Base price:", item?.basePrice || item?.price)
-      console.log("WISHLIST - Commission rate:", overrideCommissionRate)
-      console.log("WISHLIST - Adjusted price (displayed):", adjustedPrice)
-      console.log("WISHLIST - Original price (sent to backend):", originalPrice)
+      console.log("WISHLIST - Adding to cart with custom fields:", customFields)
 
-      // Try with axios - now sending the quantity and ORIGINAL price
       const response = await axios.post(
         `${apiUrl}/api/addToCart`,
         {
           productId,
-          quantity, // Send the quantity to the API
-          price: originalPrice, // Send the ORIGINAL price to the backend
+          quantity,
+          price: originalPrice,
+          customQuantity: customFields.customQuantity,
+          customFinish: customFields.customFinish,
+          customThickness: customFields.customThickness,
         },
         {
           headers: {
@@ -506,11 +600,16 @@ export default function WishlistPage() {
           <div className="divide-y divide-border">
             {wishlistItems.map((item) => {
               const itemId = item.postId || item._id
-              // Calculate the adjusted price with commission
               const adjustedPrice = calculateAdjustedPrice(item)
+              const isEditing = editingCustomFields[itemId]
+              const currentCustomFields = isEditing || {
+                customQuantity: item.customQuantity,
+                customFinish: item.customFinish,
+                customThickness: item.customThickness,
+              }
 
               return (
-                <div key={itemId} className="p-4 flex flex-col md:flex-row md:items-center">
+                <div key={itemId} className="p-4 flex flex-col md:flex-row md:items-start">
                   <div className="relative h-20 w-20 rounded-md overflow-hidden flex-shrink-0 mb-4 md:mb-0">
                     <Image
                       src={item.image && item.image.length > 0 ? item.image[0] : "/placeholder.svg?height=80&width=80"}
@@ -526,7 +625,118 @@ export default function WishlistPage() {
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2">
                       <span className="font-semibold">₹{adjustedPrice.toLocaleString()}</span>
                     </div>
+
+                    {/* Custom Fields Display/Edit */}
+                    <div className="mt-4 space-y-3 bg-muted/20 p-3 rounded-md">
+                      <h4 className="text-sm font-medium">Custom Specifications</h4>
+
+                      {/* Custom Quantity */}
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm text-muted-foreground w-20">Quantity:</label>
+                        {isEditing ? (
+                          <Input
+                            type="number"
+                            value={currentCustomFields.customQuantity || ""}
+                            onChange={(e) => handleCustomFieldChange(itemId, "customQuantity", Number(e.target.value))}
+                            className="h-8 w-24"
+                            placeholder="sqft"
+                          />
+                        ) : (
+                          <span className="text-sm">
+                            {item.customQuantity ? `${item.customQuantity} sqft` : "Not specified"}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Custom Finish */}
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm text-muted-foreground w-20">Finish:</label>
+                        {isEditing ? (
+                          <select
+                            value={currentCustomFields.customFinish || ""}
+                            onChange={(e) => handleCustomFieldChange(itemId, "customFinish", e.target.value)}
+                            className="h-8 px-2 border rounded text-sm"
+                          >
+                            <option value="">Select finish</option>
+                            {finishOptions.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="text-sm">{item.customFinish || "Not specified"}</span>
+                        )}
+                      </div>
+
+                      {/* Custom Thickness */}
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm text-muted-foreground w-20">Thickness:</label>
+                        {isEditing ? (
+                          <Input
+                            type="text"
+                            value={currentCustomFields.customThickness || ""}
+                            onChange={(e) => handleCustomFieldChange(itemId, "customThickness", e.target.value)}
+                            className="h-8 w-24"
+                            placeholder="mm"
+                          />
+                        ) : (
+                          <span className="text-sm">
+                            {item.customThickness ? `${item.customThickness} mm` : "Not specified"}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Edit/Save buttons */}
+                      <div className="flex gap-2">
+                        {isEditing ? (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => saveCustomFields(itemId)}
+                              className="h-7 text-xs"
+                            >
+                              Save
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                setEditingCustomFields((prev) => {
+                                  const newState = { ...prev }
+                                  delete newState[itemId]
+                                  return newState
+                                })
+                              }
+                              className="h-7 text-xs"
+                            >
+                              Cancel
+                            </Button>
+                          </>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              setEditingCustomFields((prev) => ({
+                                ...prev,
+                                [itemId]: {
+                                  customQuantity: item.customQuantity,
+                                  customFinish: item.customFinish,
+                                  customThickness: item.customThickness,
+                                },
+                              }))
+                            }
+                            className="h-7 text-xs"
+                          >
+                            Edit Specs
+                          </Button>
+                        )}
+                      </div>
+                    </div>
                   </div>
+
                   <div className="flex flex-col md:flex-row items-center gap-4 mt-4 md:mt-0">
                     <div className="flex items-center">
                       <Input
