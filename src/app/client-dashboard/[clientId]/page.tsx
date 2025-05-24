@@ -11,13 +11,16 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { Button } from "@/components/ui/button"
 
-// Define the Product interface
+// Define the Product interface with new backend price fields
 interface Product {
   _id: string
   name: string
-  price: number
-  basePrice?: number
-  originalPrice?: number
+  price: number // ✅ MAIN PRICE - Use this for display (includes all commissions)
+  basePrice?: number // ✅ Original price (before commissions)
+  adjustedPrice?: number // ✅ Same as 'price' - fully calculated price
+  originalPrice?: number // Legacy field
+  priceWithAgentCommission?: number // Price + agent commission only
+  priceWithFullCommission?: number // Price + agent + consultant level
   image: string[]
   postId: string
   category: string
@@ -25,6 +28,13 @@ interface Product {
   status?: "draft" | "pending" | "approved"
   applicationAreas?: string
   quantityAvailable?: number
+  // Commission info (for transparency)
+  commissionInfo?: {
+    agentCommission: number
+    consultantLevel: string
+    consultantCommission: number
+    totalCommission: number
+  }
 }
 
 // Define the WishlistItem interface
@@ -193,6 +203,16 @@ export default function ProductsPage() {
         if (data.success && Array.isArray(data.data)) {
           console.log("Products fetched successfully:", data.data)
 
+          // Log first product to check price structure
+          if (data.data.length > 0) {
+            console.log("First product price structure:", {
+              price: data.data[0].price,
+              basePrice: data.data[0].basePrice,
+              adjustedPrice: data.data[0].adjustedPrice,
+              commissionInfo: data.data[0].commissionInfo,
+            })
+          }
+
           // Filter out products with missing or invalid postId
           const validProducts = data.data.filter(
             (product: Product) => product.postId && typeof product.postId === "string",
@@ -343,10 +363,12 @@ export default function ProductsPage() {
             },
             body: JSON.stringify({
               productId,
-              // Use the price directly from the product (backend calculated)
+              // ✅ Use the price directly from the product (backend calculated)
               price: product.price,
             }),
           })
+
+          console.log("Adding to wishlist with backend price:", product.price)
 
           if (!response.ok) {
             throw new Error(`API error: ${response.status} ${response.statusText}`)
@@ -448,10 +470,12 @@ export default function ProductsPage() {
         },
         body: JSON.stringify({
           productId,
-          // Use the price directly from the product (backend calculated)
+          // ✅ Use the price directly from the product (backend calculated)
           price: product.price,
         }),
       })
+
+      console.log("Adding to cart with backend price:", product.price)
 
       if (!response.ok) {
         throw new Error(`API error: ${response.status} ${response.statusText}`)
@@ -636,6 +660,18 @@ export default function ProductsPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             {filteredProducts.map((product) => {
+              // ✅ Use backend calculated prices directly
+              const displayPrice = product.price // Main price (includes all commissions)
+              const originalPrice = product.basePrice // Original price before commissions
+
+              // 🔍 Debug logging for price structure
+              console.log(`Product ${product.name} prices:`, {
+                displayPrice,
+                originalPrice,
+                adjustedPrice: product.adjustedPrice,
+                commissionInfo: product.commissionInfo,
+              })
+
               return (
                 <div
                   key={product._id}
@@ -677,13 +713,18 @@ export default function ProductsPage() {
                   <div className="p-4">
                     <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
 
-                    {/* Display price directly from backend */}
+                    {/* ✅ Display backend calculated prices */}
                     <div className="mt-2">
-                      <p className="text-lg font-bold">₹{product.price.toLocaleString()}/sqft</p>
+                      <p className="text-lg font-bold">₹{displayPrice.toLocaleString()}/sqft</p>
                       {/* Show original price if different from current price */}
-                      {product.originalPrice && product.originalPrice !== product.price && (
-                        <p className="text-sm text-gray-500 line-through">
-                          ₹{product.originalPrice.toLocaleString()}/sqft
+                      {originalPrice && originalPrice !== displayPrice && (
+                        <p className="text-sm text-gray-500 line-through">₹{originalPrice.toLocaleString()}/sqft</p>
+                      )}
+                      {/* 🔍 Debug info - remove in production */}
+                      {product.commissionInfo && (
+                        <p className="text-xs text-blue-600 mt-1">
+                          Commission: {product.commissionInfo.totalCommission}% | Level:{" "}
+                          {product.commissionInfo.consultantLevel}
                         </p>
                       )}
                     </div>
