@@ -222,7 +222,8 @@ export default function WishlistPage() {
         items.forEach((item: WishlistItem) => {
           const itemId = item.postId || item._id
           initialState[itemId] = { removing: false, addingToCart: false }
-          initialQuantities[itemId] = 1000 // Default quantity is now 1000
+          // Use customQuantity if available, otherwise default to 1000
+          initialQuantities[itemId] = item.customQuantity || 1000
         })
 
         setActionLoading(initialState)
