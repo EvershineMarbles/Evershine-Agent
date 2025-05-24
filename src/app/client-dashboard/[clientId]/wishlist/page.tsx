@@ -2,794 +2,358 @@
 
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
-import Image from "next/image"
-import Link from "next/link"
-import { ArrowLeft, Trash2, Loader2, Heart, ShoppingCart, RefreshCw } from "lucide-react"
+import { toast } from "react-hot-toast"
+import { useSession } from "next-auth/react"
+import { FaHeart, FaShoppingCart } from "react-icons/fa"
+
 import { Button } from "@/components/ui/button"
-import { useToast } from "@/components/ui/use-toast"
 import { Input } from "@/components/ui/input"
-import axios from "axios"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Skeleton } from "@/components/ui/skeleton"
 
-// Add the CommissionData interface
-interface CommissionData {
-  agentId: string
-  name: string
-  email: string
-  commissionRate: number
-  categoryCommissions?: Record<string, number>
-}
-
-interface WishlistItem {
+interface Product {
   _id: string
-  postId: string
   name: string
   price: number
-  basePrice?: number
-  image: string[]
+  basePrice: number
+  images: string[]
+  description: string
   category: string
-  customQuantity?: number
-  customFinish?: string
-  customThickness?: string
+  stockQuantity: number
 }
 
-export default function WishlistPage() {
-  const params = useParams()
+interface Client {
+  _id: string
+  name: string
+  address: string
+  phone: string
+}
+
+const ClientDashboard = () => {
   const router = useRouter()
-  const { toast } = useToast()
-  const clientId = params.clientId as string
+  const { clientId } = useParams()
+  const { data: session } = useSession()
 
-  const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([])
+  const [client, setClient] = useState<Client | null>(null)
+  const [products, setProducts] = useState<Product[]>([])
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([])
+  const [searchTerm, setSearchTerm] = useState("")
+  const [categoryFilter, setCategoryFilter] = useState("All")
+  const [wishlist, setWishlist] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [actionLoading, setActionLoading] = useState<Record<string, { removing: boolean; addingToCart: boolean }>>({})
-  const [cartCount, setCartCount] = useState(0)
-  const [refreshing, setRefreshing] = useState(false)
-  const [quantities, setQuantities] = useState<Record<string, number>>({})
-  const [editingCustomFields, setEditingCustomFields] = useState<
-    Record<
-      string,
-      {
-        customQuantity?: number
-        customFinish?: string
-        customThickness?: string
-      }
-    >
-  >({})
+  const [clientLoading, setClientLoading] = useState(true)
+  const [wishlistLoading, setWishlistLoading] = useState(true)
+  const [categories, setCategories] = useState<string[]>([])
 
-  // Add commission data state
-  const [commissionData, setCommissionData] = useState<CommissionData | null>(null)
-  const [overrideCommissionRate, setOverrideCommissionRate] = useState<number | null>(null)
-
-  const finishOptions = ["Polish", "Leather", "Flute", "River", "Satin", "Dual"]
-
-  // Get API URL from environment or use default
-  const getApiUrl = () => {
-    return process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
-  }
-
-  // Get token from localStorage
-  const getToken = () => {
-    try {
-      // Try both token storage options
-      const token = localStorage.getItem("clientImpersonationToken") || localStorage.getItem("token")
-      if (!token) {
-        setError("No authentication token found. Please log in again.")
-        return null
-      }
-      return token
-    } catch (e) {
-      setError("Error accessing authentication. Please refresh the page.")
-      return null
-    }
-  }
-
-  // Add fetchCommissionData function
-  const fetchCommissionData = async () => {
-    try {
-      const token = getToken()
-      if (!token) return null
-
-      const apiUrl = getApiUrl()
-      const response = await axios.get(`${apiUrl}/api/client/agent-commission`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-
-      if (response.data.success && response.data.data) {
-        setCommissionData(response.data.data)
-        return response.data.data
-      }
-      return null
-    } catch (error) {
-      console.error("Error fetching commission data:", error)
-      return null
-    }
-  }
-
-  // Add calculateAdjustedPrice function
-  const calculateAdjustedPrice = (item: WishlistItem) => {
-    // Always use basePrice (which should be the original price)
-    const basePrice = item.basePrice || item.price
-
-    // Get the default commission rate (from agent or category-specific)
-    let defaultRate = commissionData?.commissionRate || 0
-
-    // Check for category-specific commission
-    if (commissionData?.categoryCommissions && item.category && commissionData.categoryCommissions[item.category]) {
-      defaultRate = commissionData.categoryCommissions[item.category]
-    }
-
-    // Add the override rate to the default rate if an override is set
-    const finalRate = overrideCommissionRate !== null ? defaultRate + overrideCommissionRate : defaultRate
-
-    // Calculate adjusted price based on the original basePrice
-    const adjustedPrice = basePrice * (1 + finalRate / 100)
-    return Math.round(adjustedPrice * 100) / 100 // Round to 2 decimal places
-  }
-
-  // Load saved commission rate from localStorage on component mount
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      // Use a client-specific key for commission rate
-      const savedRate = localStorage.getItem(`commission-override-${clientId}`)
-      if (savedRate) {
-        setOverrideCommissionRate(Number(savedRate))
-      } else {
-        // Reset to null if no saved rate for this client
-        setOverrideCommissionRate(null)
-      }
-    }
-  }, [clientId])
-
-  // Fetch client data to get consultant level
-  useEffect(() => {
-    const fetchClientData = async () => {
+    const fetchClient = async () => {
+      setClientLoading(true)
       try {
-        const token = getToken()
-        if (!token) return
-
-        const apiUrl = getApiUrl()
-        const response = await axios.get(`${apiUrl}/api/getClientDetails/${clientId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
-
-        if (response.data.success && response.data.data) {
-          // Set commission rate based on consultant level color
-          if (response.data.data.consultantLevel) {
-            const consultantLevel = response.data.data.consultantLevel
-            console.log("Client consultant level:", consultantLevel)
-
-            // Map color to commission rate
-            let commissionRate = null
-            switch (consultantLevel) {
-              case "red":
-                commissionRate = 5
-                break
-              case "yellow":
-                commissionRate = 10
-                break
-              case "purple":
-                commissionRate = 15
-                break
-              default:
-                commissionRate = null
-            }
-
-            // Set the override commission rate
-            setOverrideCommissionRate(commissionRate)
-            console.log(`Setting commission rate to ${commissionRate}% based on consultant level ${consultantLevel}`)
-          }
+        const response = await fetch(`/api/clients/${clientId}`)
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
         }
+        const data = await response.json()
+        setClient(data)
       } catch (error) {
-        console.error("Error fetching client data:", error)
+        console.error("Failed to fetch client:", error)
+        toast.error("Failed to fetch client")
+      } finally {
+        setClientLoading(false)
       }
     }
 
-    fetchClientData()
+    fetchClient()
   }, [clientId])
 
-  // Fetch wishlist items
-  const fetchWishlist = async () => {
-    try {
-      setLoading(true)
-
-      const token = getToken()
-      if (!token) {
-        setLoading(false)
-        return
-      }
-
-      // First fetch commission data
-      await fetchCommissionData()
-
-      const apiUrl = getApiUrl()
-
-      const response = await axios.get(`${apiUrl}/api/getUserWishlist`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      if (response.data.success) {
-        const items = response.data.data.items || []
-        setWishlistItems(items)
-
-        // Initialize action loading state for each item
-        const initialState: Record<string, { removing: boolean; addingToCart: boolean }> = {}
-        const initialQuantities: Record<string, number> = {}
-
-        items.forEach((item: WishlistItem) => {
-          const itemId = item.postId || item._id
-          initialState[itemId] = { removing: false, addingToCart: false }
-          // Use customQuantity if available, otherwise default to 1000
-          initialQuantities[itemId] = item.customQuantity || 1000
-        })
-
-        setActionLoading(initialState)
-        setQuantities(initialQuantities)
-      } else {
-        setError("Failed to fetch wishlist: " + (response.data.message || "Unknown error"))
-      }
-    } catch (error: any) {
-      if (error.response && error.response.status === 401) {
-        setError("Authentication failed. Please log in again.")
-      } else {
-        setError("Error loading wishlist. Please try again.")
-      }
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
-    }
-  }
-
-  // Fetch cart count
-  const fetchCartCount = async () => {
-    try {
-      const token = getToken()
-      if (!token) return
-
-      const apiUrl = getApiUrl()
-
-      const response = await axios.get(`${apiUrl}/api/getUserCart`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      if (response.data.success && response.data.data && Array.isArray(response.data.data.items)) {
-        setCartCount(response.data.data.items.length)
-      }
-    } catch (error) {
-      // Silently fail for cart count
-    }
-  }
-
-  // Initialize data on component mount
   useEffect(() => {
-    fetchWishlist()
-    fetchCartCount()
+    const fetchProducts = async () => {
+      setLoading(true)
+      try {
+        const response = await fetch("/api/products")
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+        const data = await response.json()
+        setProducts(data)
+        setFilteredProducts(data)
+        const uniqueCategories = ["All", ...new Set(data.map((product: Product) => product.category))]
+        setCategories(uniqueCategories)
+      } catch (error) {
+        console.error("Failed to fetch products:", error)
+        toast.error("Failed to fetch products")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchProducts()
   }, [])
 
-  // Handle quantity change
-  const handleQuantityChange = (itemId: string, value: string) => {
-    const numValue = Number.parseInt(value)
-
-    if (!isNaN(numValue) && numValue > 0) {
-      setQuantities((prev) => ({
-        ...prev,
-        [itemId]: numValue,
-      }))
+  useEffect(() => {
+    const fetchWishlist = async () => {
+      setWishlistLoading(true)
+      try {
+        if (!session?.user?.email) {
+          console.warn("Session not found")
+          return
+        }
+        const response = await fetch(`/api/wishlist?email=${session?.user?.email}`)
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+        const data = await response.json()
+        setWishlist(data.map((item: any) => item.productId))
+      } catch (error) {
+        console.error("Failed to fetch wishlist:", error)
+        toast.error("Failed to fetch wishlist")
+      } finally {
+        setWishlistLoading(false)
+      }
     }
-  }
 
-  // Remove item from wishlist
-  const removeFromWishlist = async (productId: string) => {
+    if (session?.user?.email) {
+      fetchWishlist()
+    }
+  }, [session?.user?.email])
+
+  useEffect(() => {
+    let results = products
+
+    if (searchTerm) {
+      results = results.filter((product) => product.name.toLowerCase().includes(searchTerm.toLowerCase()))
+    }
+
+    if (categoryFilter !== "All") {
+      results = results.filter((product) => product.category === categoryFilter)
+    }
+
+    setFilteredProducts(results)
+  }, [searchTerm, categoryFilter, products])
+
+  const toggleWishlist = async (productId: string, product: Product) => {
+    if (!session?.user?.email) {
+      toast.error("Please sign in to add to wishlist")
+      return
+    }
+
+    const inWishlist = wishlist.includes(productId)
+
     try {
-      setActionLoading((prev) => ({
-        ...prev,
-        [productId]: { ...prev[productId], removing: true },
-      }))
-
-      const token = getToken()
-      if (!token) return
-
-      const apiUrl = getApiUrl()
-
-      const response = await axios.delete(`${apiUrl}/api/deleteUserWishlistItem`, {
+      const response = await fetch("/api/wishlist", {
+        method: inWishlist ? "DELETE" : "POST",
         headers: {
-          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
-        data: { productId },
+        body: JSON.stringify({
+          productId,
+          price: product.price, // Use direct price instead of calculateAdjustedPrice(product)
+        }),
       })
 
-      if (response.data.success) {
-        // Update local state
-        setWishlistItems((prev) => prev.filter((item) => (item.postId || item._id) !== productId))
-
-        toast({
-          title: "Item removed",
-          description: "Item has been removed from your wishlist",
-        })
-      } else {
-        toast({
-          title: "Failed to remove item",
-          description: response.data.message || "Unknown error",
-          variant: "destructive",
-        })
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
       }
-    } catch (error: any) {
-      if (error.response && error.response.status === 401) {
-        toast({
-          title: "Authentication failed",
-          description: "Please log in again to continue.",
-          variant: "destructive",
-        })
+
+      if (inWishlist) {
+        setWishlist(wishlist.filter((id) => id !== productId))
+        toast.success("Removed from wishlist")
       } else {
-        toast({
-          title: "Error",
-          description: "Failed to remove item from wishlist",
-          variant: "destructive",
-        })
-      }
-    } finally {
-      setActionLoading((prev) => ({
-        ...prev,
-        [productId]: { ...prev[productId], removing: false },
-      }))
-    }
-  }
-
-  // Handle custom field changes
-  const handleCustomFieldChange = (itemId: string, field: string, value: string | number) => {
-    setEditingCustomFields((prev) => ({
-      ...prev,
-      [itemId]: {
-        ...prev[itemId],
-        [field]: value,
-      },
-    }))
-  }
-
-  // Save custom field changes
-  const saveCustomFields = async (productId: string) => {
-    try {
-      const token = getToken()
-      if (!token) return
-
-      const apiUrl = getApiUrl()
-      const customFields = editingCustomFields[productId]
-
-      if (!customFields) return
-
-      const response = await axios.put(
-        `${apiUrl}/api/updateWishlistItem`,
-        {
-          productId,
-          customQuantity: customFields.customQuantity,
-          customFinish: customFields.customFinish,
-          customThickness: customFields.customThickness,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      )
-
-      if (response.data.success) {
-        // Update local state
-        setWishlistItems((prev) =>
-          prev.map((item) => {
-            const itemId = item.postId || item._id
-            if (itemId === productId) {
-              return {
-                ...item,
-                customQuantity: customFields.customQuantity,
-                customFinish: customFields.customFinish,
-                customThickness: customFields.customThickness,
-              }
-            }
-            return item
-          }),
-        )
-
-        // Clear editing state
-        setEditingCustomFields((prev) => {
-          const newState = { ...prev }
-          delete newState[productId]
-          return newState
-        })
-
-        toast({
-          title: "Custom fields updated",
-          description: "Your custom specifications have been saved",
-        })
+        setWishlist([...wishlist, productId])
+        toast.success("Added to wishlist")
       }
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update custom fields",
-        variant: "destructive",
-      })
+      console.error("Failed to update wishlist:", error)
+      toast.error("Failed to update wishlist")
     }
   }
 
-  // Add item to cart
-  const addToCart = async (productId: string) => {
+  const addToCart = async (productId: string, product: Product) => {
+    if (!session?.user?.email) {
+      toast.error("Please sign in to add to cart")
+      return
+    }
+
     try {
-      setActionLoading((prev) => ({
-        ...prev,
-        [productId]: { ...prev[productId], addingToCart: true },
-      }))
-
-      const token = getToken()
-      if (!token) return
-
-      const apiUrl = getApiUrl()
-
-      // Get the quantity for this product
-      const quantity = quantities[productId] || 1000
-
-      // Find the item to get its data
-      const item = wishlistItems.find((item) => (item.postId || item._id) === productId)
-
-      // Get custom fields (either from editing state or original item)
-      const customFields = editingCustomFields[productId] || {
-        customQuantity: item?.customQuantity,
-        customFinish: item?.customFinish,
-        customThickness: item?.customThickness,
-      }
-
-      const originalPrice = item ? item.basePrice || item.price : 0
-      const adjustedPrice = item ? calculateAdjustedPrice(item) : 0
-
-      console.log("WISHLIST - Adding to cart with custom fields:", customFields)
-
-      const response = await axios.post(
-        `${apiUrl}/api/addToCart`,
-        {
+      const response = await fetch("/api/cart", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
           productId,
-          quantity,
-          price: originalPrice,
-          customQuantity: customFields.customQuantity,
-          customFinish: customFields.customFinish,
-          customThickness: customFields.customThickness,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      )
-
-      if (response.data.success) {
-        // Then remove from wishlist
-        await axios.delete(`${apiUrl}/api/deleteUserWishlistItem`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          data: { productId },
-        })
-
-        // Update local state
-        setWishlistItems((prev) => prev.filter((item) => (item.postId || item._id) !== productId))
-        setCartCount((prev) => prev + 1)
-
-        toast({
-          title: "Added to cart",
-          description: `Item has been added to your cart with quantity: ${quantity}`,
-          action: (
-            <Button variant="outline" size="sm" onClick={() => router.push(`/client-dashboard/${clientId}/cart`)}>
-              View Cart
-            </Button>
-          ),
-        })
-      } else {
-        toast({
-          title: "Failed to add item",
-          description: response.data.message || "Failed to add item to cart",
-          variant: "destructive",
-        })
-      }
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: "Failed to add item to cart. Please try again.",
-        variant: "destructive",
+          price: product.price, // Use direct price instead of calculateAdjustedPrice(product)
+        }),
       })
-    } finally {
-      setActionLoading((prev) => ({
-        ...prev,
-        [productId]: { ...prev[productId], addingToCart: false },
-      }))
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      toast.success("Added to cart")
+    } catch (error) {
+      console.error("Failed to add to cart:", error)
+      toast.error("Failed to add to cart")
     }
   }
 
-  // Handle refresh
-  const handleRefresh = () => {
-    setRefreshing(true)
-    fetchWishlist()
-    fetchCartCount()
-  }
-
-  // Handle login
-  const handleLogin = () => {
-    router.push("/agent-login")
-  }
-
-  // Loading state
-  if (loading) {
+  if (clientLoading) {
     return (
-      <div className="flex flex-col items-center justify-center h-[80vh]">
-        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-muted-foreground">Loading your wishlist...</p>
+      <div className="container mx-auto p-4">
+        <Skeleton className="h-10 w-40 mb-4" />
+        <Skeleton className="h-6 w-64 mb-2" />
+        <Skeleton className="h-6 w-64 mb-2" />
+        <Skeleton className="h-6 w-64 mb-2" />
       </div>
     )
   }
 
-  // Error state
-  if (error) {
+  if (!client) {
     return (
-      <div className="flex flex-col items-center justify-center h-[60vh] p-6">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md w-full">
-          <div className="flex items-center mb-4">
-            <div className="h-6 w-6 text-red-500 mr-2" />
-            <h2 className="text-xl font-semibold text-red-700">Error Loading Wishlist</h2>
-          </div>
-          <p className="text-red-600 mb-4">{error}</p>
-          <div className="flex flex-wrap gap-2 mt-4">
-            <Button onClick={handleLogin} variant="default">
-              Go to Login
-            </Button>
-            <Button onClick={fetchWishlist} variant="outline">
-              Try Again
-            </Button>
-          </div>
-        </div>
+      <div className="container mx-auto p-4">
+        <p className="text-red-500">Client not found.</p>
       </div>
     )
   }
 
   return (
-    <div className="p-6 md:p-8">
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center">
-          <Button variant="ghost" size="icon" onClick={() => router.back()} className="mr-4">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-3xl font-bold">Your Wishlist</h1>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={handleRefresh} disabled={refreshing} className="relative">
-            <RefreshCw className={`h-5 w-5 ${refreshing ? "animate-spin" : ""}`} />
-          </Button>
-
-          <Link
-            href={`/client-dashboard/${clientId}/cart`}
-            className="relative p-2 rounded-full hover:bg-gray-100 transition-colors"
-          >
-            <ShoppingCart className="h-6 w-6 text-gray-600" />
-            {cartCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-primary text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                {cartCount}
-              </span>
-            )}
-          </Link>
-        </div>
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-4">Client Dashboard</h1>
+      <div>
+        <p>
+          Client Name: <span className="font-semibold">{client.name}</span>
+        </p>
+        <p>
+          Address: <span className="font-semibold">{client.address}</span>
+        </p>
+        <p>
+          Phone: <span className="font-semibold">{client.phone}</span>
+        </p>
       </div>
 
-      {wishlistItems.length === 0 ? (
-        <div className="text-center py-12 bg-muted/20 rounded-lg">
-          <Heart className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-          <p className="text-xl font-medium mb-4">Your wishlist is empty</p>
-          <p className="text-muted-foreground mb-6">Add some products to your wishlist to see them here</p>
-          <Button
-            onClick={() => router.push(`/client-dashboard/${clientId}/products`)}
-            className="bg-primary hover:bg-primary/90"
-          >
-            Browse Products
-          </Button>
-        </div>
-      ) : (
-        <div className="bg-card rounded-lg border border-border overflow-hidden">
-          <div className="p-4 bg-muted/20 border-b border-border">
-            <h2 className="font-semibold">Wishlist Items ({wishlistItems.length})</h2>
-          </div>
-          <div className="divide-y divide-border">
-            {wishlistItems.map((item) => {
-              const itemId = item.postId || item._id
-              const adjustedPrice = calculateAdjustedPrice(item)
-              const isEditing = editingCustomFields[itemId]
-              const currentCustomFields = isEditing || {
-                customQuantity: item.customQuantity,
-                customFinish: item.customFinish,
-                customThickness: item.customThickness,
-              }
+      <div className="flex flex-col md:flex-row items-center justify-between mt-6 gap-4">
+        <Input
+          type="text"
+          placeholder="Search products..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="max-w-md"
+        />
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Filter by category" />
+          </SelectTrigger>
+          <SelectContent>
+            {categories.map((category) => (
+              <SelectItem key={category} value={category}>
+                {category}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
-              return (
-                <div key={itemId} className="p-4 flex flex-col md:flex-row md:items-start">
-                  <div className="relative h-20 w-20 rounded-md overflow-hidden flex-shrink-0 mb-4 md:mb-0">
-                    <Image
-                      src={item.image && item.image.length > 0 ? item.image[0] : "/placeholder.svg?height=80&width=80"}
-                      alt={item.name}
-                      fill
-                      className="object-cover"
-                      unoptimized={true}
-                    />
-                  </div>
-                  <div className="md:ml-4 flex-grow">
-                    <h3 className="font-medium">{item.name || "Unknown Product"}</h3>
-                    <p className="text-sm text-muted-foreground">{item.category || "Uncategorized"}</p>
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2">
-                      <span className="font-semibold">₹{adjustedPrice.toLocaleString()}</span>
-                    </div>
-
-                    {/* Custom Fields Display/Edit */}
-                    <div className="mt-4 space-y-3 bg-muted/20 p-3 rounded-md">
-                      <h4 className="text-sm font-medium">Custom Specifications</h4>
-
-                      {/* Custom Quantity */}
-                      <div className="flex items-center gap-2">
-                        <label className="text-sm text-muted-foreground w-20">Quantity:</label>
-                        {isEditing ? (
-                          <Input
-                            type="number"
-                            value={currentCustomFields.customQuantity || ""}
-                            onChange={(e) => handleCustomFieldChange(itemId, "customQuantity", Number(e.target.value))}
-                            className="h-8 w-24"
-                            placeholder="sqft"
-                          />
-                        ) : (
-                          <span className="text-sm">
-                            {item.customQuantity ? `${item.customQuantity} sqft` : "Not specified"}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Custom Finish */}
-                      <div className="flex items-center gap-2">
-                        <label className="text-sm text-muted-foreground w-20">Finish:</label>
-                        {isEditing ? (
-                          <select
-                            value={currentCustomFields.customFinish || ""}
-                            onChange={(e) => handleCustomFieldChange(itemId, "customFinish", e.target.value)}
-                            className="h-8 px-2 border rounded text-sm"
-                          >
-                            <option value="">Select finish</option>
-                            {finishOptions.map((option) => (
-                              <option key={option} value={option}>
-                                {option}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <span className="text-sm">{item.customFinish || "Not specified"}</span>
-                        )}
-                      </div>
-
-                      {/* Custom Thickness */}
-                      <div className="flex items-center gap-2">
-                        <label className="text-sm text-muted-foreground w-20">Thickness:</label>
-                        {isEditing ? (
-                          <Input
-                            type="text"
-                            value={currentCustomFields.customThickness || ""}
-                            onChange={(e) => handleCustomFieldChange(itemId, "customThickness", e.target.value)}
-                            className="h-8 w-24"
-                            placeholder="mm"
-                          />
-                        ) : (
-                          <span className="text-sm">
-                            {item.customThickness ? `${item.customThickness} mm` : "Not specified"}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Edit/Save buttons */}
-                      <div className="flex gap-2">
-                        {isEditing ? (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => saveCustomFields(itemId)}
-                              className="h-7 text-xs"
-                            >
-                              Save
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() =>
-                                setEditingCustomFields((prev) => {
-                                  const newState = { ...prev }
-                                  delete newState[itemId]
-                                  return newState
-                                })
-                              }
-                              className="h-7 text-xs"
-                            >
-                              Cancel
-                            </Button>
-                          </>
-                        ) : (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              setEditingCustomFields((prev) => ({
-                                ...prev,
-                                [itemId]: {
-                                  customQuantity: item.customQuantity,
-                                  customFinish: item.customFinish,
-                                  customThickness: item.customThickness,
-                                },
-                              }))
-                            }
-                            className="h-7 text-xs"
-                          >
-                            Edit Specs
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col md:flex-row items-center gap-4 mt-4 md:mt-0">
-                    <div className="flex items-center">
-                      <Input
-                        type="number"
-                        min="1"
-                        value={quantities[itemId] || 1000}
-                        onChange={(e) => handleQuantityChange(itemId, e.target.value)}
-                        className="h-9 w-24 text-center"
-                      />
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => addToCart(itemId)}
-                        disabled={actionLoading[itemId]?.addingToCart}
-                        className="flex items-center"
-                      >
-                        {actionLoading[itemId]?.addingToCart ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        ) : (
-                          <ShoppingCart className="h-4 w-4 mr-2" />
-                        )}
-                        Add to Cart
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeFromWishlist(itemId)}
-                        disabled={actionLoading[itemId]?.removing}
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                      >
-                        {actionLoading[itemId]?.removing ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-6">
+        {loading ? (
+          <>
+            {Array(8)
+              .fill(0)
+              .map((_, i) => (
+                <div
+                  key={i}
+                  className="group relative bg-card rounded-lg overflow-hidden border border-border hover:border-primary transition-all hover:shadow-md cursor-pointer"
+                >
+                  <Skeleton className="h-40 w-full" />
+                  <div className="p-4">
+                    <Skeleton className="h-8 w-3/4 mb-2" />
+                    <Skeleton className="h-6 w-1/2" />
                   </div>
                 </div>
-              )
-            })}
+              ))}
+          </>
+        ) : filteredProducts.length === 0 ? (
+          <div className="col-span-full text-center">
+            <p className="text-muted-foreground">No products found.</p>
           </div>
-          <div className="p-4 bg-muted/10 border-t border-border">
-            <div className="flex justify-end">
-              <Link href={`/client-dashboard/${clientId}/products`} className="text-sm text-primary hover:underline">
-                Continue Shopping
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
+        ) : (
+          filteredProducts.map((product) => {
+            return (
+              <div
+                key={product._id}
+                className="group relative bg-card rounded-lg overflow-hidden border border-border hover:border-primary transition-all hover:shadow-md cursor-pointer"
+              >
+                <div className="relative">
+                  <img
+                    src={product.images[0] || "/placeholder.svg"}
+                    alt={product.name}
+                    className="w-full h-40 object-cover rounded-t-lg"
+                  />
+                  <div className="absolute top-2 right-2 flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="hover:bg-accent hover:text-accent-foreground"
+                      onClick={() => toggleWishlist(product._id, product)}
+                      disabled={wishlistLoading}
+                    >
+                      {wishlistLoading ? (
+                        <svg
+                          className="animate-spin h-5 w-5"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                      ) : wishlist.includes(product._id) ? (
+                        <FaHeart className="text-red-500" />
+                      ) : (
+                        <FaHeart />
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="hover:bg-accent hover:text-accent-foreground"
+                      onClick={() => addToCart(product._id, product)}
+                    >
+                      <FaShoppingCart />
+                    </Button>
+                  </div>
+                </div>
+                <div className="p-4">
+                  <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
+
+                  {/* Updated price display */}
+                  <div className="mt-2">
+                    <p className="text-lg font-bold">₹{product.price.toLocaleString()}/sqft</p>
+                    {product.basePrice && product.basePrice !== product.price && (
+                      <p className="text-sm text-muted-foreground line-through">
+                        ₹{product.basePrice.toLocaleString()}/sqft
+                      </p>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground line-clamp-2 mt-2">{product.description}</p>
+                </div>
+              </div>
+            )
+          })
+        )}
+      </div>
     </div>
   )
 }
+
+export default ClientDashboard
