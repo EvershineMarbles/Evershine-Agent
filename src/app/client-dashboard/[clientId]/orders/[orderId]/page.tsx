@@ -20,6 +20,9 @@ interface OrderItem {
   price: number
   basePrice?: number
   quantity: number
+  customQuantity?: number
+  customFinish?: string
+  customThickness?: string
 }
 
 interface ShippingAddress {
@@ -618,6 +621,7 @@ export default function OrderDetailsPage() {
                 <TableRow>
                   <TableHead>Item</TableHead>
                   <TableHead>Category</TableHead>
+                  <TableHead>Custom Specs</TableHead>
                   <TableHead className="text-right">Price</TableHead>
                   <TableHead className="text-right">Quantity</TableHead>
                   <TableHead className="text-right">Total</TableHead>
@@ -630,6 +634,16 @@ export default function OrderDetailsPage() {
                     <TableRow key={index}>
                       <TableCell className="font-medium">{item.name}</TableCell>
                       <TableCell>{item.category}</TableCell>
+                      <TableCell>
+                        <div className="text-xs space-y-1">
+                          {item.customQuantity && <div>Qty: {item.customQuantity} sqft</div>}
+                          {item.customFinish && <div>Finish: {item.customFinish}</div>}
+                          {item.customThickness && <div>Thickness: {item.customThickness} mm</div>}
+                          {!item.customQuantity && !item.customFinish && !item.customThickness && (
+                            <div className="text-muted-foreground">Standard specs</div>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-right">
                         ₹
                         {adjustedPrice.toLocaleString(undefined, {

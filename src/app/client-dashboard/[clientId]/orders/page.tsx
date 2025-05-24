@@ -3,11 +3,10 @@
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Loader2, Package, FileText, RefreshCw } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
-import Link from "next/link"
 
 // Define interfaces for type safety
 interface OrderItem {
@@ -16,6 +15,9 @@ interface OrderItem {
   price: number
   basePrice?: number
   quantity: number
+  customQuantity?: number
+  customFinish?: string
+  customThickness?: string
 }
 
 interface ShippingAddress {
@@ -425,6 +427,14 @@ export default function OrdersPage() {
                               <div>
                                 <p className="font-medium">{item.name}</p>
                                 <p className="text-sm text-muted-foreground">{item.category}</p>
+                                {/* Custom specifications */}
+                                {(item.customQuantity || item.customFinish || item.customThickness) && (
+                                  <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                                    {item.customQuantity && <div>Qty: {item.customQuantity} sqft</div>}
+                                    {item.customFinish && <div>Finish: {item.customFinish}</div>}
+                                    {item.customThickness && <div>Thickness: {item.customThickness} mm</div>}
+                                  </div>
+                                )}
                               </div>
                               <div className="text-right">
                                 <p>
@@ -478,7 +488,7 @@ export default function OrdersPage() {
                         <p className="text-sm text-muted-foreground">No shipping address provided</p>
                       )}
 
-                 <div className="mt-4">
+                      <div className="mt-4">
                         <Button
                           variant="outline"
                           className="w-full mt-2"
@@ -492,14 +502,11 @@ export default function OrdersPage() {
                     </div>
                   </div>
                 </CardContent>
-               
               </Card>
             )
           })()}
         </div>
       )}
-
- 
     </div>
   )
 }

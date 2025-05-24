@@ -29,6 +29,9 @@ interface CartItem {
   postId: string
   category: string
   quantity: number
+  customQuantity?: number
+  customFinish?: string
+  customThickness?: string
 }
 
 export default function CartPage() {
@@ -50,6 +53,19 @@ export default function CartPage() {
   // We'll still fetch the commission data but NOT use the override rate
   // since it's already applied by the backend
   const [overrideCommissionRate, setOverrideCommissionRate] = useState<number | null>(null)
+
+  const [editingCustomFields, setEditingCustomFields] = useState<
+    Record<
+      string,
+      {
+        customQuantity?: number
+        customFinish?: string
+        customThickness?: string
+      }
+    >
+  >({})
+
+  const finishOptions = ["Polish", "Leather", "Flute", "River", "Satin", "Dual"]
 
   // Get API URL from environment or use default
   const getApiUrl = () => {
@@ -203,6 +219,82 @@ export default function CartPage() {
   useEffect(() => {
     fetchCart()
   }, [])
+
+  // Handle custom field changes
+  const handleCustomFieldChange = (itemId: string, field: string, value: string | number) => {
+    setEditingCustomFields((prev) => ({
+      ...prev,
+      [itemId]: {
+        ...prev[itemId],
+        [field]: value,
+      },
+    }))
+  }
+
+  // Save custom field changes
+  const saveCustomFields = async (productId: string) => {
+    try {
+      const token = getToken()
+      if (!token) return
+
+      const apiUrl = getApiUrl()
+      const customFields = editingCustomFields[productId]
+
+      if (!customFields) return
+
+      const response = await fetch(`${apiUrl}/api/updateCartItem`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          productId,
+          customQuantity: customFields.customQuantity,
+          customFinish: customFields.customFinish,
+          customThickness: customFields.customThickness,
+        }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success) {
+          // Update local state
+          setCartItems((prev) =>
+            prev.map((item) => {
+              if (item.postId === productId) {
+                return {
+                  ...item,
+                  customQuantity: customFields.customQuantity,
+                  customFinish: customFields.customFinish,
+                  customThickness: customFields.customThickness,
+                }
+              }
+              return item
+            }),
+          )
+
+          // Clear editing state
+          setEditingCustomFields((prev) => {
+            const newState = { ...prev }
+            delete newState[productId]
+            return newState
+          })
+
+          toast({
+            title: "Custom fields updated",
+            description: "Your custom specifications have been saved",
+          })
+        }
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update custom fields",
+        variant: "destructive",
+      })
+    }
+  }
 
   const fetchCart = async () => {
     try {
@@ -590,8 +682,13 @@ export default function CartPage() {
               </div>
               <div className="divide-y">
                 {cartItems.map((item) => {
-                  // Calculate the adjusted price with ONLY the base commission rate
                   const adjustedPrice = calculateAdjustedPrice(item)
+                  const isEditing = editingCustomFields[item.postId]
+                  const currentCustomFields = isEditing || {
+                    customQuantity: item.customQuantity,
+                    customFinish: item.customFinish,
+                    customThickness: item.customThickness,
+                  }
 
                   return (
                     <div key={item.postId} className="p-6 flex flex-col sm:flex-row items-start sm:items-center gap-4">
@@ -609,6 +706,122 @@ export default function CartPage() {
                         <h3 className="font-medium text-lg">{item.name}</h3>
                         <p className="text-sm text-muted-foreground mb-2">{item.category}</p>
                         <p className="font-semibold text-lg text-primary">₹{adjustedPrice.toLocaleString()}</p>
+
+                        {/* Custom Fields Display/Edit */}
+                        {(item.customQuantity || item.customFinish || item.customThickness || isEditing) && (
+                          <div className="mt-3 space-y-2 bg-muted/20 p-3 rounded-md">
+                            <h4 className="text-sm font-medium">Custom Specifications</h4>
+
+                            {/* Custom Quantity */}
+                            <div className="flex items-center gap-2">
+                              <label className="text-sm text-muted-foreground w-20">Quantity:</label>
+                              {isEditing ? (
+                                <Input
+                                  type="number"
+                                  value={currentCustomFields.customQuantity || ""}
+                                  onChange={(e) =>
+                                    handleCustomFieldChange(item.postId, "customQuantity", Number(e.target.value))
+                                  }
+                                  className="h-7 w-20 text-xs"
+                                  placeholder="sqft"
+                                />
+                              ) : (
+                                <span className="text-sm">
+                                  {item.customQuantity ? `${item.customQuantity} sqft` : "Not specified"}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Custom Finish */}
+                            <div className="flex items-center gap-2">
+                              <label className="text-sm text-muted-foreground w-20">Finish:</label>
+                              {isEditing ? (
+                                <select
+                                  value={currentCustomFields.customFinish || ""}
+                                  onChange={(e) => handleCustomFieldChange(item.postId, "customFinish", e.target.value)}
+                                  className="h-7 px-2 border rounded text-xs"
+                                >
+                                  <option value="">Select finish</option>
+                                  {finishOptions.map((option) => (
+                                    <option key={option} value={option}>
+                                      {option}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <span className="text-sm">{item.customFinish || "Not specified"}</span>
+                              )}
+                            </div>
+
+                            {/* Custom Thickness */}
+                            <div className="flex items-center gap-2">
+                              <label className="text-sm text-muted-foreground w-20">Thickness:</label>
+                              {isEditing ? (
+                                <Input
+                                  type="text"
+                                  value={currentCustomFields.customThickness || ""}
+                                  onChange={(e) =>
+                                    handleCustomFieldChange(item.postId, "customThickness", e.target.value)
+                                  }
+                                  className="h-7 w-20 text-xs"
+                                  placeholder="mm"
+                                />
+                              ) : (
+                                <span className="text-sm">
+                                  {item.customThickness ? `${item.customThickness} mm` : "Not specified"}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Edit/Save buttons */}
+                            <div className="flex gap-2">
+                              {isEditing ? (
+                                <>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => saveCustomFields(item.postId)}
+                                    className="h-6 text-xs px-2"
+                                  >
+                                    Save
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() =>
+                                      setEditingCustomFields((prev) => {
+                                        const newState = { ...prev }
+                                        delete newState[item.postId]
+                                        return newState
+                                      })
+                                    }
+                                    className="h-6 text-xs px-2"
+                                  >
+                                    Cancel
+                                  </Button>
+                                </>
+                              ) : (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() =>
+                                    setEditingCustomFields((prev) => ({
+                                      ...prev,
+                                      [item.postId]: {
+                                        customQuantity: item.customQuantity,
+                                        customFinish: item.customFinish,
+                                        customThickness: item.customThickness,
+                                      },
+                                    }))
+                                  }
+                                  className="h-6 text-xs px-2"
+                                >
+                                  Edit Specs
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <div className="flex flex-col sm:flex-row items-center gap-4 mt-2 sm:mt-0">
                         {/* Quantity input */}
