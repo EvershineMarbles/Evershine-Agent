@@ -707,11 +707,9 @@ export default function ProductsPage() {
                     {/* Display price directly from backend */}
                     <div className="mt-2">
                       <p className="text-lg font-bold">₹{product.price.toLocaleString()}/sqft</p>
-                      {/* Show original price if different from current price */}
-                      {product.originalPrice && product.originalPrice !== product.price && (
-                        <p className="text-sm text-gray-500 line-through">
-                          ₹{product.originalPrice.toLocaleString()}/sqft
-                        </p>
+                      {/* Show base price if different from current price */}
+                      {product.basePrice && product.basePrice !== product.price && (
+                        <p className="text-sm text-gray-500 line-through">₹{product.basePrice.toLocaleString()}/sqft</p>
                       )}
                     </div>
 
