@@ -48,6 +48,14 @@ interface ApiResponse {
   msg?: string
 }
 
+interface CommissionData {
+  agentId: string
+  name: string
+  email: string
+  commissionRate: number
+  categoryCommissions?: Record<string, number>
+}
+
 export default function ProductDetail() {
   const params = useParams()
   const router = useRouter()
@@ -70,22 +78,85 @@ export default function ProductDetail() {
   const [customFinish, setCustomFinish] = useState<string | undefined>(undefined)
   const [customThickness, setCustomThickness] = useState<string | undefined>(undefined)
 
+  // Add state for commission data
+  const [commissionData, setCommissionData] = useState<CommissionData | null>(null)
+  const [overrideCommissionRate, setOverrideCommissionRate] = useState<number | null>(null)
+  const [commissionLoading, setCommissionLoading] = useState(false)
+  const [basePrice, setBasePrice] = useState<number | null>(null)
+
+  // Add this useEffect after the clientId declaration
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedRate = localStorage.getItem(`commission-override-${clientId}`)
+      if (savedRate) {
+        setOverrideCommissionRate(Number(savedRate))
+      } else {
+        setOverrideCommissionRate(null)
+      }
+    }
+  }, [clientId])
+
+  // Add fetchCommissionData function
+  const fetchCommissionData = async () => {
+    try {
+      setCommissionLoading(true)
+      const token = localStorage.getItem("clientImpersonationToken")
+      if (!token) {
+        return null
+      }
+
+      const response = await fetch(`${API_URL}/api/client/agent-commission`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (!response.ok) {
+        return null
+      }
+
+      const data = await response.json()
+      if (data.success && data.data) {
+        setCommissionData(data.data)
+        return data.data
+      }
+      return null
+    } catch (error) {
+      console.error("Error fetching commission data:", error)
+      return null
+    } finally {
+      setCommissionLoading(false)
+    }
+  }
+
+  // Add calculateAdjustedPrice function
+  const calculateAdjustedPrice = (price: number, category: string) => {
+    const productBasePrice = basePrice || price
+
+    let defaultRate = commissionData?.commissionRate || 10
+
+    if (commissionData?.categoryCommissions && category && commissionData.categoryCommissions[category]) {
+      defaultRate = commissionData.categoryCommissions[category]
+    }
+
+    const finalRate = overrideCommissionRate !== null ? defaultRate + overrideCommissionRate : defaultRate
+
+    const adjustedPrice = productBasePrice * (1 + finalRate / 100)
+    return Math.round(adjustedPrice * 100) / 100
+  }
+
   useEffect(() => {
     const fetchProduct = async () => {
       try {
         setLoading(true)
         setError("")
+        await fetchCommissionData()
 
         if (!params.id) {
           throw new Error("Product ID is missing")
         }
 
         // Use client-specific endpoint for pricing
-        const response = await axios.get<ApiResponse>(`${API_URL}/api/getProductById`, {
+        const response = await axios.get<ApiResponse>(`${API_URL}/api/getPostDataById`, {
           params: { id: params.id },
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("clientImpersonationToken")}`,
-          },
         })
 
         if (response.data.success && response.data.data?.[0]) {
@@ -99,6 +170,7 @@ export default function ProductDetail() {
           }
 
           setProduct(processedProduct)
+          setBasePrice(productData.basePrice || productData.price)
           setImageLoadError(new Array(productData.image.length).fill(false))
 
           checkWishlistStatus(productData.postId)
@@ -462,29 +534,9 @@ export default function ProductDetail() {
             {/* DISPLAY BACKEND CALCULATED PRICE */}
             <div className="pb-4 border-b border-gray-200">
               <p className="text-gray-500">Price (per sqft)</p>
-              {hasCommission ? (
-                <div className="space-y-2 mt-1">
-                  <div className="flex items-center gap-3">
-                    <p className="text-2xl font-bold text-green-600">₹{displayPrice.toLocaleString()}/sqft</p>
-                    <span className="text-sm bg-green-100 text-green-700 px-3 py-1 rounded-full">
-                      Commission Applied ✓
-                    </span>
-                  </div>
-                  <p className="text-lg text-gray-500 line-through">₹{originalPrice.toLocaleString()}/sqft</p>
-                  {product.commissionInfo && (
-                    <div className="text-sm text-gray-600 space-y-1">
-                      <p>Agent Commission: {product.commissionInfo.currentAgentCommission}%</p>
-                      <p>
-                        Consultant Level ({product.commissionInfo.consultantLevel}):{" "}
-                        {product.commissionInfo.consultantLevelCommission}%
-                      </p>
-                      <p className="font-medium">Total Commission: {product.commissionInfo.totalCommission}%</p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <p className="text-2xl font-bold mt-1">₹{displayPrice.toLocaleString()}/sqft</p>
-              )}
+              <p className="text-2xl font-bold mt-1">
+                ₹{product && calculateAdjustedPrice(product.price, product.category).toLocaleString()}/sqft
+              </p>
             </div>
 
             <div className="pb-4 border-b border-gray-200">
