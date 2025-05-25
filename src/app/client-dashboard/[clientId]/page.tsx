@@ -592,98 +592,100 @@ export default function ProductsPage() {
 
   return (
     <ErrorBoundary>
-      {/* Subtle gradient showing consultant level */}
+      {/* Background wash showing consultant level */}
       <div
-        className={`h-2 w-full ${
+        className={`w-full ${
           clientData?.consultantLevel === "red"
-            ? "bg-gradient-to-r from-red-200 via-red-300 to-red-200"
+            ? "bg-gradient-to-b from-red-50 via-red-25 to-transparent"
             : clientData?.consultantLevel === "yellow"
-              ? "bg-gradient-to-r from-yellow-200 via-yellow-300 to-yellow-200"
+              ? "bg-gradient-to-b from-yellow-50 via-yellow-25 to-transparent"
               : clientData?.consultantLevel === "purple"
-                ? "bg-gradient-to-r from-purple-200 via-purple-300 to-purple-200"
-                : "bg-gradient-to-r from-red-200 via-red-300 to-red-200"
+                ? "bg-gradient-to-b from-purple-50 via-purple-25 to-transparent"
+                : "bg-gradient-to-b from-red-50 via-red-25 to-transparent"
         }`}
-      />
+      >
+        <div className="p-6 md:p-8">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+            <h1 className="text-3xl font-bold">Welcome, {clientData?.name?.split(" ")[0] || "Client"}</h1>
+          </div>
+          {error && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
 
-      <div className="p-6 md:p-8">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-          <h1 className="text-3xl font-bold">Welcome, {clientData?.name?.split(" ")[0] || "Client"}</h1>
-        </div>
-        {error && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+          <div className="flex justify-between items-center mb-8">
+            <h1 className="text-3xl font-bold">Products</h1>
 
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Products</h1>
+            <div className="flex items-center gap-4">
+              {/* Color dots for consultant level switching - NO TOOLTIPS WITH PERCENTAGES */}
+              <div className="flex items-center gap-2 mr-2">
+                <button
+                  onClick={() => handleConsultantLevelChange("red")}
+                  className={`w-6 h-6 rounded-full bg-red-500 hover:bg-red-600 transition-all ${
+                    clientData?.consultantLevel === "red" ? "ring-2 ring-red-300 scale-110" : "hover:scale-105"
+                  }`}
+                  title="Red Level"
+                />
+                <button
+                  onClick={() => handleConsultantLevelChange("yellow")}
+                  className={`w-6 h-6 rounded-full bg-yellow-500 hover:bg-yellow-600 transition-all ${
+                    clientData?.consultantLevel === "yellow" ? "ring-2 ring-yellow-300 scale-110" : "hover:scale-105"
+                  }`}
+                  title="Yellow Level"
+                />
+                <button
+                  onClick={() => handleConsultantLevelChange("purple")}
+                  className={`w-6 h-6 rounded-full bg-purple-600 hover:bg-purple-700 transition-all ${
+                    clientData?.consultantLevel === "purple" ? "ring-2 ring-purple-300 scale-110" : "hover:scale-105"
+                  }`}
+                  title="Purple Level"
+                />
+              </div>
 
-          <div className="flex items-center gap-4">
-            {/* Color dots for consultant level switching - NO TOOLTIPS WITH PERCENTAGES */}
-            <div className="flex items-center gap-2 mr-2">
               <button
-                onClick={() => handleConsultantLevelChange("red")}
-                className={`w-6 h-6 rounded-full bg-red-500 hover:bg-red-600 transition-all ${
-                  clientData?.consultantLevel === "red" ? "ring-2 ring-red-300 scale-110" : "hover:scale-105"
-                }`}
-                title="Red Level"
-              />
-              <button
-                onClick={() => handleConsultantLevelChange("yellow")}
-                className={`w-6 h-6 rounded-full bg-yellow-500 hover:bg-yellow-600 transition-all ${
-                  clientData?.consultantLevel === "yellow" ? "ring-2 ring-yellow-300 scale-110" : "hover:scale-105"
-                }`}
-                title="Yellow Level"
-              />
-              <button
-                onClick={() => handleConsultantLevelChange("purple")}
-                className={`w-6 h-6 rounded-full bg-purple-600 hover:bg-purple-700 transition-all ${
-                  clientData?.consultantLevel === "purple" ? "ring-2 ring-purple-300 scale-110" : "hover:scale-105"
-                }`}
-                title="Purple Level"
-              />
+                onClick={handleScanQR}
+                className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                aria-label="Scan QR Code"
+              >
+                <QrCode className="h-6 w-6 text-gray-600" />
+              </button>
+
+              <Link href={`/client-dashboard/${clientId}/wishlist`} className="relative">
+                <Heart className="h-6 w-6 text-gray-600" />
+                {wishlist.length > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                    {wishlist.length}
+                  </span>
+                )}
+              </Link>
+
+              <Link href={`/client-dashboard/${clientId}/cart`} className="relative">
+                <ShoppingCart className="h-6 w-6 text-gray-600" />
+                {cart.length > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                    {cart.length}
+                  </span>
+                )}
+              </Link>
             </div>
+          </div>
 
-            <button
-              onClick={handleScanQR}
-              className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-              aria-label="Scan QR Code"
-            >
-              <QrCode className="h-6 w-6 text-gray-600" />
-            </button>
-
-            <Link href={`/client-dashboard/${clientId}/wishlist`} className="relative">
-              <Heart className="h-6 w-6 text-gray-600" />
-              {wishlist.length > 0 && (
-                <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  {wishlist.length}
-                </span>
-              )}
-            </Link>
-
-            <Link href={`/client-dashboard/${clientId}/cart`} className="relative">
-              <ShoppingCart className="h-6 w-6 text-gray-600" />
-              {cart.length > 0 && (
-                <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  {cart.length}
-                </span>
-              )}
-            </Link>
+          <div className="relative mb-6">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search products by name or category..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 pr-4 py-2 w-full rounded-lg border border-input focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+            />
           </div>
         </div>
+      </div>
 
-        <div className="relative mb-6">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search products by name or category..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 pr-4 py-2 w-full rounded-lg border border-input focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-          />
-        </div>
-
+      <div className="px-6 md:px-8">
         {filteredProducts.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-xl font-medium mb-4">No products found</p>
