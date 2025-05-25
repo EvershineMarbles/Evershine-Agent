@@ -81,7 +81,7 @@ export default function ProductDetail() {
         }
 
         // Use client-specific endpoint for pricing
-        const response = await axios.get<ApiResponse>(`${API_URL}/api/getClientProductById`, {
+        const response = await axios.get<ApiResponse>(`${API_URL}/api/getProductById`, {
           params: { id: params.id },
           headers: {
             Authorization: `Bearer ${localStorage.getItem("clientImpersonationToken")}`,
@@ -462,17 +462,15 @@ export default function ProductDetail() {
             {/* DISPLAY BACKEND CALCULATED PRICE */}
             <div className="pb-4 border-b border-gray-200">
               <p className="text-gray-500">Price (per sqft)</p>
-              {product.updatedPrice && product.updatedPrice !== product.price ? (
+              {hasCommission ? (
                 <div className="space-y-2 mt-1">
                   <div className="flex items-center gap-3">
-                    <p className="text-2xl font-bold text-green-600">₹{product.updatedPrice.toLocaleString()}/sqft</p>
+                    <p className="text-2xl font-bold text-green-600">₹{displayPrice.toLocaleString()}/sqft</p>
                     <span className="text-sm bg-green-100 text-green-700 px-3 py-1 rounded-full">
                       Commission Applied ✓
                     </span>
                   </div>
-                  <p className="text-lg text-gray-500 line-through">
-                    ₹{(product.basePrice || product.price).toLocaleString()}/sqft
-                  </p>
+                  <p className="text-lg text-gray-500 line-through">₹{originalPrice.toLocaleString()}/sqft</p>
                   {product.commissionInfo && (
                     <div className="text-sm text-gray-600 space-y-1">
                       <p>Agent Commission: {product.commissionInfo.currentAgentCommission}%</p>
@@ -485,7 +483,7 @@ export default function ProductDetail() {
                   )}
                 </div>
               ) : (
-                <p className="text-2xl font-bold mt-1">₹{product.price.toLocaleString()}/sqft</p>
+                <p className="text-2xl font-bold mt-1">₹{displayPrice.toLocaleString()}/sqft</p>
               )}
             </div>
 
