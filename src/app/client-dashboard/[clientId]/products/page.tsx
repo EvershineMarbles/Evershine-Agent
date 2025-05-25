@@ -198,11 +198,14 @@ export default function ProductsPage() {
       console.error("Error fetching products:", error)
       setError(errorMessage)
 
-      toast({
-        title: "Error fetching products",
-        description: "Could not load products from the server. Please try again later.",
-        variant: "destructive",
-      })
+      // Only show toast for actual errors, not for silent refreshes
+      if (!error.message?.includes("silent")) {
+        toast({
+          title: "Error fetching products",
+          description: "Could not load products from the server. Please try again later.",
+          variant: "destructive",
+        })
+      }
 
       setProducts([])
     } finally {
@@ -210,32 +213,77 @@ export default function ProductsPage() {
     }
   }, [toast])
 
+  // Silent fetch products function (no loading states or error toasts)
+  const silentFetchProducts = useCallback(async () => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
+      const endpoint = `${apiUrl}/api/getClientProducts`
+
+      const token = localStorage.getItem("clientImpersonationToken")
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      }
+
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`
+      } else {
+        return // Silently fail if no token
+      }
+
+      const response = await fetch(endpoint, {
+        method: "GET",
+        headers,
+        signal: AbortSignal.timeout(10000),
+      })
+
+      if (!response.ok) {
+        return // Silently fail
+      }
+
+      const data = await response.json()
+
+      if (data.success && Array.isArray(data.data)) {
+        const validProducts = data.data.filter(
+          (product: Product) => product.postId && typeof product.postId === "string",
+        )
+
+        const processedProducts = validProducts.map((product: Product) => ({
+          ...product,
+          image:
+            Array.isArray(product.image) && product.image.length > 0
+              ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
+              : ["/placeholder.svg"],
+          basePrice: product.basePrice || product.price,
+        }))
+
+        setProducts(processedProducts)
+      }
+    } catch (error) {
+      // Silently fail - no error handling
+      console.log("Silent refresh failed, continuing...")
+    }
+  }, [])
+
   // Fetch products on component mount
   useEffect(() => {
     fetchProducts()
   }, [fetchProducts])
 
-  // Auto-refresh products every 30 seconds
+  // Silent auto-refresh products every 30 seconds
   useEffect(() => {
     const interval = setInterval(() => {
-      console.log("🔄 Auto-refreshing products...")
-      fetchProducts()
+      silentFetchProducts()
     }, 30000) // 30 seconds
 
     return () => clearInterval(interval)
-  }, [fetchProducts])
+  }, [silentFetchProducts])
 
-  // Handle consultant level change with auto-save
+  // Handle consultant level change with auto-save (NO TOAST MESSAGES)
   const handleConsultantLevelChange = async (level: string) => {
     try {
       const token = localStorage.getItem("clientImpersonationToken")
       if (!token) {
-        toast({
-          title: "Error",
-          description: "No authentication token found",
-          variant: "destructive",
-        })
-        return
+        return // Silently fail
       }
 
       // Optimistically update the UI
@@ -260,18 +308,14 @@ export default function ProductsPage() {
         throw new Error(`API error: ${response.status} ${response.statusText}`)
       }
 
-  
+      // NO TOAST MESSAGE - Silent update
       // Refresh products to get updated pricing
-      fetchProducts()
+      silentFetchProducts()
     } catch (error: any) {
       console.error("Error updating consultant level:", error)
       // Revert the optimistic update
       setClientData((prev: any) => ({ ...prev, consultantLevel: clientData?.consultantLevel || "red" }))
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update consultant level",
-        variant: "destructive",
-      })
+      // NO TOAST MESSAGE - Silent failure
     }
   }
 
@@ -549,28 +593,18 @@ export default function ProductsPage() {
 
   return (
     <ErrorBoundary>
-      {/* Big gradient background showing consultant level */}
+      {/* Subtle gradient showing consultant level */}
       <div
-        className={`h-16 w-full flex items-center justify-center text-white font-medium ${
+        className={`h-2 w-full ${
           clientData?.consultantLevel === "red"
-            ? "bg-gradient-to-r from-red-400 via-red-500 to-red-600"
+            ? "bg-gradient-to-r from-red-200 via-red-300 to-red-200"
             : clientData?.consultantLevel === "yellow"
-              ? "bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-600"
+              ? "bg-gradient-to-r from-yellow-200 via-yellow-300 to-yellow-200"
               : clientData?.consultantLevel === "purple"
-                ? "bg-gradient-to-r from-purple-400 via-purple-500 to-purple-600"
-                : "bg-gradient-to-r from-red-400 via-red-500 to-red-600"
+                ? "bg-gradient-to-r from-purple-200 via-purple-300 to-purple-200"
+                : "bg-gradient-to-r from-red-200 via-red-300 to-red-200"
         }`}
-      >
-        <span className="text-lg font-semibold">
-          {clientData?.consultantLevel === "red"
-            ? "Red Level - 5% Commission"
-            : clientData?.consultantLevel === "yellow"
-              ? "Yellow Level - 10% Commission"
-              : clientData?.consultantLevel === "purple"
-                ? "Purple Level - 15% Commission"
-                : "Red Level - 5% Commission"}
-        </span>
-      </div>
+      />
 
       <div className="p-6 md:p-8">
         {error && (
@@ -584,28 +618,28 @@ export default function ProductsPage() {
           <h1 className="text-3xl font-bold">Products</h1>
 
           <div className="flex items-center gap-4">
-            {/* Color dots for consultant level switching */}
+            {/* Color dots for consultant level switching - NO TOOLTIPS WITH PERCENTAGES */}
             <div className="flex items-center gap-2 mr-2">
               <button
                 onClick={() => handleConsultantLevelChange("red")}
                 className={`w-6 h-6 rounded-full bg-red-500 hover:bg-red-600 transition-all ${
                   clientData?.consultantLevel === "red" ? "ring-2 ring-red-300 scale-110" : "hover:scale-105"
                 }`}
-                title="Red Level (+5%)"
+                title="Red Level"
               />
               <button
                 onClick={() => handleConsultantLevelChange("yellow")}
                 className={`w-6 h-6 rounded-full bg-yellow-500 hover:bg-yellow-600 transition-all ${
                   clientData?.consultantLevel === "yellow" ? "ring-2 ring-yellow-300 scale-110" : "hover:scale-105"
                 }`}
-                title="Yellow Level (+10%)"
+                title="Yellow Level"
               />
               <button
                 onClick={() => handleConsultantLevelChange("purple")}
                 className={`w-6 h-6 rounded-full bg-purple-600 hover:bg-purple-700 transition-all ${
                   clientData?.consultantLevel === "purple" ? "ring-2 ring-purple-300 scale-110" : "hover:scale-105"
                 }`}
-                title="Purple Level (+15%)"
+                title="Purple Level"
               />
             </div>
 
@@ -671,10 +705,8 @@ export default function ProductsPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             {filteredProducts.map((product) => {
-              // USE BACKEND CALCULATED PRICE
+              // USE BACKEND CALCULATED PRICE - NO COMMISSION INFO DISPLAYED
               const displayPrice = product.updatedPrice || product.price
-              const hasCommission = product.updatedPrice && product.updatedPrice !== product.price
-              const originalPrice = product.basePrice || product.price
 
               return (
                 <div
@@ -716,26 +748,9 @@ export default function ProductsPage() {
                   <div className="p-4">
                     <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
 
-                    {/* DISPLAY BACKEND CALCULATED PRICE */}
+                    {/* SIMPLE PRICE DISPLAY - NO COMMISSION INFO */}
                     <div className="mt-2">
-                      {hasCommission ? (
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <p className="text-lg font-bold text-green-600">₹{displayPrice.toLocaleString()}/sqft</p>
-                            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
-                              Commission Applied ✓
-                            </span>
-                          </div>
-                          <p className="text-sm text-gray-500 line-through">₹{originalPrice.toLocaleString()}/sqft</p>
-                          {product.commissionInfo && (
-                            <p className="text-xs text-gray-600">
-                              +{product.commissionInfo.totalCommission}% total commission
-                            </p>
-                          )}
-                        </div>
-                      ) : (
-                        <p className="text-lg font-bold">₹{displayPrice.toLocaleString()}/sqft</p>
-                      )}
+                      <p className="text-lg font-bold">₹{displayPrice.toLocaleString()}/sqft</p>
                     </div>
 
                     <p className="text-sm text-muted-foreground mt-1">
