@@ -297,10 +297,17 @@ export default function WishlistPage() {
       if (!token) return
 
       const apiUrl = getApiUrl()
-
       const quantity = quantities[productId] || 1000
-
       const item = wishlistItems.find((item) => (item.postId || item._id) === productId)
+
+      if (!item) {
+        toast({
+          title: "Error",
+          description: "Product not found in wishlist",
+          variant: "destructive",
+        })
+        return
+      }
 
       const customFields = editingCustomFields[productId] || {
         customQuantity: item?.customQuantity,
@@ -308,37 +315,50 @@ export default function WishlistPage() {
         customThickness: item?.customThickness,
       }
 
+      // Prepare the request payload - match the expected format
+      const requestPayload = {
+        productId: productId,
+        quantity: quantity,
+        ...(customFields.customQuantity && { customQuantity: customFields.customQuantity }),
+        ...(customFields.customFinish && { customFinish: customFields.customFinish }),
+        ...(customFields.customThickness && { customThickness: customFields.customThickness }),
+      }
+
+      console.log("Adding to cart with payload:", requestPayload)
+
       // Add to cart - let backend calculate price
-      const response = await axios.post(
-        `${apiUrl}/api/addToCart`,
-        {
-          productId,
-          quantity,
-          customQuantity: customFields.customQuantity,
-          customFinish: customFields.customFinish,
-          customThickness: customFields.customThickness,
+      const response = await axios.post(`${apiUrl}/api/addToCart`, requestPayload, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      )
+        timeout: 10000, // 10 second timeout
+      })
+
+      console.log("Add to cart response:", response.data)
 
       if (response.data.success) {
-        await axios.delete(`${apiUrl}/api/deleteUserWishlistItem`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          data: { productId },
-        })
+        // Only remove from wishlist if add to cart was successful
+        try {
+          await axios.delete(`${apiUrl}/api/deleteUserWishlistItem`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            data: { productId },
+            timeout: 5000,
+          })
+        } catch (deleteError) {
+          console.warn("Failed to remove from wishlist after adding to cart:", deleteError)
+          // Don't fail the entire operation if wishlist removal fails
+        }
 
+        // Update local state
         setWishlistItems((prev) => prev.filter((item) => (item.postId || item._id) !== productId))
         setCartCount((prev) => prev + 1)
 
         toast({
           title: "Added to cart",
-          description: `Item has been added to your cart with quantity: ${quantity}`,
+          description: `${item.name} has been added to your cart with quantity: ${quantity}`,
           action: (
             <Button variant="outline" size="sm" onClick={() => router.push(`/client-dashboard/${clientId}/cart`)}>
               View Cart
@@ -353,9 +373,22 @@ export default function WishlistPage() {
         })
       }
     } catch (error: any) {
+      console.error("Add to cart error:", error)
+
+      let errorMessage = "Failed to add item to cart. Please try again."
+
+      if (error.response) {
+        // Server responded with error status
+        console.error("Server error response:", error.response.data)
+        errorMessage = error.response.data?.message || `Server error: ${error.response.status}`
+      } else if (error.request) {
+        // Request was made but no response received
+        errorMessage = "Network error. Please check your connection."
+      }
+
       toast({
         title: "Error",
-        description: "Failed to add item to cart. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {
