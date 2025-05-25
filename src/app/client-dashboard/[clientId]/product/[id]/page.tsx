@@ -211,7 +211,7 @@ export default function ProductDetail() {
       const token = localStorage.getItem("clientImpersonationToken")
       if (!token) return
 
-      const response = await fetch(`${API_URL}/api/getUserWishlist`, {
+      const response = await fetch(`${API_URL}/api/getWishlist`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -304,8 +304,9 @@ export default function ProductDetail() {
       }
 
       if (inWishlist) {
-        const response = await fetch(`${API_URL}/api/deleteUserWishlistItem`, {
-          method: "DELETE",
+        // Remove from wishlist
+        const response = await fetch(`${API_URL}/api/removeFromWishlist`, {
+          method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
@@ -337,8 +338,8 @@ export default function ProductDetail() {
           description: `${product.name} has been removed from your wishlist.`,
         })
       } else {
-        // Add to wishlist - let backend calculate price
-        const response = await fetch(`${API_URL}/api/addToWishlist`, {
+        // Add to wishlist
+        const response = await fetch(`${API_URL}/api/addToUserWishlist`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
