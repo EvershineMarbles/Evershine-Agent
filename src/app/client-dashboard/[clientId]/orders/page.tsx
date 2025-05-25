@@ -86,8 +86,8 @@ export default function OrdersPage() {
 
       const apiUrl = getApiUrl()
 
-      // Use client-specific orders endpoint
-      const response = await fetch(`${apiUrl}/api/getUserOrders`, {
+      // Use the correct backend endpoint: GET /order
+      const response = await fetch(`${apiUrl}/order`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,

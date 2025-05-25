@@ -93,8 +93,8 @@ export default function OrderDetailsPage() {
 
       const apiUrl = getApiUrl()
 
-      // Use client-specific order endpoint
-      const response = await fetch(`${apiUrl}/api/getClientOrder/${orderId}`, {
+      // Use the correct backend endpoint: GET /order/:id
+      const response = await fetch(`${apiUrl}/order/${orderId}`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -105,6 +105,8 @@ export default function OrderDetailsPage() {
       if (!response.ok) {
         if (response.status === 401) {
           throw new Error("Authentication failed. Please refresh the token and try again.")
+        } else if (response.status === 404) {
+          throw new Error(`Order #${orderId} not found`)
         } else {
           throw new Error(`API error: ${response.status} ${response.statusText}`)
         }
@@ -117,14 +119,7 @@ export default function OrderDetailsPage() {
       } else if (data && !Array.isArray(data) && data.orderId) {
         setOrder(data)
       } else {
-        const ordersArray = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : []
-        const foundOrder = ordersArray.find((o: Order) => o.orderId === orderId)
-
-        if (foundOrder) {
-          setOrder(foundOrder)
-        } else {
-          throw new Error(`Order #${orderId} not found`)
-        }
+        throw new Error(`Order #${orderId} not found`)
       }
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : "Failed to load order details. Please try again."
@@ -269,13 +264,13 @@ export default function OrderDetailsPage() {
 
   if (error) {
     return (
-      <div className="p-6 md:p-8">
-        <div className="flex items-center mb-8">
+      <div className="p-4 md:p-6">
+        <div className="flex items-center mb-6">
           <Button variant="ghost" size="icon" onClick={() => router.back()} className="mr-4">
             <ArrowLeft className="h-5 w-5" />
             <span className="sr-only">Go back</span>
           </Button>
-          <h1 className="text-3xl font-bold">Order Details</h1>
+          <h1 className="text-2xl font-bold">Order Details</h1>
         </div>
 
         <Card className="mb-6 border-red-200 bg-red-50">
@@ -300,19 +295,19 @@ export default function OrderDetailsPage() {
 
   if (!order) {
     return (
-      <div className="p-6 md:p-8">
-        <div className="flex items-center mb-8">
+      <div className="p-4 md:p-6">
+        <div className="flex items-center mb-6">
           <Button variant="ghost" size="icon" onClick={() => router.back()} className="mr-4">
             <ArrowLeft className="h-5 w-5" />
             <span className="sr-only">Go back</span>
           </Button>
-          <h1 className="text-3xl font-bold">Order Details</h1>
+          <h1 className="text-2xl font-bold">Order Details</h1>
         </div>
 
-        <Card className="text-center py-12">
+        <Card className="text-center py-8">
           <CardContent className="pt-6">
-            <Package className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-            <h2 className="text-xl font-medium mb-4">Order not found</h2>
+            <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <h2 className="text-lg font-medium mb-4">Order not found</h2>
             <p className="text-muted-foreground mb-6">The requested order could not be found</p>
             <Button
               onClick={() => router.push(`/client-dashboard/${clientId}`)}
@@ -327,20 +322,20 @@ export default function OrderDetailsPage() {
   }
 
   return (
-    <div className="p-6 md:p-8 max-w-5xl mx-auto">
+    <div className="p-4 md:p-6 max-w-4xl mx-auto">
       <div ref={invoiceRef}>
-        <div className="hidden print:block mb-8">
-          <h1 className="text-3xl font-bold text-center">INVOICE</h1>
+        <div className="hidden print:block mb-6">
+          <h1 className="text-2xl font-bold text-center">INVOICE</h1>
           <p className="text-center text-muted-foreground">Order #{order.orderId}</p>
         </div>
 
-        <div className="flex items-center justify-between mb-8 print:hidden">
+        <div className="flex items-center justify-between mb-6 print:hidden">
           <div className="flex items-center">
             <Button variant="ghost" size="icon" onClick={() => router.back()} className="mr-4">
               <ArrowLeft className="h-5 w-5" />
               <span className="sr-only">Go back</span>
             </Button>
-            <h1 className="text-3xl font-bold">Invoice</h1>
+            <h1 className="text-2xl font-bold">Invoice</h1>
           </div>
 
           <div className="flex gap-2">
@@ -364,7 +359,7 @@ export default function OrderDetailsPage() {
           </div>
         </div>
 
-        <Card className="mb-8 overflow-hidden">
+        <Card className="mb-6 overflow-hidden">
           <CardHeader className="bg-muted/20 pb-3">
             <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-2">
               <div>
@@ -375,11 +370,11 @@ export default function OrderDetailsPage() {
                 <Badge
                   variant={
                     order.status === "delivered"
-                      ? "success"
+                      ? "default"
                       : order.status === "shipped"
-                        ? "info"
+                        ? "secondary"
                         : order.status === "processing"
-                          ? "warning"
+                          ? "outline"
                           : order.status === "cancelled"
                             ? "destructive"
                             : "outline"
@@ -390,10 +385,10 @@ export default function OrderDetailsPage() {
                 <Badge
                   variant={
                     order.paymentStatus === "paid"
-                      ? "success"
+                      ? "default"
                       : order.paymentStatus === "failed"
                         ? "destructive"
-                        : "warning"
+                        : "outline"
                   }
                 >
                   Payment: {order.paymentStatus.charAt(0).toUpperCase() + order.paymentStatus.slice(1)}
@@ -402,10 +397,10 @@ export default function OrderDetailsPage() {
             </div>
           </CardHeader>
 
-          <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+          <CardContent className="p-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div>
-                <h3 className="font-medium text-lg mb-2">Billing Information</h3>
+                <h3 className="font-medium text-base mb-2">Billing Information</h3>
                 <div className="text-sm">
                   <p className="font-medium">Client ID: {clientId}</p>
                   {order.shippingAddress ? (
@@ -423,7 +418,7 @@ export default function OrderDetailsPage() {
               </div>
 
               <div>
-                <h3 className="font-medium text-lg mb-2">Shipping Information</h3>
+                <h3 className="font-medium text-base mb-2">Shipping Information</h3>
                 <div className="text-sm">
                   {order.shippingAddress ? (
                     <>
@@ -440,89 +435,91 @@ export default function OrderDetailsPage() {
               </div>
             </div>
 
-            <Separator className="my-6" />
+            <Separator className="my-4" />
 
-            <h3 className="font-medium text-lg mb-4">Order Items</h3>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Item</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Custom Specs</TableHead>
-                  <TableHead className="text-right">Price</TableHead>
-                  <TableHead className="text-right">Quantity</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {order.items.map((item, index) => {
-                  const displayPrice = item.updatedPrice || item.price
-                  const hasCommission = item.updatedPrice && item.updatedPrice !== item.price
-                  const originalPrice = item.basePrice || item.price
+            <h3 className="font-medium text-base mb-3">Order Items</h3>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-xs">Item</TableHead>
+                    <TableHead className="text-xs">Category</TableHead>
+                    <TableHead className="text-xs">Custom Specs</TableHead>
+                    <TableHead className="text-right text-xs">Price</TableHead>
+                    <TableHead className="text-right text-xs">Qty</TableHead>
+                    <TableHead className="text-right text-xs">Total</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {order.items.map((item, index) => {
+                    const displayPrice = item.updatedPrice || item.price
+                    const hasCommission = item.updatedPrice && item.updatedPrice !== item.price
+                    const originalPrice = item.basePrice || item.price
 
-                  return (
-                    <TableRow key={index}>
-                      <TableCell className="font-medium">{item.name}</TableCell>
-                      <TableCell>{item.category}</TableCell>
-                      <TableCell>
-                        <div className="text-xs space-y-1">
-                          {item.customQuantity && <div>Qty: {item.customQuantity} sqft</div>}
-                          {item.customFinish && <div>Finish: {item.customFinish}</div>}
-                          {item.customThickness && <div>Thickness: {item.customThickness} mm</div>}
-                          {!item.customQuantity && !item.customFinish && !item.customThickness && (
-                            <div className="text-muted-foreground">Standard specs</div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="space-y-1">
-                          {hasCommission ? (
-                            <>
-                              <div className="font-medium text-green-600">
+                    return (
+                      <TableRow key={index}>
+                        <TableCell className="font-medium text-sm">{item.name}</TableCell>
+                        <TableCell className="text-sm">{item.category}</TableCell>
+                        <TableCell>
+                          <div className="text-xs space-y-1">
+                            {item.customQuantity && <div>Qty: {item.customQuantity} sqft</div>}
+                            {item.customFinish && <div>Finish: {item.customFinish}</div>}
+                            {item.customThickness && <div>Thickness: {item.customThickness} mm</div>}
+                            {!item.customQuantity && !item.customFinish && !item.customThickness && (
+                              <div className="text-muted-foreground">Standard specs</div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="space-y-1">
+                            {hasCommission ? (
+                              <>
+                                <div className="font-medium text-green-600 text-sm">
+                                  ₹
+                                  {displayPrice.toLocaleString(undefined, {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}
+                                </div>
+                                <div className="text-xs text-gray-500 line-through">
+                                  ₹
+                                  {originalPrice.toLocaleString(undefined, {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}
+                                </div>
+                                {item.commissionInfo && (
+                                  <div className="text-xs text-gray-600">+{item.commissionInfo.totalCommission}%</div>
+                                )}
+                              </>
+                            ) : (
+                              <div className="font-medium text-sm">
                                 ₹
                                 {displayPrice.toLocaleString(undefined, {
                                   minimumFractionDigits: 2,
                                   maximumFractionDigits: 2,
                                 })}
                               </div>
-                              <div className="text-xs text-gray-500 line-through">
-                                ₹
-                                {originalPrice.toLocaleString(undefined, {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}
-                              </div>
-                              {item.commissionInfo && (
-                                <div className="text-xs text-gray-600">+{item.commissionInfo.totalCommission}%</div>
-                              )}
-                            </>
-                          ) : (
-                            <div className="font-medium">
-                              ₹
-                              {displayPrice.toLocaleString(undefined, {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">{item.quantity}</TableCell>
-                      <TableCell className="text-right">
-                        ₹
-                        {(displayPrice * item.quantity).toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right text-sm">{item.quantity}</TableCell>
+                        <TableCell className="text-right text-sm">
+                          ₹
+                          {(displayPrice * item.quantity).toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </div>
 
-            <div className="mt-6 flex flex-col items-end">
-              <div className="w-full md:w-1/3 space-y-2">
+            <div className="mt-4 flex flex-col items-end">
+              <div className="w-full md:w-1/3 space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span>Subtotal:</span>
                   <span>
@@ -556,7 +553,7 @@ export default function OrderDetailsPage() {
             </div>
           </CardContent>
 
-          <CardFooter className="bg-muted/10 justify-between py-4 print:hidden">
+          <CardFooter className="bg-muted/10 justify-between py-3 print:hidden">
             <Button variant="outline" onClick={() => router.back()}>
               Back to Orders
             </Button>
@@ -564,7 +561,7 @@ export default function OrderDetailsPage() {
           </CardFooter>
         </Card>
 
-        <div className="text-center text-sm text-muted-foreground mt-8 print:mt-16">
+        <div className="text-center text-sm text-muted-foreground mt-6 print:mt-12">
           <p>Thank you for your business!</p>
           <p className="mt-1">If you have any questions, please contact our support team.</p>
           <p className="mt-4 print:hidden">
@@ -574,26 +571,26 @@ export default function OrderDetailsPage() {
           </p>
         </div>
 
-        <div className="hidden print:block mt-16 pt-8 border-t text-center text-sm text-muted-foreground">
+        <div className="hidden print:block mt-12 pt-6 border-t text-center text-sm text-muted-foreground">
           <p>This is an electronically generated invoice and does not require a signature.</p>
         </div>
       </div>
 
       <style jsx global>{`
-        @media print {
-          @page {
-            size: A4;
-            margin: 1cm;
-          }
-          body {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-        }
-        .generating-pdf {
-          background-color: white !important;
-        }
-      `}</style>
+       @media print {
+         @page {
+           size: A4;
+           margin: 1cm;
+         }
+         body {
+           -webkit-print-color-adjust: exact !important;
+           print-color-adjust: exact !important;
+         }
+       }
+       .generating-pdf {
+         background-color: white !important;
+       }
+     `}</style>
     </div>
   )
 }
