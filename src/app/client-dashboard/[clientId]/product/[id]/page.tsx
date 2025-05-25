@@ -524,6 +524,16 @@ export default function ProductDetail() {
                 ))}
               </div>
             )}
+
+            {/* Product Visualizer Button */}
+            <div className="mt-4">
+              <Button
+                onClick={() => setShowVisualizer(!showVisualizer)}
+                className="w-full bg-[#194a95] hover:bg-[#0f3a7a] py-3 text-white rounded-xl"
+              >
+                {showVisualizer ? "Hide Product Visualizer" : "Show Product Visualizer"}
+              </Button>
+            </div>
           </div>
 
           <div className="w-full md:w-1/2 md:order-1 space-y-6">
@@ -664,26 +674,13 @@ export default function ProductDetail() {
               <Button
                 onClick={toggleWishlist}
                 disabled={wishlistLoading}
-                className={`px-8 py-3 rounded-md flex items-center gap-2 ${
-                  inWishlist
-                    ? "bg-gray-200 hover:bg-gray-300 text-gray-700"
-                    : "bg-[#194a95] hover:bg-[#0f3a7a] text-white"
-                }`}
+                className="px-8 py-3 rounded-md flex items-center gap-2 bg-[#194a95] hover:bg-[#0f3a7a] text-white"
               >
                 <Heart className={`w-4 h-4 ${inWishlist ? "fill-current" : ""}`} />
-                {wishlistLoading ? "Processing..." : "Add to Wishlist"}
+                {wishlistLoading ? "Processing..." : inWishlist ? "In Wishlist" : "Add to Wishlist"}
               </Button>
             </div>
           </div>
-        </div>
-
-        <div className="pb-4 border-b border-gray-200 mt-4">
-          <Button
-            onClick={() => setShowVisualizer(!showVisualizer)}
-            className="w-full bg-[#194a95] hover:bg-[#0f3a7a] py-3 text-white"
-          >
-            {showVisualizer ? "Hide Visualizer" : "Show Product Visualizer"}
-          </Button>
         </div>
 
         {showVisualizer && product.image.length > 0 && (
