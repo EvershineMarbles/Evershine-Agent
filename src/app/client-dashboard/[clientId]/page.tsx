@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode } from "lucide-react"
+import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode } from 'lucide-react'
 import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -16,8 +16,8 @@ interface Product {
   _id: string
   name: string
   price: number
-  basePrice?: number // Original price before any adjustments
-  originalPrice?: number // Alternative field for original price
+  basePrice?: number
+  updatedPrice?: number // Backend calculated price
   image: string[]
   postId: string
   category: string
@@ -25,6 +25,12 @@ interface Product {
   status?: "draft" | "pending" | "approved"
   applicationAreas?: string
   quantityAvailable?: number
+  commissionInfo?: {
+    currentAgentCommission: number
+    consultantLevelCommission: number
+    totalCommission: number
+    consultantLevel: string
+  }
 }
 
 // Define the WishlistItem interface
@@ -61,6 +67,17 @@ export default function ProductsPage() {
   const [error, setError] = useState<string | null>(null)
   const [clientData, setClientData] = useState<any>(null)
   const [wishlistLoading, setWishlistLoading] = useState(false)
+
+  // Debug scroll event
+  useEffect(() => {
+    console.log("Setting up scroll debug in ProductsPage")
+    const logScroll = () => {
+      console.log("Scroll event detected in ProductsPage, window.scrollY:", window.scrollY)
+    }
+
+    window.addEventListener("scroll", logScroll)
+    return () => window.removeEventListener("scroll", logScroll)
+  }, [])
 
   // Fetch wishlist from backend
   const fetchWishlist = useCallback(async () => {
@@ -141,7 +158,7 @@ export default function ProductsPage() {
     }
   }, [cart, clientId])
 
-  // Fetch products function
+  // Fetch products function - SIMPLIFIED: Just fetch and display backend prices
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true)
@@ -195,6 +212,7 @@ export default function ProductsPage() {
         }))
 
         setProducts(processedProducts)
+        console.log("Products with backend calculated prices:", processedProducts)
       } else {
         throw new Error(data.msg || "Invalid API response format")
       }
@@ -296,12 +314,7 @@ export default function ProductsPage() {
             throw new Error(data.message || "Failed to remove from wishlist")
           }
         } else {
-          // Add to wishlist
-          const product = products.find((p) => p.postId === productId)
-          if (!product) {
-            throw new Error("Product not found")
-          }
-
+          // Add to wishlist - Let backend handle all price calculations
           const response = await fetch("https://evershinebackend-2.onrender.com/api/addToWishlist", {
             method: "POST",
             headers: {
@@ -310,10 +323,11 @@ export default function ProductsPage() {
             },
             body: JSON.stringify({
               productId,
-              // Use the price directly from the product (backend calculated)
-              price: product.price,
+              // No price calculation on frontend - backend handles everything
             }),
           })
+
+          console.log(`Adding to wishlist: Product ${productId} - backend will calculate price`)
 
           if (!response.ok) {
             throw new Error(`API error: ${response.status} ${response.statusText}`)
@@ -366,10 +380,10 @@ export default function ProductsPage() {
         setAddingToWishlist((prev) => ({ ...prev, [productId]: false }))
       }
     },
-    [wishlist, toast, clientId, router, fetchWishlist, products],
+    [wishlist, toast, clientId, router, fetchWishlist],
   )
 
-  // Add to cart function
+  // Add to cart function - SIMPLIFIED: Let backend handle price calculations
   const addToCart = async (e: React.MouseEvent, productId: string, productName: string) => {
     e.preventDefault() // Prevent navigation
 
@@ -401,12 +415,7 @@ export default function ProductsPage() {
         throw new Error("No authentication token found. Please refresh the token and try again.")
       }
 
-      const product = products.find((p) => p.postId === productId)
-      if (!product) {
-        throw new Error("Product not found")
-      }
-
-      // Make API request in background
+      // Make API request - Let backend handle all price calculations
       const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
         method: "POST",
         headers: {
@@ -415,10 +424,11 @@ export default function ProductsPage() {
         },
         body: JSON.stringify({
           productId,
-          // Use the price directly from the product (backend calculated)
-          price: product.price,
+          // No price calculation on frontend - backend handles everything
         }),
       })
+
+      console.log(`Adding to cart: Product ${productId} - backend will calculate price`)
 
       if (!response.ok) {
         throw new Error(`API error: ${response.status} ${response.statusText}`)
@@ -496,6 +506,7 @@ export default function ProductsPage() {
           const data = await response.json()
           if (data.data) {
             setClientData(data.data)
+            console.log("Client data fetched:", data.data)
           }
         }
       } catch (error) {
@@ -603,6 +614,10 @@ export default function ProductsPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             {filteredProducts.map((product) => {
+              // SIMPLIFIED: Just use the price from backend response
+              // Backend handles all commission calculations and returns final price
+              const displayPrice = product.updatedPrice || product.price
+
               return (
                 <div
                   key={product._id}
@@ -644,16 +659,15 @@ export default function ProductsPage() {
                   <div className="p-4">
                     <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
 
-                    {/* Display price directly from backend */}
+                    {/* SIMPLIFIED: Just display the backend calculated price */}
                     <div className="mt-2">
-                      <p className="text-lg font-bold">₹{product.price.toLocaleString()}/sqft</p>
-                      {/* Show original price if different from current price */}
-                      {(product.basePrice || product.originalPrice) &&
-                        (product.basePrice !== product.price || product.originalPrice !== product.price) && (
-                          <p className="text-sm text-muted-foreground line-through">
-                            ₹{(product.basePrice || product.originalPrice)?.toLocaleString()}/sqft
-                          </p>
-                        )}
+                      <p className="text-lg font-bold">₹{displayPrice.toLocaleString()}/sqft</p>
+                      {/* Show commission info if available from backend */}
+                      {product.commissionInfo && (
+                        <p className="text-xs text-muted-foreground">
+                          Commission: {product.commissionInfo.totalCommission}% applied
+                        </p>
+                      )}
                     </div>
 
                     <p className="text-sm text-muted-foreground mt-1">
@@ -663,14 +677,14 @@ export default function ProductsPage() {
                     <button
                       onClick={(e) => toggleWishlist(e, product.postId)}
                       className={`mt-4 w-full py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2
-                               ${
-                                 wishlist.includes(product.postId)
-                                   ? "bg-gray-100 text-gray-600 border border-gray-200"
-                                   : addingToWishlist[product.postId]
-                                     ? "bg-gray-200 text-gray-700"
-                                     : "bg-primary hover:bg-primary/90 text-primary-foreground"
-                               } 
-                               transition-colors`}
+                                ${
+                                  wishlist.includes(product.postId)
+                                    ? "bg-gray-100 text-gray-600 border border-gray-200"
+                                    : addingToWishlist[product.postId]
+                                      ? "bg-gray-200 text-gray-700"
+                                      : "bg-primary hover:bg-primary/90 text-primary-foreground"
+                                } 
+                                transition-colors`}
                       disabled={addingToWishlist[product.postId]}
                       type="button"
                     >
