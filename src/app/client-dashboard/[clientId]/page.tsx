@@ -264,6 +264,57 @@ export default function ProductsPage() {
     }
   }, [])
 
+  // Super fast fetch products function (faster timeouts)
+  const silentFetchProductsFast = useCallback(async () => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
+      const endpoint = `${apiUrl}/api/getClientProducts`
+
+      const token = localStorage.getItem("clientImpersonationToken")
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      }
+
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`
+      } else {
+        return // Silently fail if no token
+      }
+
+      const response = await fetch(endpoint, {
+        method: "GET",
+        headers,
+        signal: AbortSignal.timeout(3000), // Faster timeout - 3 seconds
+      })
+
+      if (!response.ok) {
+        return // Silently fail
+      }
+
+      const data = await response.json()
+
+      if (data.success && Array.isArray(data.data)) {
+        const validProducts = data.data.filter(
+          (product: Product) => product.postId && typeof product.postId === "string",
+        )
+
+        const processedProducts = validProducts.map((product: Product) => ({
+          ...product,
+          image:
+            Array.isArray(product.image) && product.image.length > 0
+              ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
+              : ["/placeholder.svg"],
+          basePrice: product.basePrice || product.price,
+        }))
+
+        setProducts(processedProducts)
+      }
+    } catch (error) {
+      // Silently fail - no error handling
+      console.log("Fast refresh failed, continuing...")
+    }
+  }, [])
+
   // Fetch products on component mount
   useEffect(() => {
     fetchProducts()
@@ -283,7 +334,7 @@ export default function ProductsPage() {
     router.push(`/client-dashboard/${clientId}/wishlist`)
   }
 
-  // Handle consultant level change with auto-save (FAST VERSION - NO WAITING)
+  // Handle consultant level change with auto-save (SUPER FAST VERSION)
   const handleConsultantLevelChange = async (level: string) => {
     // INSTANT UI UPDATE - Don't wait for anything
     setClientData((prev: any) => ({ ...prev, consultantLevel: level }))
@@ -292,7 +343,7 @@ export default function ProductsPage() {
     const token = localStorage.getItem("clientImpersonationToken")
     if (!token) return
 
-    // Fire and forget - update in background
+    // Fire and forget - update in background with faster timeout
     fetch(`${process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"}/api/update-client`, {
       method: "POST",
       headers: {
@@ -303,11 +354,11 @@ export default function ProductsPage() {
         ...clientData,
         consultantLevel: level,
       }),
-      signal: AbortSignal.timeout(5000), // Faster timeout
+      signal: AbortSignal.timeout(2000), // Super fast timeout - 2 seconds
     })
       .then(() => {
-        // Only refresh products after successful update
-        silentFetchProducts()
+        // Immediate product refresh with faster timeout
+        silentFetchProductsFast()
       })
       .catch((error) => {
         console.error("Background update failed:", error)
@@ -584,16 +635,16 @@ export default function ProductsPage() {
 
   return (
     <ErrorBoundary>
-      {/* Background wash showing consultant level */}
+      {/* Background wash showing consultant level - STICKY */}
       <div
-        className={`w-full ${
+        className={`sticky top-0 z-10 w-full ${
           clientData?.consultantLevel === "red"
-            ? "bg-gradient-to-b from-red-50 via-red-25 to-transparent"
+            ? "bg-gradient-to-b from-orange-100 via-peach-50 to-transparent"
             : clientData?.consultantLevel === "yellow"
               ? "bg-gradient-to-b from-yellow-50 via-yellow-25 to-transparent"
               : clientData?.consultantLevel === "purple"
                 ? "bg-gradient-to-b from-purple-50 via-purple-25 to-transparent"
-                : "bg-gradient-to-b from-red-50 via-red-25 to-transparent"
+                : "bg-gradient-to-b from-orange-100 via-peach-50 to-transparent"
         }`}
       >
         <div className="p-6 md:p-8">
