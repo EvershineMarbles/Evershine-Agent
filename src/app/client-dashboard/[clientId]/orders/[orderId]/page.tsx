@@ -13,16 +13,22 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { jsPDF } from "jspdf"
 import html2canvas from "html2canvas"
 
-// Define interfaces for type safety
 interface OrderItem {
   name: string
   category: string
   price: number
   basePrice?: number
+  updatedPrice?: number // Backend calculated price
   quantity: number
   customQuantity?: number
   customFinish?: string
   customThickness?: string
+  commissionInfo?: {
+    currentAgentCommission: number
+    consultantLevelCommission: number
+    totalCommission: number
+    consultantLevel: string
+  }
 }
 
 interface ShippingAddress {
@@ -43,15 +49,6 @@ interface Order {
   shippingAddress?: ShippingAddress
 }
 
-// Add the CommissionData interface from wishlist page
-interface CommissionData {
-  agentId: string
-  name: string
-  email: string
-  commissionRate: number
-  categoryCommissions?: Record<string, number>
-}
-
 export default function OrderDetailsPage() {
   const params = useParams()
   const router = useRouter()
@@ -65,19 +62,12 @@ export default function OrderDetailsPage() {
   const [error, setError] = useState<string | null>(null)
   const [generatingPdf, setGeneratingPdf] = useState(false)
 
-  // Add commission-related state from wishlist page
-  const [commissionData, setCommissionData] = useState<CommissionData | null>(null)
-  const [overrideCommissionRate, setOverrideCommissionRate] = useState<number | null>(null)
-
-  // Get API URL from environment or use default
   const getApiUrl = () => {
     return process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
   }
 
-  // Get token from localStorage
   const getToken = () => {
     try {
-      // Try both token storage options
       const token = localStorage.getItem("clientImpersonationToken") || localStorage.getItem("token")
       if (!token) {
         setError("No authentication token found. Please log in again.")
@@ -90,126 +80,6 @@ export default function OrderDetailsPage() {
     }
   }
 
-  // Add fetchCommissionData function from wishlist page
-  const fetchCommissionData = async () => {
-    try {
-      const token = getToken()
-      if (!token) return null
-
-      const apiUrl = getApiUrl()
-      const response = await fetch(`${apiUrl}/api/client/agent-commission`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-
-      if (!response.ok) {
-        console.error("Failed to fetch commission data:", response.status)
-        return null
-      }
-
-      const data = await response.json()
-      if (data.success && data.data) {
-        setCommissionData(data.data)
-        return data.data
-      }
-      return null
-    } catch (error) {
-      console.error("Error fetching commission data:", error)
-      return null
-    }
-  }
-
-  // Load saved commission rate from localStorage on component mount
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      // Use a client-specific key for commission rate
-      const savedRate = localStorage.getItem(`commission-override-${clientId}`)
-      if (savedRate) {
-        setOverrideCommissionRate(Number(savedRate))
-      } else {
-        // Reset to null if no saved rate for this client
-        setOverrideCommissionRate(null)
-      }
-    }
-  }, [clientId])
-
-  // Fetch client data to get consultant level
-  useEffect(() => {
-    const fetchClientData = async () => {
-      try {
-        const token = getToken()
-        if (!token) return
-
-        const apiUrl = getApiUrl()
-        const response = await fetch(`${apiUrl}/api/getClientDetails/${clientId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
-
-        if (!response.ok) {
-          console.error("Failed to fetch client data:", response.status)
-          return
-        }
-
-        const data = await response.json()
-        if (data.success && data.data) {
-          // Set commission rate based on consultant level color
-          if (data.data.consultantLevel) {
-            const consultantLevel = data.data.consultantLevel
-            console.log("Client consultant level:", consultantLevel)
-
-            // Map color to commission rate
-            let commissionRate = null
-            switch (consultantLevel) {
-              case "red":
-                commissionRate = 5
-                break
-              case "yellow":
-                commissionRate = 10
-                break
-              case "purple":
-                commissionRate = 15
-                break
-              default:
-                commissionRate = null
-            }
-
-            // Set the override commission rate
-            setOverrideCommissionRate(commissionRate)
-            console.log(`Setting commission rate to ${commissionRate}% based on consultant level ${consultantLevel}`)
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching client data:", error)
-      }
-    }
-
-    fetchClientData()
-  }, [clientId])
-
-  // Calculate adjusted price with commission (from wishlist page)
-  const calculateAdjustedPrice = (item: OrderItem) => {
-    // Always use basePrice (which should be the original price)
-    const basePrice = item.basePrice || item.price
-
-    // Get the default commission rate (from agent or category-specific)
-    let defaultRate = commissionData?.commissionRate || 0
-
-    // Check for category-specific commission
-    if (commissionData?.categoryCommissions && item.category && commissionData.categoryCommissions[item.category]) {
-      defaultRate = commissionData.categoryCommissions[item.category]
-    }
-
-    // Add the override rate to the default rate if an override is set
-    const finalRate = overrideCommissionRate !== null ? defaultRate + overrideCommissionRate : defaultRate
-
-    // Calculate adjusted price based on the original basePrice
-    const adjustedPrice = basePrice * (1 + finalRate / 100)
-
-    return Math.round(adjustedPrice * 100) / 100 // Round to 2 decimal places
-  }
-
-  // Update the fetchOrder function to use the correct API endpoint
   const fetchOrder = async () => {
     try {
       setLoading(true)
@@ -221,32 +91,17 @@ export default function OrderDetailsPage() {
         return
       }
 
-      // First fetch commission data
-      await fetchCommissionData()
-
       const apiUrl = getApiUrl()
-      console.log(`Fetching order ${orderId} with token:`, token.substring(0, 15) + "...")
 
-      // Use the direct order endpoint from your backend
-      const response = await fetch(`${apiUrl}/api/orders/${orderId}`, {
+      // Use client-specific order endpoint
+      const response = await fetch(`${apiUrl}/api/getClientOrder/${orderId}`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-      }).catch(() => {
-        // If specific order endpoint fails, fall back to fetching all orders
-        console.log("Specific order endpoint failed, falling back to all orders")
-        return fetch(`${apiUrl}/api/clients/${clientId}/orders`, {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        })
       })
 
-      // Check for errors
       if (!response.ok) {
         if (response.status === 401) {
           throw new Error("Authentication failed. Please refresh the token and try again.")
@@ -256,17 +111,12 @@ export default function OrderDetailsPage() {
       }
 
       const data = await response.json()
-      console.log("ORDER DETAILS - API response:", data)
 
-      // Handle different response formats
       if (data && data.data && !Array.isArray(data.data)) {
-        // Single order response
         setOrder(data.data)
       } else if (data && !Array.isArray(data) && data.orderId) {
-        // Direct order object response
         setOrder(data)
       } else {
-        // Array of orders response - find the specific order
         const ordersArray = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : []
         const foundOrder = ordersArray.find((o: Order) => o.orderId === orderId)
 
@@ -290,12 +140,10 @@ export default function OrderDetailsPage() {
     }
   }
 
-  // Initialize data on component mount
   useEffect(() => {
     fetchOrder()
   }, [clientId, orderId, toast])
 
-  // Format date
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleDateString("en-US", {
@@ -305,20 +153,18 @@ export default function OrderDetailsPage() {
     })
   }
 
-  // Calculate order total with adjusted prices
+  // Calculate order total using backend prices
   const calculateAdjustedTotal = (order: Order) => {
     return order.items.reduce((total, item) => {
-      const adjustedPrice = calculateAdjustedPrice(item)
-      return total + adjustedPrice * item.quantity
+      const displayPrice = item.updatedPrice || item.price
+      return total + displayPrice * item.quantity
     }, 0)
   }
 
-  // Handle print invoice
   const handlePrint = () => {
     window.print()
   }
 
-  // Handle download PDF
   const handleDownloadPdf = async () => {
     if (!invoiceRef.current || !order) return
 
@@ -329,27 +175,22 @@ export default function OrderDetailsPage() {
         description: "Please wait while we generate your invoice PDF...",
       })
 
-      // Create a new jsPDF instance
       const pdf = new jsPDF({
         orientation: "portrait",
         unit: "mm",
         format: "a4",
       })
 
-      // Get the invoice element
       const element = invoiceRef.current
 
-      // Temporarily modify the element for better PDF capture
       const originalStyles = {
         background: element.style.background,
         padding: element.style.padding,
       }
 
-      // Apply styles for PDF generation
       element.style.background = "white"
       element.style.padding = "15px"
 
-      // Show print-only elements
       const printElements = element.querySelectorAll(".print\\:block")
       const printStyles = Array.from(printElements).map((el) => {
         const style = (el as HTMLElement).style.display
@@ -357,7 +198,6 @@ export default function OrderDetailsPage() {
         return style
       })
 
-      // Hide print-hidden elements
       const hiddenElements = element.querySelectorAll(".print\\:hidden")
       const hiddenStyles = Array.from(hiddenElements).map((el) => {
         const style = (el as HTMLElement).style.display
@@ -365,7 +205,6 @@ export default function OrderDetailsPage() {
         return style
       })
 
-      // Generate canvas
       const canvas = await html2canvas(element, {
         scale: 2,
         useCORS: true,
@@ -373,33 +212,27 @@ export default function OrderDetailsPage() {
         backgroundColor: "#ffffff",
       })
 
-      // Restore original styles
       element.style.background = originalStyles.background
       element.style.padding = originalStyles.padding
 
-      // Restore print elements
       printElements.forEach((el, i) => {
         ;(el as HTMLElement).style.display = printStyles[i]
       })
 
-      // Restore hidden elements
       hiddenElements.forEach((el, i) => {
         ;(el as HTMLElement).style.display = hiddenStyles[i]
       })
 
-      // Add image to PDF
       const imgData = canvas.toDataURL("image/jpeg", 1.0)
-      const imgWidth = 210 // A4 width in mm
-      const pageHeight = 297 // A4 height in mm
+      const imgWidth = 210
+      const pageHeight = 297
       const imgHeight = (canvas.height * imgWidth) / canvas.width
       let heightLeft = imgHeight
       let position = 0
 
-      // Add first page
       pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight)
       heightLeft -= pageHeight
 
-      // Add additional pages if needed
       while (heightLeft > 0) {
         position = heightLeft - imgHeight
         pdf.addPage()
@@ -407,7 +240,6 @@ export default function OrderDetailsPage() {
         heightLeft -= pageHeight
       }
 
-      // Save the PDF
       pdf.save(`Invoice-${order.orderId}.pdf`)
 
       toast({
@@ -426,7 +258,6 @@ export default function OrderDetailsPage() {
     }
   }
 
-  // Loading state
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-[80vh]">
@@ -436,7 +267,6 @@ export default function OrderDetailsPage() {
     )
   }
 
-  // Error state
   if (error) {
     return (
       <div className="p-6 md:p-8">
@@ -468,7 +298,6 @@ export default function OrderDetailsPage() {
     )
   }
 
-  // No order found state
   if (!order) {
     return (
       <div className="p-6 md:p-8">
@@ -500,13 +329,11 @@ export default function OrderDetailsPage() {
   return (
     <div className="p-6 md:p-8 max-w-5xl mx-auto">
       <div ref={invoiceRef}>
-        {/* Print-friendly header that only shows when printing */}
         <div className="hidden print:block mb-8">
           <h1 className="text-3xl font-bold text-center">INVOICE</h1>
           <p className="text-center text-muted-foreground">Order #{order.orderId}</p>
         </div>
 
-        {/* Regular header that hides when printing */}
         <div className="flex items-center justify-between mb-8 print:hidden">
           <div className="flex items-center">
             <Button variant="ghost" size="icon" onClick={() => router.back()} className="mr-4">
@@ -629,7 +456,10 @@ export default function OrderDetailsPage() {
               </TableHeader>
               <TableBody>
                 {order.items.map((item, index) => {
-                  const adjustedPrice = calculateAdjustedPrice(item)
+                  const displayPrice = item.updatedPrice || item.price
+                  const hasCommission = item.updatedPrice && item.updatedPrice !== item.price
+                  const originalPrice = item.basePrice || item.price
+
                   return (
                     <TableRow key={index}>
                       <TableCell className="font-medium">{item.name}</TableCell>
@@ -645,16 +475,42 @@ export default function OrderDetailsPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        ₹
-                        {adjustedPrice.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
+                        <div className="space-y-1">
+                          {hasCommission ? (
+                            <>
+                              <div className="font-medium text-green-600">
+                                ₹
+                                {displayPrice.toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
+                              </div>
+                              <div className="text-xs text-gray-500 line-through">
+                                ₹
+                                {originalPrice.toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
+                              </div>
+                              {item.commissionInfo && (
+                                <div className="text-xs text-gray-600">+{item.commissionInfo.totalCommission}%</div>
+                              )}
+                            </>
+                          ) : (
+                            <div className="font-medium">
+                              ₹
+                              {displayPrice.toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </div>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">{item.quantity}</TableCell>
                       <TableCell className="text-right">
                         ₹
-                        {(adjustedPrice * item.quantity).toLocaleString(undefined, {
+                        {(displayPrice * item.quantity).toLocaleString(undefined, {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
                         })}
@@ -718,13 +574,11 @@ export default function OrderDetailsPage() {
           </p>
         </div>
 
-        {/* Print-only footer */}
         <div className="hidden print:block mt-16 pt-8 border-t text-center text-sm text-muted-foreground">
           <p>This is an electronically generated invoice and does not require a signature.</p>
         </div>
       </div>
 
-      {/* Add global styles for PDF generation */}
       <style jsx global>{`
         @media print {
           @page {

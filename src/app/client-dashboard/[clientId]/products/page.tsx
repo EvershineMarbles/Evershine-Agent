@@ -11,12 +11,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { Button } from "@/components/ui/button"
 
-// Define the Product interface
+// Define the Product interface with updatedPrice
 interface Product {
   _id: string
   name: string
   price: number
-  basePrice?: number // Add this field to recognize the original price
+  basePrice?: number
+  updatedPrice?: number // Backend calculated price
   image: string[]
   postId: string
   category: string
@@ -24,15 +25,12 @@ interface Product {
   status?: "draft" | "pending" | "approved"
   applicationAreas?: string
   quantityAvailable?: number
-}
-
-// Add the CommissionData interface
-interface CommissionData {
-  agentId: string
-  name: string
-  email: string
-  commissionRate: number
-  categoryCommissions?: Record<string, number>
+  commissionInfo?: {
+    currentAgentCommission: number
+    consultantLevelCommission: number
+    totalCommission: number
+    consultantLevel: string
+  }
 }
 
 // Define the WishlistItem interface
@@ -49,8 +47,6 @@ interface WishlistItem {
 }
 
 export default function ProductsPage() {
-  console.log("ProductsPage rendering")
-
   // Use the useParams hook to get the clientId
   const params = useParams()
   const router = useRouter()
@@ -68,55 +64,7 @@ export default function ProductsPage() {
   const [addingToWishlist, setAddingToWishlist] = useState<Record<string, boolean>>({})
   const [error, setError] = useState<string | null>(null)
   const [clientData, setClientData] = useState<any>(null)
-  // Add commission data state
-  const [commissionData, setCommissionData] = useState<CommissionData | null>(null)
-  // Add state for commission rate override
-  const [overrideCommissionRate, setOverrideCommissionRate] = useState<number | null>(null)
-  const [commissionLoading, setCommissionLoading] = useState(false)
   const [wishlistLoading, setWishlistLoading] = useState(false)
-
-  // Load saved commission rate from localStorage on component mount
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      // Use a client-specific key for commission rate
-      const savedRate = localStorage.getItem(`commission-override-${clientId}`)
-      if (savedRate) {
-        setOverrideCommissionRate(Number(savedRate))
-      } else {
-        // Reset to null if no saved rate for this client
-        setOverrideCommissionRate(null)
-      }
-    }
-  }, [clientId])
-
-  // Save commission rate to localStorage whenever it changes
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      // Use a client-specific key for commission rate
-      if (overrideCommissionRate !== null) {
-        localStorage.setItem(`commission-override-${clientId}`, overrideCommissionRate.toString())
-      } else {
-        localStorage.removeItem(`commission-override-${clientId}`)
-      }
-    }
-  }, [overrideCommissionRate, clientId])
-
-  // Handle commission rate change
-  const handleCommissionRateChange = (rate: number | null) => {
-    setOverrideCommissionRate(rate)
-    console.log(`Setting commission rate for client ${clientId} to ${rate}`)
-  }
-
-  // Debug scroll event
-  useEffect(() => {
-    console.log("Setting up scroll debug in ProductsPage")
-    const logScroll = () => {
-      console.log("Scroll event detected in ProductsPage, window.scrollY:", window.scrollY)
-    }
-
-    window.addEventListener("scroll", logScroll)
-    return () => window.removeEventListener("scroll", logScroll)
-  }, [])
 
   // Fetch wishlist from backend
   const fetchWishlist = useCallback(async () => {
@@ -143,21 +91,15 @@ export default function ProductsPage() {
       const data = await response.json()
 
       if (data.success && data.data && Array.isArray(data.data.items)) {
-        // Extract just the postIds from the wishlist items
         const wishlistIds = data.data.items.map((item: WishlistItem) => item.postId)
-        console.log("Fetched wishlist from backend:", wishlistIds)
         setWishlist(wishlistIds)
-
-        // Update localStorage for optimistic UI updates
         localStorage.setItem(`wishlist-${clientId}`, JSON.stringify(wishlistIds))
       } else {
-        console.log("No wishlist items found or invalid response format")
         setWishlist([])
         localStorage.setItem(`wishlist-${clientId}`, JSON.stringify([]))
       }
     } catch (error) {
       console.error("Error fetching wishlist:", error)
-      // Fallback to localStorage if API fails
       try {
         const savedWishlist = localStorage.getItem(`wishlist-${clientId}`)
         if (savedWishlist) {
@@ -197,78 +139,14 @@ export default function ProductsPage() {
     }
   }, [cart, clientId])
 
-  // Add fetchCommissionData function
-  const fetchCommissionData = useCallback(async () => {
-    try {
-      setCommissionLoading(true)
-      const token = localStorage.getItem("clientImpersonationToken")
-      if (!token) {
-        return null
-      }
-
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
-      const response = await fetch(`${apiUrl}/api/client/agent-commission`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-
-      if (!response.ok) {
-        return null
-      }
-
-      const data = await response.json()
-      if (data.success && data.data) {
-        setCommissionData(data.data)
-        return data.data
-      }
-      return null
-    } catch (error) {
-      console.error("Error fetching commission data:", error)
-      return null
-    } finally {
-      setCommissionLoading(false)
-    }
-  }, [])
-
-  // Add calculateAdjustedPrice function with override support
-  const calculateAdjustedPrice = useCallback(
-    (product: Product) => {
-      // Always use basePrice (which should be the original price)
-      const basePrice = product.basePrice || product.price
-
-      // Get the default commission rate (from agent or category-specific)
-      let defaultRate = commissionData?.commissionRate || 0
-
-      // Check for category-specific commission
-      if (
-        commissionData?.categoryCommissions &&
-        product.category &&
-        commissionData.categoryCommissions[product.category]
-      ) {
-        defaultRate = commissionData.categoryCommissions[product.category]
-      }
-
-      // Add the override rate to the default rate if an override is set
-      const finalRate = overrideCommissionRate !== null ? defaultRate + overrideCommissionRate : defaultRate
-
-      // Calculate adjusted price based on the original basePrice
-      const adjustedPrice = basePrice * (1 + finalRate / 100)
-      return Math.round(adjustedPrice * 100) / 100 // Round to 2 decimal places
-    },
-    [commissionData, overrideCommissionRate],
-  )
-
-  // Fetch products function
+  // Fetch products function - NOW USES CLIENT-SPECIFIC ENDPOINT
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
 
-      // First fetch commission data
-      await fetchCommissionData()
-
-      // Use environment variable if available, otherwise use a default URL
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
-      console.log("Fetching products from:", `${apiUrl}/api/getAllProducts`)
+      const endpoint = `${apiUrl}/api/getClientProducts`
 
       const token = localStorage.getItem("clientImpersonationToken")
       const headers: Record<string, string> = {
@@ -277,13 +155,14 @@ export default function ProductsPage() {
 
       if (token) {
         headers["Authorization"] = `Bearer ${token}`
+      } else {
+        throw new Error("No authentication token found. Please refresh the page.")
       }
 
-      const response = await fetch(`${apiUrl}/api/getAllProducts`, {
+      const response = await fetch(endpoint, {
         method: "GET",
         headers,
-        // Add a timeout to prevent long waiting times
-        signal: AbortSignal.timeout(8000), // 8 second timeout
+        signal: AbortSignal.timeout(10000),
       })
 
       if (!response.ok) {
@@ -293,9 +172,6 @@ export default function ProductsPage() {
       const data = await response.json()
 
       if (data.success && Array.isArray(data.data)) {
-        console.log("Products fetched successfully:", data.data)
-
-        // Filter out products with missing or invalid postId
         const validProducts = data.data.filter(
           (product: Product) => product.postId && typeof product.postId === "string",
         )
@@ -304,43 +180,49 @@ export default function ProductsPage() {
           console.warn(`Filtered out ${data.data.length - validProducts.length} products with invalid postId`)
         }
 
-        // Process the image URLs to ensure they're valid
         const processedProducts = validProducts.map((product: Product) => ({
           ...product,
           image:
             Array.isArray(product.image) && product.image.length > 0
               ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
               : ["/placeholder.svg"],
-          // Ensure basePrice is set if it doesn't exist
           basePrice: product.basePrice || product.price,
         }))
 
         setProducts(processedProducts)
       } else {
-        throw new Error(data.msg || "Invalid API response format")
+        throw new Error(data.message || "Invalid API response format")
       }
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : "Failed to load products"
       console.error("Error fetching products:", error)
       setError(errorMessage)
 
-      // Show error toast
       toast({
         title: "Error fetching products",
         description: "Could not load products from the server. Please try again later.",
         variant: "destructive",
       })
 
-      // Set empty products array
       setProducts([])
     } finally {
       setLoading(false)
     }
-  }, [toast, fetchCommissionData])
+  }, [toast])
 
   // Fetch products on component mount
   useEffect(() => {
     fetchProducts()
+  }, [fetchProducts])
+
+  // Auto-refresh products every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log("🔄 Auto-refreshing products...")
+      fetchProducts()
+    }, 30000) // 30 seconds
+
+    return () => clearInterval(interval)
   }, [fetchProducts])
 
   // Navigate to wishlist page
@@ -348,12 +230,11 @@ export default function ProductsPage() {
     router.push(`/client-dashboard/${clientId}/wishlist`)
   }
 
-  // Update the toggleWishlist function to make an API call instead of just updating local state
+  // Update the toggleWishlist function
   const toggleWishlist = useCallback(
     async (e: React.MouseEvent, productId: string) => {
-      e.preventDefault() // Prevent navigation
+      e.preventDefault()
 
-      // Add validation here
       if (!productId || typeof productId !== "string") {
         toast({
           title: "Error",
@@ -363,20 +244,15 @@ export default function ProductsPage() {
         return
       }
 
-      // Set loading state for this specific product
       setAddingToWishlist((prev) => ({ ...prev, [productId]: true }))
 
-      // Optimistically update UI
       if (wishlist.includes(productId)) {
-        // Remove from wishlist
         setWishlist((prev) => prev.filter((id) => id !== productId))
       } else {
-        // Add to wishlist
         setWishlist((prev) => [...prev, productId])
       }
 
       try {
-        // Get the token
         const token = localStorage.getItem("clientImpersonationToken")
 
         if (!token) {
@@ -384,7 +260,6 @@ export default function ProductsPage() {
         }
 
         if (wishlist.includes(productId)) {
-          // Remove from wishlist
           const response = await fetch("https://evershinebackend-2.onrender.com/api/deleteUserWishlistItem", {
             method: "DELETE",
             headers: {
@@ -401,7 +276,6 @@ export default function ProductsPage() {
           const data = await response.json()
 
           if (data.success) {
-            // Update localStorage after successful API call
             const updatedWishlist = wishlist.filter((id) => id !== productId)
             localStorage.setItem(`wishlist-${clientId}`, JSON.stringify(updatedWishlist))
 
@@ -411,37 +285,20 @@ export default function ProductsPage() {
               variant: "default",
             })
 
-            // Refresh wishlist from backend to ensure sync
             fetchWishlist()
           } else {
             throw new Error(data.message || "Failed to remove from wishlist")
           }
         } else {
-          // Add to wishlist
-          const product = products.find((p) => p.postId === productId)
-          if (!product) {
-            throw new Error("Product not found")
-          }
-
-          const adjustedPrice = calculateAdjustedPrice(product)
-
+          // Add to wishlist - let backend calculate the price
           const response = await fetch("https://evershinebackend-2.onrender.com/api/addToWishlist", {
             method: "POST",
             headers: {
               Authorization: `Bearer ${token}`,
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({
-              productId,
-              // Include the current price with commission applied
-              price: adjustedPrice,
-            }),
+            body: JSON.stringify({ productId }),
           })
-
-          // Add console log to debug the price being sent
-          console.log(
-            `Adding to wishlist: Product ${productId} with price ${adjustedPrice} (commission rate: ${overrideCommissionRate !== null ? overrideCommissionRate : "default"})`,
-          )
 
           if (!response.ok) {
             throw new Error(`API error: ${response.status} ${response.statusText}`)
@@ -450,7 +307,6 @@ export default function ProductsPage() {
           const data = await response.json()
 
           if (data.success) {
-            // Update localStorage after successful API call
             const updatedWishlist = [...wishlist.filter((id) => id !== productId), productId]
             localStorage.setItem(`wishlist-${clientId}`, JSON.stringify(updatedWishlist))
 
@@ -467,7 +323,6 @@ export default function ProductsPage() {
               variant: "default",
             })
 
-            // Refresh wishlist from backend to ensure sync
             fetchWishlist()
           } else {
             throw new Error(data.message || "Failed to add to wishlist")
@@ -476,12 +331,9 @@ export default function ProductsPage() {
       } catch (error: any) {
         console.error("Error updating wishlist:", error)
 
-        // Revert the optimistic update
         if (wishlist.includes(productId)) {
-          // We were trying to remove, but failed, so add it back
           setWishlist((prev) => [...prev, productId])
         } else {
-          // We were trying to add, but failed, so remove it
           setWishlist((prev) => prev.filter((id) => id !== productId))
         }
 
@@ -494,12 +346,12 @@ export default function ProductsPage() {
         setAddingToWishlist((prev) => ({ ...prev, [productId]: false }))
       }
     },
-    [wishlist, toast, clientId, router, fetchWishlist, products, calculateAdjustedPrice],
+    [wishlist, toast, clientId, router, fetchWishlist, products],
   )
 
   // Add to cart function
   const addToCart = async (e: React.MouseEvent, productId: string, productName: string) => {
-    e.preventDefault() // Prevent navigation
+    e.preventDefault()
 
     if (cart.includes(productId)) {
       toast({
@@ -511,43 +363,26 @@ export default function ProductsPage() {
     }
 
     try {
-      // Set loading state for this specific product
       setAddingToCart((prev) => ({ ...prev, [productId]: true }))
-
-      // Immediately update UI state to show item as added to cart
       setCart((prev) => [...prev, productId])
 
-      // Update localStorage cart
       const savedCart = localStorage.getItem(`cart-${clientId}`)
       const cartItems = savedCart ? JSON.parse(savedCart) : []
       localStorage.setItem(`cart-${clientId}`, JSON.stringify([...cartItems, productId]))
 
-      // Get the token
       const token = localStorage.getItem("clientImpersonationToken")
 
       if (!token) {
         throw new Error("No authentication token found. Please refresh the token and try again.")
       }
 
-      const product = products.find((p) => p.postId === productId)
-      if (!product) {
-        throw new Error("Product not found")
-      }
-
-      const adjustedPrice = calculateAdjustedPrice(product)
-
-      // Make API request in background
       const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          productId,
-          // Include the current price with commission applied
-          price: adjustedPrice,
-        }),
+        body: JSON.stringify({ productId }),
       })
 
       if (!response.ok) {
@@ -566,7 +401,6 @@ export default function ProductsPage() {
         throw new Error(data.message || "Failed to add to cart")
       }
     } catch (error: any) {
-      // If there was an error, revert the cart state
       setCart((prev) => prev.filter((id) => id !== productId))
 
       console.error("Error adding to cart:", error)
@@ -576,7 +410,6 @@ export default function ProductsPage() {
         variant: "destructive",
       })
     } finally {
-      // Clear loading state
       setAddingToCart((prev) => ({ ...prev, [productId]: false }))
     }
   }
@@ -626,32 +459,6 @@ export default function ProductsPage() {
           const data = await response.json()
           if (data.data) {
             setClientData(data.data)
-
-            // Set commission rate based on consultant level color
-            if (data.data.consultantLevel) {
-              const consultantLevel = data.data.consultantLevel
-              console.log("Client consultant level:", consultantLevel)
-
-              // Map color to commission rate
-              let commissionRate = null
-              switch (consultantLevel) {
-                case "red":
-                  commissionRate = 5
-                  break
-                case "yellow":
-                  commissionRate = 10
-                  break
-                case "purple":
-                  commissionRate = 15
-                  break
-                default:
-                  commissionRate = null
-              }
-
-              // Set the override commission rate
-              setOverrideCommissionRate(commissionRate)
-              console.log(`Setting commission rate to ${commissionRate}% based on consultant level ${consultantLevel}`)
-            }
           }
         }
       } catch (error) {
@@ -661,16 +468,6 @@ export default function ProductsPage() {
 
     fetchClientData()
   }, [clientId])
-
-  useEffect(() => {
-    if (clientData?.consultantLevel && overrideCommissionRate !== null) {
-      // toast({
-      //   title: "Commission Rate Applied",
-      //   description: `${overrideCommissionRate}% commission rate applied based on client's consultant level`,
-      //   duration: 3000,
-      // });
-    }
-  }, [clientData?.consultantLevel, overrideCommissionRate, toast])
 
   // Loading state
   if (loading) {
@@ -772,9 +569,6 @@ export default function ProductsPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             {filteredProducts.map((product) => {
-              // Calculate the adjusted price based on commission
-              const adjustedPrice = calculateAdjustedPrice(product)
-
               return (
                 <div
                   key={product._id}
@@ -818,7 +612,9 @@ export default function ProductsPage() {
 
                     {/* Simplified price display - just the adjusted price */}
                     <div className="mt-2">
-                      <p className="text-lg font-bold">₹{adjustedPrice.toLocaleString()}/sqft</p>
+                      <p className="text-lg font-bold">
+                        ₹{product.updatedPrice?.toLocaleString() || product.price.toLocaleString()}/sqft
+                      </p>
                     </div>
 
                     <p className="text-sm text-muted-foreground mt-1">

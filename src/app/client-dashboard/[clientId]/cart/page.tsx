@@ -9,22 +9,13 @@ import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
-import axios from "axios"
-
-// Add the CommissionData interface
-interface CommissionData {
-  agentId: string
-  name: string
-  email: string
-  commissionRate: number
-  categoryCommissions?: Record<string, number>
-}
 
 interface CartItem {
   _id: string
   name: string
   price: number
   basePrice?: number
+  updatedPrice?: number // Backend calculated price
   image: string[]
   postId: string
   category: string
@@ -32,6 +23,12 @@ interface CartItem {
   customQuantity?: number
   customFinish?: string
   customThickness?: string
+  commissionInfo?: {
+    currentAgentCommission: number
+    consultantLevelCommission: number
+    totalCommission: number
+    consultantLevel: string
+  }
 }
 
 export default function CartPage() {
@@ -47,13 +44,6 @@ export default function CartPage() {
   const [isCheckingOut, setIsCheckingOut] = useState(false)
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
 
-  // Add commission data state
-  const [commissionData, setCommissionData] = useState<CommissionData | null>(null)
-
-  // We'll still fetch the commission data but NOT use the override rate
-  // since it's already applied by the backend
-  const [overrideCommissionRate, setOverrideCommissionRate] = useState<number | null>(null)
-
   const [editingCustomFields, setEditingCustomFields] = useState<
     Record<
       string,
@@ -67,15 +57,12 @@ export default function CartPage() {
 
   const finishOptions = ["Polish", "Leather", "Flute", "River", "Satin", "Dual"]
 
-  // Get API URL from environment or use default
   const getApiUrl = () => {
     return process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
   }
 
-  // Get token from localStorage
   const getToken = () => {
     try {
-      // Try both token storage options
       const token = localStorage.getItem("clientImpersonationToken") || localStorage.getItem("token")
       if (!token) {
         toast({
@@ -96,131 +83,10 @@ export default function CartPage() {
     }
   }
 
-  // Add fetchCommissionData function
-  const fetchCommissionData = async () => {
-    try {
-      const token = getToken()
-      if (!token) return null
-
-      const apiUrl = getApiUrl()
-      const response = await axios.get(`${apiUrl}/api/client/agent-commission`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-
-      if (response.data.success && response.data.data) {
-        setCommissionData(response.data.data)
-        return response.data.data
-      }
-      return null
-    } catch (error) {
-      console.error("Error fetching commission data:", error)
-      return null
-    }
-  }
-
-  // Replace the calculateAdjustedPrice function with this new version
-  const calculateAdjustedPrice = (item: CartItem) => {
-    // Get the base price (if available) or use the current price
-    const basePrice = item.basePrice || item.price
-
-    // Get the default commission rate (from agent or category-specific)
-    let commissionRate = commissionData?.commissionRate || 0
-
-    // Check for category-specific commission
-    if (commissionData?.categoryCommissions && item.category && commissionData.categoryCommissions[item.category]) {
-      commissionRate = commissionData.categoryCommissions[item.category]
-    }
-
-    // Add the consultant level commission (if available)
-    const consultantCommission = overrideCommissionRate || 0
-
-    // Calculate total commission rate
-    const totalCommissionRate = commissionRate + consultantCommission
-
-    console.log(`CART - Calculating price for ${item.name}:`)
-    console.log(`CART - Base price:`, basePrice)
-    console.log(`CART - Base commission rate:`, commissionRate)
-    console.log(`CART - Consultant commission rate:`, consultantCommission)
-    console.log(`CART - Total commission rate:`, totalCommissionRate)
-
-    // Calculate adjusted price based on the base price and total commission
-    const adjustedPrice = basePrice * (1 + totalCommissionRate / 100)
-    const roundedPrice = Math.round(adjustedPrice * 100) / 100
-
-    console.log(`CART - Adjusted price:`, roundedPrice)
-
-    return roundedPrice
-  }
-
-  // Load saved commission rate from localStorage on component mount
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      // Use a client-specific key for commission rate
-      const savedRate = localStorage.getItem(`commission-override-${clientId}`)
-      if (savedRate) {
-        setOverrideCommissionRate(Number(savedRate))
-      } else {
-        // Reset to null if no saved rate for this client
-        setOverrideCommissionRate(null)
-      }
-    }
-  }, [clientId])
-
-  // Fetch client data to get consultant level - we still fetch it but don't use it for calculations
-  useEffect(() => {
-    const fetchClientData = async () => {
-      try {
-        const token = getToken()
-        if (!token) return
-
-        const apiUrl = getApiUrl()
-        const response = await axios.get(`${apiUrl}/api/getClientDetails/${clientId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
-
-        if (response.data.success && response.data.data) {
-          // Set commission rate based on consultant level color
-          if (response.data.data.consultantLevel) {
-            const consultantLevel = response.data.data.consultantLevel
-            console.log("Client consultant level:", consultantLevel)
-
-            // Map color to commission rate
-            let commissionRate = null
-            switch (consultantLevel) {
-              case "red":
-                commissionRate = 5
-                break
-              case "yellow":
-                commissionRate = 10
-                break
-              case "purple":
-                commissionRate = 15
-                break
-              default:
-                commissionRate = null
-            }
-
-            // Set the override commission rate
-            setOverrideCommissionRate(commissionRate)
-            console.log(`Setting commission rate to ${commissionRate}% based on consultant level ${consultantLevel}`)
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching client data:", error)
-      }
-    }
-
-    fetchClientData()
-  }, [clientId])
-
-  // Fetch cart items from server
   useEffect(() => {
     fetchCart()
   }, [])
 
-  // Handle custom field changes
   const handleCustomFieldChange = (itemId: string, field: string, value: string | number) => {
     setEditingCustomFields((prev) => ({
       ...prev,
@@ -231,7 +97,6 @@ export default function CartPage() {
     }))
   }
 
-  // Save custom field changes
   const saveCustomFields = async (productId: string) => {
     try {
       const token = getToken()
@@ -259,7 +124,6 @@ export default function CartPage() {
       if (response.ok) {
         const data = await response.json()
         if (data.success) {
-          // Update local state
           setCartItems((prev) =>
             prev.map((item) => {
               if (item.postId === productId) {
@@ -274,7 +138,6 @@ export default function CartPage() {
             }),
           )
 
-          // Clear editing state
           setEditingCustomFields((prev) => {
             const newState = { ...prev }
             delete newState[productId]
@@ -306,12 +169,10 @@ export default function CartPage() {
         return
       }
 
-      // First fetch commission data
-      await fetchCommissionData()
-
       const apiUrl = getApiUrl()
 
-      const response = await fetch(`${apiUrl}/api/getUserCart`, {
+      // Use client-specific cart endpoint
+      const response = await fetch(`${apiUrl}/api/getClientCart`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -330,28 +191,7 @@ export default function CartPage() {
           (item: CartItem) => item.postId && typeof item.postId === "string",
         )
 
-        console.log("CART - Items received from backend:", validItems)
-
-        // Ensure all items have valid prices
-        const itemsWithValidPrices = validItems.map((item: CartItem) => {
-          console.log(`CART - Item ${item.name} - Price from backend:`, item.price)
-
-          // If price is missing or invalid, try to get it from the product
-          if (!item.price || item.price <= 0) {
-            // We'll fetch the product details to get the correct price
-            fetchProductPrice(item.postId).then((price) => {
-              console.log(`CART - Fetched product price for ${item.name}:`, price)
-              if (price > 0) {
-                setCartItems((prev) =>
-                  prev.map((cartItem) => (cartItem.postId === item.postId ? { ...cartItem, price } : cartItem)),
-                )
-              }
-            })
-          }
-          return item
-        })
-
-        setCartItems(itemsWithValidPrices)
+        setCartItems(validItems)
       } else {
         setCartItems([])
       }
@@ -367,36 +207,6 @@ export default function CartPage() {
     }
   }
 
-  // Fetch product price if needed
-  const fetchProductPrice = async (productId: string): Promise<number> => {
-    try {
-      const token = getToken()
-      if (!token) return 0
-
-      const apiUrl = getApiUrl()
-
-      const response = await fetch(`${apiUrl}/api/getProduct/${productId}`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      if (!response.ok) return 0
-
-      const data = await response.json()
-      if (data.success && data.data && data.data.price) {
-        return data.data.price
-      }
-
-      return 0
-    } catch (error) {
-      return 0
-    }
-  }
-
-  // Update item quantity
   const updateQuantity = async (productId: string, newQuantity: number) => {
     if (newQuantity < 1) return
 
@@ -408,15 +218,9 @@ export default function CartPage() {
 
       const apiUrl = getApiUrl()
 
-      // Get the current item
       const currentItem = cartItems.find((item) => item.postId === productId)
       if (!currentItem) return
 
-      console.log(`CART - Updating quantity for ${currentItem.name}:`)
-      console.log(`CART - Original price:`, currentItem.price)
-      console.log(`CART - New quantity:`, newQuantity)
-
-      // First remove the item
       await fetch(`${apiUrl}/api/deleteUserCartItem`, {
         method: "DELETE",
         headers: {
@@ -426,7 +230,7 @@ export default function CartPage() {
         body: JSON.stringify({ productId }),
       })
 
-      // Then add it back with the new quantity and preserve the original price
+      // Add back with new quantity - let backend calculate price
       await fetch(`${apiUrl}/api/addToCart`, {
         method: "POST",
         headers: {
@@ -436,11 +240,9 @@ export default function CartPage() {
         body: JSON.stringify({
           productId,
           quantity: newQuantity,
-          price: currentItem.price, // Preserve the original price
         }),
       })
 
-      // Update local state
       setCartItems((prev) =>
         prev.map((item) => (item.postId === productId ? { ...item, quantity: newQuantity } : item)),
       )
@@ -460,7 +262,6 @@ export default function CartPage() {
     }
   }
 
-  // Handle direct quantity input
   const handleQuantityChange = (productId: string, value: string) => {
     const numValue = Number.parseInt(value)
     if (!isNaN(numValue) && numValue > 0) {
@@ -468,7 +269,6 @@ export default function CartPage() {
     }
   }
 
-  // Remove item from cart
   const removeFromCart = async (productId: string) => {
     try {
       setRemoving((prev) => ({ ...prev, [productId]: true }))
@@ -513,15 +313,14 @@ export default function CartPage() {
     }
   }
 
-  // Calculate total with adjusted prices
+  // Calculate total using backend prices
   const calculateTotal = () => {
     return cartItems.reduce((total, item) => {
-      const adjustedPrice = calculateAdjustedPrice(item)
-      return total + adjustedPrice * item.quantity
+      const displayPrice = item.updatedPrice || item.price
+      return total + displayPrice * item.quantity
     }, 0)
   }
 
-  // Handle checkout
   const handleCheckout = async () => {
     try {
       setIsCheckingOut(true)
@@ -588,7 +387,6 @@ export default function CartPage() {
     }
   }
 
-  // Clear cart
   const clearCart = async () => {
     try {
       setLoading(true)
@@ -604,6 +402,7 @@ export default function CartPage() {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
+        body: JSON.stringify({}), // Declared payload as an empty object
       })
 
       if (!response.ok) {
@@ -682,7 +481,9 @@ export default function CartPage() {
               </div>
               <div className="divide-y">
                 {cartItems.map((item) => {
-                  const adjustedPrice = calculateAdjustedPrice(item)
+                  const displayPrice = item.updatedPrice || item.price
+                  const hasCommission = item.updatedPrice && item.updatedPrice !== item.price
+                  const originalPrice = item.basePrice || item.price
                   const isEditing = editingCustomFields[item.postId]
                   const currentCustomFields = isEditing || {
                     customQuantity: item.customQuantity,
@@ -705,14 +506,31 @@ export default function CartPage() {
                       <div className="flex-grow">
                         <h3 className="font-medium text-lg">{item.name}</h3>
                         <p className="text-sm text-muted-foreground mb-2">{item.category}</p>
-                        <p className="font-semibold text-lg text-primary">₹{adjustedPrice.toLocaleString()}</p>
 
-                        {/* Custom Fields Display/Edit */}
+                        {/* DISPLAY BACKEND CALCULATED PRICE */}
+                        {hasCommission ? (
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <p className="font-semibold text-lg text-green-600">₹{displayPrice.toLocaleString()}</p>
+                              <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+                                Commission Applied ✓
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-500 line-through">₹{originalPrice.toLocaleString()}</p>
+                            {item.commissionInfo && (
+                              <p className="text-xs text-gray-600">
+                                +{item.commissionInfo.totalCommission}% total commission
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="font-semibold text-lg text-primary">₹{displayPrice.toLocaleString()}</p>
+                        )}
+
                         {(item.customQuantity || item.customFinish || item.customThickness || isEditing) && (
                           <div className="mt-3 space-y-2 bg-muted/20 p-3 rounded-md">
                             <h4 className="text-sm font-medium">Custom Specifications</h4>
 
-                            {/* Custom Quantity */}
                             <div className="flex items-center gap-2">
                               <label className="text-sm text-muted-foreground w-20">Quantity:</label>
                               {isEditing ? (
@@ -732,7 +550,6 @@ export default function CartPage() {
                               )}
                             </div>
 
-                            {/* Custom Finish */}
                             <div className="flex items-center gap-2">
                               <label className="text-sm text-muted-foreground w-20">Finish:</label>
                               {isEditing ? (
@@ -753,7 +570,6 @@ export default function CartPage() {
                               )}
                             </div>
 
-                            {/* Custom Thickness */}
                             <div className="flex items-center gap-2">
                               <label className="text-sm text-muted-foreground w-20">Thickness:</label>
                               {isEditing ? (
@@ -773,7 +589,6 @@ export default function CartPage() {
                               )}
                             </div>
 
-                            {/* Edit/Save buttons */}
                             <div className="flex gap-2">
                               {isEditing ? (
                                 <>
@@ -824,7 +639,6 @@ export default function CartPage() {
                         )}
                       </div>
                       <div className="flex flex-col sm:flex-row items-center gap-4 mt-2 sm:mt-0">
-                        {/* Quantity input */}
                         <div className="flex items-center border rounded-md">
                           <Input
                             type="number"

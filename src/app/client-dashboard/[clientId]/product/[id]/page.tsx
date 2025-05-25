@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import axios, { AxiosError } from "axios"
@@ -22,6 +21,8 @@ interface Product {
   _id: string
   name: string
   price: number
+  basePrice?: number
+  updatedPrice?: number // Backend calculated price
   category: string
   applicationAreas: string | string[]
   description: string
@@ -33,14 +34,12 @@ interface Product {
   numberOfPieces?: number | null
   thickness?: string
   finishes?: string
-}
-
-interface CommissionData {
-  agentId: string
-  name: string
-  email: string
-  commissionRate: number
-  categoryCommissions?: Record<string, number>
+  commissionInfo?: {
+    currentAgentCommission: number
+    consultantLevelCommission: number
+    totalCommission: number
+    consultantLevel: string
+  }
 }
 
 interface ApiResponse {
@@ -62,10 +61,6 @@ export default function ProductDetail() {
   const [wishlistLoading, setWishlistLoading] = useState(false)
   const [inWishlist, setInWishlist] = useState(false)
   const clientId = params.clientId as string
-  const [commissionData, setCommissionData] = useState<CommissionData | null>(null)
-  const [overrideCommissionRate, setOverrideCommissionRate] = useState<number | null>(null)
-  const [commissionLoading, setCommissionLoading] = useState(false)
-  const [basePrice, setBasePrice] = useState<number | null>(null)
   const [showFullDescription, setShowFullDescription] = useState(false)
   const [galleryOpen, setGalleryOpen] = useState(false)
   const [showVisualizer, setShowVisualizer] = useState(false)
@@ -74,72 +69,6 @@ export default function ProductDetail() {
   const [customQuantity, setCustomQuantity] = useState<number | undefined>(undefined)
   const [customFinish, setCustomFinish] = useState<string | undefined>(undefined)
   const [customThickness, setCustomThickness] = useState<string | undefined>(undefined)
-
-  // Load saved commission rate from localStorage on component mount
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      // Use a client-specific key for commission rate
-      const savedRate = localStorage.getItem(`commission-override-${clientId}`)
-      if (savedRate) {
-        setOverrideCommissionRate(Number(savedRate))
-      } else {
-        // Reset to null if no saved rate for this client
-        setOverrideCommissionRate(null)
-      }
-    }
-  }, [clientId])
-
-  // Add fetchCommissionData function
-  const fetchCommissionData = async () => {
-    try {
-      setCommissionLoading(true)
-      const token = localStorage.getItem("clientImpersonationToken")
-      if (!token) {
-        return null
-      }
-
-      const response = await fetch(`${API_URL}/api/client/agent-commission`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-
-      if (!response.ok) {
-        return null
-      }
-
-      const data = await response.json()
-      if (data.success && data.data) {
-        setCommissionData(data.data)
-        return data.data
-      }
-      return null
-    } catch (error) {
-      console.error("Error fetching commission data:", error)
-      return null
-    } finally {
-      setCommissionLoading(false)
-    }
-  }
-
-  // Add calculateAdjustedPrice function with override support
-  const calculateAdjustedPrice = (price: number, category: string) => {
-    // Use the base price if available
-    const productBasePrice = basePrice || price
-
-    // Get the default commission rate (from agent or category-specific)
-    let defaultRate = commissionData?.commissionRate || 10
-
-    // Check for category-specific commission
-    if (commissionData?.categoryCommissions && category && commissionData.categoryCommissions[category]) {
-      defaultRate = commissionData.categoryCommissions[category]
-    }
-
-    // Add the override rate to the default rate if an override is set
-    const finalRate = overrideCommissionRate !== null ? defaultRate + overrideCommissionRate : defaultRate
-
-    // Calculate adjusted price based on the original basePrice
-    const adjustedPrice = productBasePrice * (1 + finalRate / 100)
-    return Math.round(adjustedPrice * 100) / 100 // Round to 2 decimal places
-  }
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -151,20 +80,17 @@ export default function ProductDetail() {
           throw new Error("Product ID is missing")
         }
 
-        // First fetch commission data
-        await fetchCommissionData()
-
-        const response = await axios.get<ApiResponse>(`${API_URL}/api/getPostDataById`, {
+        // Use client-specific endpoint for pricing
+        const response = await axios.get<ApiResponse>(`${API_URL}/api/getClientProductById`, {
           params: { id: params.id },
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("clientImpersonationToken")}`,
+          },
         })
 
         if (response.data.success && response.data.data?.[0]) {
           const productData = response.data.data[0]
 
-          // Store the base price
-          setBasePrice(productData.basePrice || productData.price)
-
-          // Add missing fields if they don't exist
           const processedProduct = {
             ...productData,
             size: productData.size !== undefined ? productData.size : "",
@@ -175,7 +101,6 @@ export default function ProductDetail() {
           setProduct(processedProduct)
           setImageLoadError(new Array(productData.image.length).fill(false))
 
-          // Check if product is in wishlist
           checkWishlistStatus(productData.postId)
         } else {
           throw new Error(response.data.msg || "No data found")
@@ -202,7 +127,6 @@ export default function ProductDetail() {
   // Check if product is in wishlist
   const checkWishlistStatus = async (productId: string) => {
     try {
-      // First check localStorage
       const savedWishlist = localStorage.getItem("wishlist")
       if (savedWishlist) {
         const wishlistItems = JSON.parse(savedWishlist)
@@ -212,7 +136,6 @@ export default function ProductDetail() {
         }
       }
 
-      // Then check API
       const token = localStorage.getItem("clientImpersonationToken")
       if (!token) return
 
@@ -263,25 +186,20 @@ export default function ProductDetail() {
     }
   }
 
-  // Open gallery when main image is clicked
   const openGallery = () => {
     setGalleryOpen(true)
-    // Prevent body scrolling when gallery is open
     if (typeof document !== "undefined") {
       document.body.style.overflow = "hidden"
     }
   }
 
-  // Close gallery
   const closeGallery = () => {
     setGalleryOpen(false)
-    // Restore body scrolling
     if (typeof document !== "undefined") {
       document.body.style.overflow = ""
     }
   }
 
-  // Handle keyboard navigation in gallery
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!galleryOpen) return
@@ -314,7 +232,6 @@ export default function ProductDetail() {
       }
 
       if (inWishlist) {
-        // Remove from wishlist
         const response = await fetch(`${API_URL}/api/deleteUserWishlistItem`, {
           method: "DELETE",
           headers: {
@@ -334,10 +251,8 @@ export default function ProductDetail() {
           throw new Error(data.message || "Failed to remove from wishlist")
         }
 
-        // Update local state
         setInWishlist(false)
 
-        // Update localStorage for wishlist
         const savedWishlist = localStorage.getItem("wishlist")
         if (savedWishlist) {
           const wishlistItems = JSON.parse(savedWishlist)
@@ -350,7 +265,7 @@ export default function ProductDetail() {
           description: `${product.name} has been removed from your wishlist.`,
         })
       } else {
-        // Add to wishlist
+        // Add to wishlist - let backend calculate price
         const response = await fetch(`${API_URL}/api/addToWishlist`, {
           method: "POST",
           headers: {
@@ -375,10 +290,8 @@ export default function ProductDetail() {
           throw new Error(data.message || "Failed to add to wishlist")
         }
 
-        // Update local state
         setInWishlist(true)
 
-        // Update localStorage for wishlist
         const savedWishlist = localStorage.getItem("wishlist")
         const wishlistItems = savedWishlist ? JSON.parse(savedWishlist) : []
         if (!wishlistItems.includes(product.postId)) {
@@ -434,7 +347,6 @@ export default function ProductDetail() {
     )
   }
 
-  // Parse application areas safely, handling both string and array types
   const getApplicationAreas = () => {
     if (!product.applicationAreas) return []
 
@@ -454,9 +366,13 @@ export default function ProductDetail() {
 
   const applicationAreas = getApplicationAreas()
 
+  // USE BACKEND CALCULATED PRICE
+  const displayPrice = product.updatedPrice || product.price
+  const hasCommission = product.updatedPrice && product.updatedPrice !== product.price
+  const originalPrice = product.basePrice || product.price
+
   return (
     <div className="min-h-screen bg-white p-6">
-      {/* Back Button */}
       <button
         onClick={() => router.back()}
         className="mb-6 hover:bg-gray-100 p-2 rounded-full transition-colors"
@@ -467,9 +383,7 @@ export default function ProductDetail() {
 
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col md:flex-row md:gap-12">
-          {/* Images Section */}
           <div className="w-full md:w-1/2 md:order-2 mb-8 md:mb-0">
-            {/* Main Image with Navigation Arrows */}
             <div className="relative rounded-2xl overflow-hidden bg-gray-100 mb-4 cursor-pointer" onClick={openGallery}>
               <div className="aspect-[4/3] relative">
                 <Image
@@ -485,12 +399,11 @@ export default function ProductDetail() {
                   priority
                 />
 
-                {/* Navigation Arrows */}
                 {product.image.length > 1 && (
                   <>
                     <button
                       onClick={(e) => {
-                        e.stopPropagation() // Prevent gallery from opening
+                        e.stopPropagation()
                         previousImage()
                       }}
                       className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full shadow-lg transition-all"
@@ -500,7 +413,7 @@ export default function ProductDetail() {
                     </button>
                     <button
                       onClick={(e) => {
-                        e.stopPropagation() // Prevent gallery from opening
+                        e.stopPropagation()
                         nextImage()
                       }}
                       className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full shadow-lg transition-all"
@@ -511,14 +424,12 @@ export default function ProductDetail() {
                   </>
                 )}
 
-                {/* Click to view indicator */}
                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 text-white px-3 py-1 rounded-full text-sm flex items-center">
                   <span>Click to zoom</span>
                 </div>
               </div>
             </div>
 
-            {/* Thumbnails */}
             {product.image.length > 1 && (
               <div className="grid grid-cols-4 gap-4">
                 {product.image.map((img, index) => (
@@ -542,35 +453,50 @@ export default function ProductDetail() {
             )}
           </div>
 
-          {/* Product Details */}
           <div className="w-full md:w-1/2 md:order-1 space-y-6">
-            {/* Product Name */}
             <div className="pb-4 border-b border-gray-200">
               <p className="text-gray-500">Product Name</p>
               <h1 className="text-3xl font-bold mt-1">{product.name}</h1>
             </div>
 
-            {/* Price */}
+            {/* DISPLAY BACKEND CALCULATED PRICE */}
             <div className="pb-4 border-b border-gray-200">
               <p className="text-gray-500">Price (per sqft)</p>
-              <p className="text-xl font-bold mt-1">
-                ₹{product && calculateAdjustedPrice(product.price, product.category)}/per sqft
-              </p>
+              {hasCommission ? (
+                <div className="space-y-2 mt-1">
+                  <div className="flex items-center gap-3">
+                    <p className="text-2xl font-bold text-green-600">₹{displayPrice.toLocaleString()}/sqft</p>
+                    <span className="text-sm bg-green-100 text-green-700 px-3 py-1 rounded-full">
+                      Commission Applied ✓
+                    </span>
+                  </div>
+                  <p className="text-lg text-gray-500 line-through">₹{originalPrice.toLocaleString()}/sqft</p>
+                  {product.commissionInfo && (
+                    <div className="text-sm text-gray-600 space-y-1">
+                      <p>Agent Commission: {product.commissionInfo.currentAgentCommission}%</p>
+                      <p>
+                        Consultant Level ({product.commissionInfo.consultantLevel}):{" "}
+                        {product.commissionInfo.consultantLevelCommission}%
+                      </p>
+                      <p className="font-medium">Total Commission: {product.commissionInfo.totalCommission}%</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-2xl font-bold mt-1">₹{displayPrice.toLocaleString()}/sqft</p>
+              )}
             </div>
 
-            {/* Product Category */}
             <div className="pb-4 border-b border-gray-200">
               <p className="text-gray-500">Product Category</p>
               <p className="text-xl font-bold mt-1">{product.category}</p>
             </div>
 
-            {/* Quantity Available */}
             <div className="pb-4 border-b border-gray-200">
               <p className="text-gray-500">Quantity Available (in sqft)</p>
               <p className="text-xl font-bold mt-1">{product.quantityAvailable}</p>
             </div>
 
-            {/* Size, No. of Pieces, and Thickness in 3 columns */}
             <div className="grid grid-cols-3 gap-4 pb-4 border-b border-gray-200">
               <div>
                 <p className="text-gray-500">Size</p>
@@ -596,7 +522,6 @@ export default function ProductDetail() {
               </div>
             </div>
 
-            {/* Custom Fields */}
             <div className="space-y-4">
               <div>
                 <Label htmlFor="customQuantity">Quantity (sqft)</Label>
@@ -640,7 +565,6 @@ export default function ProductDetail() {
               </div>
             </div>
 
-            {/* Application Areas */}
             <div className="pb-4 border-b border-gray-200">
               <p className="text-gray-500">Application Areas</p>
               <div className="flex flex-wrap gap-2 mt-2">
@@ -656,7 +580,6 @@ export default function ProductDetail() {
               </div>
             </div>
 
-            {/* About Product */}
             <div className="pb-4 border-b border-gray-200">
               <p className="text-gray-500">About Product</p>
               <div className="mt-1">
@@ -684,7 +607,6 @@ export default function ProductDetail() {
               </div>
             </div>
 
-            {/* Action Buttons */}
             <div className="flex flex-wrap gap-4 mb-8">
               <Button
                 onClick={toggleWishlist}
@@ -701,7 +623,7 @@ export default function ProductDetail() {
             </div>
           </div>
         </div>
-        {/* Visualizer Button */}
+
         <div className="pb-4 border-b border-gray-200 mt-4">
           <Button
             onClick={() => setShowVisualizer(!showVisualizer)}
@@ -710,18 +632,16 @@ export default function ProductDetail() {
             {showVisualizer ? "Hide Visualizer" : "Show Product Visualizer"}
           </Button>
         </div>
-        {/* Product Visualizer Section */}
+
         {showVisualizer && product.image.length > 0 && (
           <div className="mt-4">
             <ProductVisualizer productImage={product.image[0]} productName={product.name} />
           </div>
         )}
 
-        {/* Image Gallery Modal */}
         {galleryOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center">
             <div className="relative w-full h-full flex flex-col">
-              {/* Close button */}
               <button
                 onClick={closeGallery}
                 className="absolute top-4 right-4 z-10 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
@@ -730,7 +650,6 @@ export default function ProductDetail() {
                 <X className="h-6 w-6" />
               </button>
 
-              {/* Main image container */}
               <div className="flex-1 flex items-center justify-center p-4">
                 <div className="relative w-full h-full max-w-4xl max-h-[80vh] mx-auto">
                   <Image
@@ -748,7 +667,6 @@ export default function ProductDetail() {
                 </div>
               </div>
 
-              {/* Navigation controls */}
               {product.image.length > 1 && (
                 <>
                   <button
@@ -768,7 +686,6 @@ export default function ProductDetail() {
                 </>
               )}
 
-              {/* Thumbnails at bottom */}
               {product.image.length > 1 && (
                 <div className="p-4 bg-black/70">
                   <div className="flex justify-center gap-2 overflow-x-auto py-2 max-w-4xl mx-auto">

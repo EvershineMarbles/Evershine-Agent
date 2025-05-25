@@ -8,16 +8,22 @@ import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Loader2, Package, FileText, RefreshCw } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 
-// Define interfaces for type safety
 interface OrderItem {
   name: string
   category: string
   price: number
   basePrice?: number
+  updatedPrice?: number // Backend calculated price
   quantity: number
   customQuantity?: number
   customFinish?: string
   customThickness?: string
+  commissionInfo?: {
+    currentAgentCommission: number
+    consultantLevelCommission: number
+    totalCommission: number
+    consultantLevel: string
+  }
 }
 
 interface ShippingAddress {
@@ -38,15 +44,6 @@ interface Order {
   shippingAddress?: ShippingAddress
 }
 
-// Add the CommissionData interface from wishlist page
-interface CommissionData {
-  agentId: string
-  name: string
-  email: string
-  commissionRate: number
-  categoryCommissions?: Record<string, number>
-}
-
 export default function OrdersPage() {
   const params = useParams()
   const router = useRouter()
@@ -58,19 +55,12 @@ export default function OrdersPage() {
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
 
-  // Add commission-related state from wishlist page
-  const [commissionData, setCommissionData] = useState<CommissionData | null>(null)
-  const [overrideCommissionRate, setOverrideCommissionRate] = useState<number | null>(null)
-
-  // Get API URL from environment or use default
   const getApiUrl = () => {
     return process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
   }
 
-  // Get token from localStorage
   const getToken = () => {
     try {
-      // Try both token storage options
       const token = localStorage.getItem("clientImpersonationToken") || localStorage.getItem("token")
       if (!token) {
         setError("No authentication token found. Please log in again.")
@@ -83,133 +73,6 @@ export default function OrdersPage() {
     }
   }
 
-  // Add fetchCommissionData function from wishlist page
-  const fetchCommissionData = async () => {
-    try {
-      const token = getToken()
-      if (!token) return null
-
-      const apiUrl = getApiUrl()
-      const response = await fetch(`${apiUrl}/api/client/agent-commission`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-
-      if (!response.ok) {
-        console.error("Failed to fetch commission data:", response.status)
-        return null
-      }
-
-      const data = await response.json()
-      if (data.success && data.data) {
-        setCommissionData(data.data)
-        return data.data
-      }
-      return null
-    } catch (error) {
-      console.error("Error fetching commission data:", error)
-      return null
-    }
-  }
-
-  // Load saved commission rate from localStorage on component mount
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      // Use a client-specific key for commission rate
-      const savedRate = localStorage.getItem(`commission-override-${clientId}`)
-      if (savedRate) {
-        setOverrideCommissionRate(Number(savedRate))
-      } else {
-        // Reset to null if no saved rate for this client
-        setOverrideCommissionRate(null)
-      }
-    }
-  }, [clientId])
-
-  // Fetch client data to get consultant level
-  useEffect(() => {
-    const fetchClientData = async () => {
-      try {
-        const token = getToken()
-        if (!token) return
-
-        const apiUrl = getApiUrl()
-        const response = await fetch(`${apiUrl}/api/getClientDetails/${clientId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
-
-        if (!response.ok) {
-          console.error("Failed to fetch client data:", response.status)
-          return
-        }
-
-        const data = await response.json()
-        if (data.success && data.data) {
-          // Set commission rate based on consultant level color
-          if (data.data.consultantLevel) {
-            const consultantLevel = data.data.consultantLevel
-            console.log("Client consultant level:", consultantLevel)
-
-            // Map color to commission rate
-            let commissionRate = null
-            switch (consultantLevel) {
-              case "red":
-                commissionRate = 5
-                break
-              case "yellow":
-                commissionRate = 10
-                break
-              case "purple":
-                commissionRate = 15
-                break
-              default:
-                commissionRate = null
-            }
-
-            // Set the override commission rate
-            setOverrideCommissionRate(commissionRate)
-            console.log(`Setting commission rate to ${commissionRate}% based on consultant level ${consultantLevel}`)
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching client data:", error)
-      }
-    }
-
-    fetchClientData()
-  }, [clientId])
-
-  // Calculate adjusted price with commission (from wishlist page)
-  const calculateAdjustedPrice = (item: OrderItem) => {
-    // Always use basePrice (which should be the original price)
-    const basePrice = item.basePrice || item.price
-
-    // Get the default commission rate (from agent or category-specific)
-    let defaultRate = commissionData?.commissionRate || 0
-
-    // Check for category-specific commission
-    if (commissionData?.categoryCommissions && item.category && commissionData.categoryCommissions[item.category]) {
-      defaultRate = commissionData.categoryCommissions[item.category]
-    }
-
-    // Add the override rate to the default rate if an override is set
-    const finalRate = overrideCommissionRate !== null ? defaultRate + overrideCommissionRate : defaultRate
-
-    // Calculate adjusted price based on the original basePrice
-    const adjustedPrice = basePrice * (1 + finalRate / 100)
-
-    console.log(`ORDERS - Calculating price for ${item.name}:`)
-    console.log(`ORDERS - Base price: ${basePrice}`)
-    console.log(`ORDERS - Base commission rate: ${defaultRate}`)
-    console.log(`ORDERS - Override commission rate: ${overrideCommissionRate}`)
-    console.log(`ORDERS - Final commission rate: ${finalRate}`)
-    console.log(`ORDERS - Adjusted price: ${adjustedPrice.toFixed(2)}`)
-
-    return Math.round(adjustedPrice * 100) / 100 // Round to 2 decimal places
-  }
-
-  // Fetch orders
   const fetchOrders = async () => {
     try {
       setLoading(true)
@@ -221,13 +84,10 @@ export default function OrdersPage() {
         return
       }
 
-      // First fetch commission data
-      await fetchCommissionData()
-
       const apiUrl = getApiUrl()
-      console.log("Fetching orders with token:", token.substring(0, 15) + "...")
 
-      const response = await fetch(`${apiUrl}/api/clients/${clientId}/orders`, {
+      // Use client-specific orders endpoint
+      const response = await fetch(`${apiUrl}/api/getClientOrders`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -235,7 +95,6 @@ export default function OrdersPage() {
         },
       })
 
-      // Check for errors
       if (!response.ok) {
         if (response.status === 401) {
           throw new Error("Authentication failed. Please refresh the token and try again.")
@@ -245,19 +104,13 @@ export default function OrdersPage() {
       }
 
       const data = await response.json()
-      console.log("ORDERS - Full API response:", data)
 
-      // Your backend returns { message, data } format
       if (data && Array.isArray(data.data)) {
-        console.log("ORDERS - Orders data:", data.data)
         setOrders(data.data)
       } else {
-        // If data.data is not an array, check if the response itself is an array
         if (Array.isArray(data)) {
-          console.log("ORDERS - Orders data (direct array):", data)
           setOrders(data)
         } else {
-          console.warn("ORDERS - Unexpected response format:", data)
           setOrders([])
         }
       }
@@ -276,12 +129,10 @@ export default function OrdersPage() {
     }
   }
 
-  // Initialize data on component mount
   useEffect(() => {
     fetchOrders()
   }, [clientId, toast])
 
-  // Format date
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleDateString("en-US", {
@@ -291,21 +142,19 @@ export default function OrdersPage() {
     })
   }
 
-  // Calculate order total with adjusted prices
+  // Calculate order total using backend prices
   const calculateAdjustedTotal = (order: Order) => {
     return order.items.reduce((total, item) => {
-      const adjustedPrice = calculateAdjustedPrice(item)
-      return total + adjustedPrice * item.quantity
+      const displayPrice = item.updatedPrice || item.price
+      return total + displayPrice * item.quantity
     }, 0)
   }
 
-  // Handle refresh
   const handleRefresh = () => {
     setRefreshing(true)
     fetchOrders()
   }
 
-  // Loading state
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-[80vh]">
@@ -369,9 +218,7 @@ export default function OrdersPage() {
         </Card>
       ) : (
         <div className="space-y-6">
-          {/* Display only the most recent order */}
           {(() => {
-            // Sort orders by date (newest first) and take the first one
             const sortedOrders = [...orders].sort(
               (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
             )
@@ -421,13 +268,15 @@ export default function OrdersPage() {
                       <h3 className="font-medium mb-2">Items</h3>
                       <div className="space-y-2">
                         {currentOrder.items.map((item, index) => {
-                          const adjustedPrice = calculateAdjustedPrice(item)
+                          const displayPrice = item.updatedPrice || item.price
+                          const hasCommission = item.updatedPrice && item.updatedPrice !== item.price
+                          const originalPrice = item.basePrice || item.price
+
                           return (
                             <div key={index} className="flex justify-between border-b pb-2">
                               <div>
                                 <p className="font-medium">{item.name}</p>
                                 <p className="text-sm text-muted-foreground">{item.category}</p>
-                                {/* Custom specifications */}
                                 {(item.customQuantity || item.customFinish || item.customThickness) && (
                                   <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
                                     {item.customQuantity && <div>Qty: {item.customQuantity} sqft</div>}
@@ -437,25 +286,50 @@ export default function OrdersPage() {
                                 )}
                               </div>
                               <div className="text-right">
-                                <p>
-                                  ₹
-                                  {adjustedPrice.toLocaleString(undefined, {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}{" "}
-                                  × {item.quantity}
-                                </p>
-                                <p className="font-medium">
-                                  ₹
-                                  {(adjustedPrice * item.quantity).toLocaleString(undefined, {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}
-                                </p>
-                                {item.basePrice && item.basePrice !== adjustedPrice && (
-                                  <p className="text-xs text-muted-foreground">
-                                    Base: ₹{item.basePrice.toLocaleString()}
-                                  </p>
+                                {hasCommission ? (
+                                  <div className="space-y-1">
+                                    <p className="text-green-600 font-medium">
+                                      ₹
+                                      {displayPrice.toLocaleString(undefined, {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      })}{" "}
+                                      × {item.quantity}
+                                    </p>
+                                    <p className="text-xs text-gray-500 line-through">
+                                      Base: ₹{originalPrice.toLocaleString()}
+                                    </p>
+                                    <p className="font-medium text-green-600">
+                                      ₹
+                                      {(displayPrice * item.quantity).toLocaleString(undefined, {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      })}
+                                    </p>
+                                    {item.commissionInfo && (
+                                      <p className="text-xs text-gray-600">
+                                        +{item.commissionInfo.totalCommission}% commission
+                                      </p>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div>
+                                    <p>
+                                      ₹
+                                      {displayPrice.toLocaleString(undefined, {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      })}{" "}
+                                      × {item.quantity}
+                                    </p>
+                                    <p className="font-medium">
+                                      ₹
+                                      {(displayPrice * item.quantity).toLocaleString(undefined, {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      })}
+                                    </p>
+                                  </div>
                                 )}
                               </div>
                             </div>

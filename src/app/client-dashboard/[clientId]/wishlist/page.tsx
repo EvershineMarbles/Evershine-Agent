@@ -10,26 +10,24 @@ import { useToast } from "@/components/ui/use-toast"
 import { Input } from "@/components/ui/input"
 import axios from "axios"
 
-// Add the CommissionData interface
-interface CommissionData {
-  agentId: string
-  name: string
-  email: string
-  commissionRate: number
-  categoryCommissions?: Record<string, number>
-}
-
 interface WishlistItem {
   _id: string
   postId: string
   name: string
   price: number
   basePrice?: number
+  updatedPrice?: number // Backend calculated price
   image: string[]
   category: string
   customQuantity?: number
   customFinish?: string
   customThickness?: string
+  commissionInfo?: {
+    currentAgentCommission: number
+    consultantLevelCommission: number
+    totalCommission: number
+    consultantLevel: string
+  }
 }
 
 export default function WishlistPage() {
@@ -56,21 +54,14 @@ export default function WishlistPage() {
     >
   >({})
 
-  // Add commission data state
-  const [commissionData, setCommissionData] = useState<CommissionData | null>(null)
-  const [overrideCommissionRate, setOverrideCommissionRate] = useState<number | null>(null)
-
   const finishOptions = ["Polish", "Leather", "Flute", "River", "Satin", "Dual"]
 
-  // Get API URL from environment or use default
   const getApiUrl = () => {
     return process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
   }
 
-  // Get token from localStorage
   const getToken = () => {
     try {
-      // Try both token storage options
       const token = localStorage.getItem("clientImpersonationToken") || localStorage.getItem("token")
       if (!token) {
         setError("No authentication token found. Please log in again.")
@@ -83,113 +74,6 @@ export default function WishlistPage() {
     }
   }
 
-  // Add fetchCommissionData function
-  const fetchCommissionData = async () => {
-    try {
-      const token = getToken()
-      if (!token) return null
-
-      const apiUrl = getApiUrl()
-      const response = await axios.get(`${apiUrl}/api/client/agent-commission`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-
-      if (response.data.success && response.data.data) {
-        setCommissionData(response.data.data)
-        return response.data.data
-      }
-      return null
-    } catch (error) {
-      console.error("Error fetching commission data:", error)
-      return null
-    }
-  }
-
-  // Add calculateAdjustedPrice function
-  const calculateAdjustedPrice = (item: WishlistItem) => {
-    // Always use basePrice (which should be the original price)
-    const basePrice = item.basePrice || item.price
-
-    // Get the default commission rate (from agent or category-specific)
-    let defaultRate = commissionData?.commissionRate || 0
-
-    // Check for category-specific commission
-    if (commissionData?.categoryCommissions && item.category && commissionData.categoryCommissions[item.category]) {
-      defaultRate = commissionData.categoryCommissions[item.category]
-    }
-
-    // Add the override rate to the default rate if an override is set
-    const finalRate = overrideCommissionRate !== null ? defaultRate + overrideCommissionRate : defaultRate
-
-    // Calculate adjusted price based on the original basePrice
-    const adjustedPrice = basePrice * (1 + finalRate / 100)
-    return Math.round(adjustedPrice * 100) / 100 // Round to 2 decimal places
-  }
-
-  // Load saved commission rate from localStorage on component mount
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      // Use a client-specific key for commission rate
-      const savedRate = localStorage.getItem(`commission-override-${clientId}`)
-      if (savedRate) {
-        setOverrideCommissionRate(Number(savedRate))
-      } else {
-        // Reset to null if no saved rate for this client
-        setOverrideCommissionRate(null)
-      }
-    }
-  }, [clientId])
-
-  // Fetch client data to get consultant level
-  useEffect(() => {
-    const fetchClientData = async () => {
-      try {
-        const token = getToken()
-        if (!token) return
-
-        const apiUrl = getApiUrl()
-        const response = await axios.get(`${apiUrl}/api/getClientDetails/${clientId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
-
-        if (response.data.success && response.data.data) {
-          // Set commission rate based on consultant level color
-          if (response.data.data.consultantLevel) {
-            const consultantLevel = response.data.data.consultantLevel
-            console.log("Client consultant level:", consultantLevel)
-
-            // Map color to commission rate
-            let commissionRate = null
-            switch (consultantLevel) {
-              case "red":
-                commissionRate = 5
-                break
-              case "yellow":
-                commissionRate = 10
-                break
-              case "purple":
-                commissionRate = 15
-                break
-              default:
-                commissionRate = null
-            }
-
-            // Set the override commission rate
-            setOverrideCommissionRate(commissionRate)
-            console.log(`Setting commission rate to ${commissionRate}% based on consultant level ${consultantLevel}`)
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching client data:", error)
-      }
-    }
-
-    fetchClientData()
-  }, [clientId])
-
-  // Fetch wishlist items
   const fetchWishlist = async () => {
     try {
       setLoading(true)
@@ -200,12 +84,10 @@ export default function WishlistPage() {
         return
       }
 
-      // First fetch commission data
-      await fetchCommissionData()
-
       const apiUrl = getApiUrl()
 
-      const response = await axios.get(`${apiUrl}/api/getUserWishlist`, {
+      // Use client-specific wishlist endpoint
+      const response = await axios.get(`${apiUrl}/api/getClientWishlist`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -215,14 +97,12 @@ export default function WishlistPage() {
         const items = response.data.data.items || []
         setWishlistItems(items)
 
-        // Initialize action loading state for each item
         const initialState: Record<string, { removing: boolean; addingToCart: boolean }> = {}
         const initialQuantities: Record<string, number> = {}
 
         items.forEach((item: WishlistItem) => {
           const itemId = item.postId || item._id
           initialState[itemId] = { removing: false, addingToCart: false }
-          // Use customQuantity if available, otherwise default to 1000
           initialQuantities[itemId] = item.customQuantity || 1000
         })
 
@@ -243,7 +123,6 @@ export default function WishlistPage() {
     }
   }
 
-  // Fetch cart count
   const fetchCartCount = async () => {
     try {
       const token = getToken()
@@ -265,13 +144,11 @@ export default function WishlistPage() {
     }
   }
 
-  // Initialize data on component mount
   useEffect(() => {
     fetchWishlist()
     fetchCartCount()
   }, [])
 
-  // Handle quantity change
   const handleQuantityChange = (itemId: string, value: string) => {
     const numValue = Number.parseInt(value)
 
@@ -283,7 +160,6 @@ export default function WishlistPage() {
     }
   }
 
-  // Remove item from wishlist
   const removeFromWishlist = async (productId: string) => {
     try {
       setActionLoading((prev) => ({
@@ -304,7 +180,6 @@ export default function WishlistPage() {
       })
 
       if (response.data.success) {
-        // Update local state
         setWishlistItems((prev) => prev.filter((item) => (item.postId || item._id) !== productId))
 
         toast({
@@ -340,7 +215,6 @@ export default function WishlistPage() {
     }
   }
 
-  // Handle custom field changes
   const handleCustomFieldChange = (itemId: string, field: string, value: string | number) => {
     setEditingCustomFields((prev) => ({
       ...prev,
@@ -351,7 +225,6 @@ export default function WishlistPage() {
     }))
   }
 
-  // Save custom field changes
   const saveCustomFields = async (productId: string) => {
     try {
       const token = getToken()
@@ -378,7 +251,6 @@ export default function WishlistPage() {
       )
 
       if (response.data.success) {
-        // Update local state
         setWishlistItems((prev) =>
           prev.map((item) => {
             const itemId = item.postId || item._id
@@ -394,7 +266,6 @@ export default function WishlistPage() {
           }),
         )
 
-        // Clear editing state
         setEditingCustomFields((prev) => {
           const newState = { ...prev }
           delete newState[productId]
@@ -415,7 +286,6 @@ export default function WishlistPage() {
     }
   }
 
-  // Add item to cart
   const addToCart = async (productId: string) => {
     try {
       setActionLoading((prev) => ({
@@ -428,30 +298,22 @@ export default function WishlistPage() {
 
       const apiUrl = getApiUrl()
 
-      // Get the quantity for this product
       const quantity = quantities[productId] || 1000
 
-      // Find the item to get its data
       const item = wishlistItems.find((item) => (item.postId || item._id) === productId)
 
-      // Get custom fields (either from editing state or original item)
       const customFields = editingCustomFields[productId] || {
         customQuantity: item?.customQuantity,
         customFinish: item?.customFinish,
         customThickness: item?.customThickness,
       }
 
-      const originalPrice = item ? item.basePrice || item.price : 0
-      const adjustedPrice = item ? calculateAdjustedPrice(item) : 0
-
-      console.log("WISHLIST - Adding to cart with custom fields:", customFields)
-
+      // Add to cart - let backend calculate price
       const response = await axios.post(
         `${apiUrl}/api/addToCart`,
         {
           productId,
           quantity,
-          price: originalPrice,
           customQuantity: customFields.customQuantity,
           customFinish: customFields.customFinish,
           customThickness: customFields.customThickness,
@@ -464,7 +326,6 @@ export default function WishlistPage() {
       )
 
       if (response.data.success) {
-        // Then remove from wishlist
         await axios.delete(`${apiUrl}/api/deleteUserWishlistItem`, {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -472,7 +333,6 @@ export default function WishlistPage() {
           data: { productId },
         })
 
-        // Update local state
         setWishlistItems((prev) => prev.filter((item) => (item.postId || item._id) !== productId))
         setCartCount((prev) => prev + 1)
 
@@ -506,19 +366,16 @@ export default function WishlistPage() {
     }
   }
 
-  // Handle refresh
   const handleRefresh = () => {
     setRefreshing(true)
     fetchWishlist()
     fetchCartCount()
   }
 
-  // Handle login
   const handleLogin = () => {
     router.push("/agent-login")
   }
 
-  // Loading state
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-[80vh]">
@@ -528,7 +385,6 @@ export default function WishlistPage() {
     )
   }
 
-  // Error state
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center h-[60vh] p-6">
@@ -600,7 +456,9 @@ export default function WishlistPage() {
           <div className="divide-y divide-border">
             {wishlistItems.map((item) => {
               const itemId = item.postId || item._id
-              const adjustedPrice = calculateAdjustedPrice(item)
+              const displayPrice = item.updatedPrice || item.price
+              const hasCommission = item.updatedPrice && item.updatedPrice !== item.price
+              const originalPrice = item.basePrice || item.price
               const isEditing = editingCustomFields[itemId]
               const currentCustomFields = isEditing || {
                 customQuantity: item.customQuantity,
@@ -622,15 +480,32 @@ export default function WishlistPage() {
                   <div className="md:ml-4 flex-grow">
                     <h3 className="font-medium">{item.name || "Unknown Product"}</h3>
                     <p className="text-sm text-muted-foreground">{item.category || "Uncategorized"}</p>
+
+                    {/* DISPLAY BACKEND CALCULATED PRICE */}
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2">
-                      <span className="font-semibold">₹{adjustedPrice.toLocaleString()}</span>
+                      {hasCommission ? (
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-green-600">₹{displayPrice.toLocaleString()}</span>
+                            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+                              Commission Applied ✓
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-500 line-through">₹{originalPrice.toLocaleString()}</p>
+                          {item.commissionInfo && (
+                            <p className="text-xs text-gray-600">
+                              +{item.commissionInfo.totalCommission}% total commission
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="font-semibold">₹{displayPrice.toLocaleString()}</span>
+                      )}
                     </div>
 
-                    {/* Custom Fields Display/Edit */}
                     <div className="mt-4 space-y-3 bg-muted/20 p-3 rounded-md">
                       <h4 className="text-sm font-medium">Custom Specifications</h4>
 
-                      {/* Custom Quantity */}
                       <div className="flex items-center gap-2">
                         <label className="text-sm text-muted-foreground w-20">Quantity:</label>
                         {isEditing ? (
@@ -648,7 +523,6 @@ export default function WishlistPage() {
                         )}
                       </div>
 
-                      {/* Custom Finish */}
                       <div className="flex items-center gap-2">
                         <label className="text-sm text-muted-foreground w-20">Finish:</label>
                         {isEditing ? (
@@ -669,7 +543,6 @@ export default function WishlistPage() {
                         )}
                       </div>
 
-                      {/* Custom Thickness */}
                       <div className="flex items-center gap-2">
                         <label className="text-sm text-muted-foreground w-20">Thickness:</label>
                         {isEditing ? (
@@ -687,7 +560,6 @@ export default function WishlistPage() {
                         )}
                       </div>
 
-                      {/* Edit/Save buttons */}
                       <div className="flex gap-2">
                         {isEditing ? (
                           <>
