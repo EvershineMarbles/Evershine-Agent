@@ -264,7 +264,7 @@ export default function ProductsPage() {
     }
   }, [])
 
-  // Ultra fast fetch products function (1 second timeout)
+  // Super fast fetch products function (faster timeouts)
   const silentFetchProductsFast = useCallback(async () => {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
@@ -284,7 +284,7 @@ export default function ProductsPage() {
       const response = await fetch(endpoint, {
         method: "GET",
         headers,
-        signal: AbortSignal.timeout(1000), // Ultra fast timeout - 1 second only
+        signal: AbortSignal.timeout(3000), // Faster timeout - 3 seconds
       })
 
       if (!response.ok) {
@@ -311,7 +311,7 @@ export default function ProductsPage() {
       }
     } catch (error) {
       // Silently fail - no error handling
-      console.log("Ultra fast refresh failed, continuing...")
+      console.log("Fast refresh failed, continuing...")
     }
   }, [])
 
@@ -334,7 +334,7 @@ export default function ProductsPage() {
     router.push(`/client-dashboard/${clientId}/wishlist`)
   }
 
-  // Handle consultant level change with auto-save (ULTRA FAST VERSION - 1 SECOND)
+  // Handle consultant level change with auto-save (SUPER FAST VERSION)
   const handleConsultantLevelChange = async (level: string) => {
     // INSTANT UI UPDATE - Don't wait for anything
     setClientData((prev: any) => ({ ...prev, consultantLevel: level }))
@@ -343,7 +343,7 @@ export default function ProductsPage() {
     const token = localStorage.getItem("clientImpersonationToken")
     if (!token) return
 
-    // Fire and forget - update in background with ultra fast timeout
+    // Fire and forget - update in background with faster timeout
     fetch(`${process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"}/api/update-client`, {
       method: "POST",
       headers: {
@@ -354,10 +354,10 @@ export default function ProductsPage() {
         ...clientData,
         consultantLevel: level,
       }),
-      signal: AbortSignal.timeout(1000), // Ultra fast timeout - 1 second
+      signal: AbortSignal.timeout(2000), // Super fast timeout - 2 seconds
     })
       .then(() => {
-        // Immediate product refresh with ultra fast timeout
+        // Immediate product refresh with faster timeout
         silentFetchProductsFast()
       })
       .catch((error) => {
