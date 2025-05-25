@@ -283,45 +283,37 @@ export default function ProductsPage() {
     router.push(`/client-dashboard/${clientId}/wishlist`)
   }
 
-  // Handle consultant level change with INSTANT UI update, backend calculations only
+  // Handle consultant level change with auto-save (FAST VERSION - NO WAITING)
   const handleConsultantLevelChange = async (level: string) => {
-    try {
-      const token = localStorage.getItem("clientImpersonationToken")
-      if (!token) {
-        return // Silently fail
-      }
+    // INSTANT UI UPDATE - Don't wait for anything
+    setClientData((prev: any) => ({ ...prev, consultantLevel: level }))
 
-      // INSTANTLY update the UI state only
-      setClientData((prev: any) => ({ ...prev, consultantLevel: level }))
+    // Background API calls - don't wait for them
+    const token = localStorage.getItem("clientImpersonationToken")
+    if (!token) return
 
-      // Background API call (don't wait for it)
-      fetch(`${process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"}/api/update-client`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          ...clientData,
-          consultantLevel: level,
-        }),
+    // Fire and forget - update in background
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"}/api/update-client`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        ...clientData,
+        consultantLevel: level,
+      }),
+      signal: AbortSignal.timeout(5000), // Faster timeout
+    })
+      .then(() => {
+        // Only refresh products after successful update
+        silentFetchProducts()
       })
-        .then((response) => {
-          if (response.ok) {
-            // Silently refresh products from backend after API call completes
-            silentFetchProducts()
-          }
-        })
-        .catch((error) => {
-          console.error("Background API call failed:", error)
-          // Revert on failure
-          setClientData((prev: any) => ({ ...prev, consultantLevel: clientData?.consultantLevel || "red" }))
-        })
-    } catch (error: any) {
-      console.error("Error updating consultant level:", error)
-      // Revert the optimistic update
-      setClientData((prev: any) => ({ ...prev, consultantLevel: clientData?.consultantLevel || "red" }))
-    }
+      .catch((error) => {
+        console.error("Background update failed:", error)
+        // Revert on failure
+        setClientData((prev: any) => ({ ...prev, consultantLevel: clientData?.consultantLevel || "red" }))
+      })
   }
 
   // Update the toggleWishlist function
