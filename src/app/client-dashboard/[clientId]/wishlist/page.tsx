@@ -223,6 +223,14 @@ export default function WishlistPage() {
         [field]: value,
       },
     }))
+
+    // Sync main quantity field when custom quantity changes
+    if (field === "customQuantity" && typeof value === "number" && value > 0) {
+      setQuantities((prev) => ({
+        ...prev,
+        [itemId]: value,
+      }))
+    }
   }
 
   const saveCustomFields = async (productId: string) => {
@@ -266,6 +274,14 @@ export default function WishlistPage() {
           }),
         )
 
+        // Sync the main quantity field with custom quantity
+        if (customFields.customQuantity) {
+          setQuantities((prev) => ({
+            ...prev,
+            [productId]: customFields.customQuantity,
+          }))
+        }
+
         setEditingCustomFields((prev) => {
           const newState = { ...prev }
           delete newState[productId]
@@ -274,7 +290,7 @@ export default function WishlistPage() {
 
         toast({
           title: "Custom fields updated",
-          description: "Your custom specifications have been saved",
+          description: "Your custom specifications have been saved and quantity synced",
         })
       }
     } catch (error) {

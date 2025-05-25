@@ -95,6 +95,21 @@ export default function CartPage() {
         [field]: value,
       },
     }))
+
+    // Sync main quantity field when custom quantity changes
+    if (field === "customQuantity" && typeof value === "number" && value > 0) {
+      setCartItems((prev) =>
+        prev.map((item) => {
+          if (item.postId === itemId) {
+            return {
+              ...item,
+              quantity: value,
+            }
+          }
+          return item
+        }),
+      )
+    }
   }
 
   const saveCustomFields = async (productId: string) => {
@@ -132,6 +147,8 @@ export default function CartPage() {
                   customQuantity: customFields.customQuantity,
                   customFinish: customFields.customFinish,
                   customThickness: customFields.customThickness,
+                  // Sync the main quantity with custom quantity
+                  quantity: customFields.customQuantity || item.quantity,
                 }
               }
               return item
@@ -146,7 +163,7 @@ export default function CartPage() {
 
           toast({
             title: "Custom fields updated",
-            description: "Your custom specifications have been saved",
+            description: "Your custom specifications have been saved and quantity synced",
           })
         }
       }
