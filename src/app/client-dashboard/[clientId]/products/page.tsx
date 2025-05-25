@@ -65,6 +65,7 @@ export default function ProductsPage() {
   const [error, setError] = useState<string | null>(null)
   const [clientData, setClientData] = useState<any>(null)
   const [wishlistLoading, setWishlistLoading] = useState(false)
+  const [levelChanging, setLevelChanging] = useState(false)
 
   // Fetch wishlist from backend
   const fetchWishlist = useCallback(async () => {
@@ -139,7 +140,7 @@ export default function ProductsPage() {
     }
   }, [cart, clientId])
 
-  // Fetch products function - NOW USES CLIENT-SPECIFIC ENDPOINT
+  // Fast fetch products function with shorter timeout
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true)
@@ -162,7 +163,7 @@ export default function ProductsPage() {
       const response = await fetch(endpoint, {
         method: "GET",
         headers,
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(5000), // Reduced timeout to 5 seconds
       })
 
       if (!response.ok) {
@@ -213,7 +214,7 @@ export default function ProductsPage() {
     }
   }, [toast])
 
-  // Silent fetch products function (no loading states or error toasts)
+  // Fast silent fetch products function (no loading states or error toasts)
   const silentFetchProducts = useCallback(async () => {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
@@ -233,7 +234,7 @@ export default function ProductsPage() {
       const response = await fetch(endpoint, {
         method: "GET",
         headers,
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(3000), // Very fast timeout for silent refresh
       })
 
       if (!response.ok) {
@@ -278,17 +279,21 @@ export default function ProductsPage() {
     return () => clearInterval(interval)
   }, [silentFetchProducts])
 
-  // Handle consultant level change with auto-save (NO TOAST MESSAGES)
+  // Handle consultant level change with FAST backend-only calculation
   const handleConsultantLevelChange = async (level: string) => {
+    if (levelChanging) return // Prevent multiple rapid clicks
+
     try {
+      setLevelChanging(true)
       const token = localStorage.getItem("clientImpersonationToken")
       if (!token) {
         return // Silently fail
       }
 
-      // Optimistically update the UI
+      // Optimistically update UI level indicator
       setClientData((prev: any) => ({ ...prev, consultantLevel: level }))
 
+      // Fast API call with short timeout
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"}/api/update-client`,
         {
@@ -301,6 +306,7 @@ export default function ProductsPage() {
             ...clientData,
             consultantLevel: level,
           }),
+          signal: AbortSignal.timeout(3000), // Fast 3-second timeout
         },
       )
 
@@ -308,14 +314,14 @@ export default function ProductsPage() {
         throw new Error(`API error: ${response.status} ${response.statusText}`)
       }
 
-      // NO TOAST MESSAGE - Silent update
-      // Refresh products to get updated pricing
-      silentFetchProducts()
+      // Immediately fetch updated products with backend-calculated prices
+      await silentFetchProducts()
     } catch (error: any) {
       console.error("Error updating consultant level:", error)
       // Revert the optimistic update
       setClientData((prev: any) => ({ ...prev, consultantLevel: clientData?.consultantLevel || "red" }))
-      // NO TOAST MESSAGE - Silent failure
+    } finally {
+      setLevelChanging(false)
     }
   }
 
@@ -621,23 +627,26 @@ export default function ProductsPage() {
               <div className="flex items-center gap-2 mr-2">
                 <button
                   onClick={() => handleConsultantLevelChange("red")}
+                  disabled={levelChanging}
                   className={`w-6 h-6 rounded-full bg-red-500 hover:bg-red-600 transition-all ${
                     clientData?.consultantLevel === "red" ? "ring-2 ring-red-300 scale-110" : "hover:scale-105"
-                  }`}
+                  } ${levelChanging ? "opacity-50 cursor-not-allowed" : ""}`}
                   title="Red Level"
                 />
                 <button
                   onClick={() => handleConsultantLevelChange("yellow")}
+                  disabled={levelChanging}
                   className={`w-6 h-6 rounded-full bg-yellow-500 hover:bg-yellow-600 transition-all ${
                     clientData?.consultantLevel === "yellow" ? "ring-2 ring-yellow-300 scale-110" : "hover:scale-105"
-                  }`}
+                  } ${levelChanging ? "opacity-50 cursor-not-allowed" : ""}`}
                   title="Yellow Level"
                 />
                 <button
                   onClick={() => handleConsultantLevelChange("purple")}
+                  disabled={levelChanging}
                   className={`w-6 h-6 rounded-full bg-purple-600 hover:bg-purple-700 transition-all ${
                     clientData?.consultantLevel === "purple" ? "ring-2 ring-purple-300 scale-110" : "hover:scale-105"
-                  }`}
+                  } ${levelChanging ? "opacity-50 cursor-not-allowed" : ""}`}
                   title="Purple Level"
                 />
               </div>
