@@ -4,13 +4,12 @@ import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode, MoreVertical } from "lucide-react"
+import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode } from "lucide-react"
 import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { Button } from "@/components/ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 // Define the Product interface with updatedPrice
 interface Product {
@@ -553,18 +552,58 @@ export default function ProductsPage() {
 
   return (
     <ErrorBoundary>
-      {/* Gradient bar showing consultant level */}
-      <div
-        className={`h-1 w-full ${
-          clientData?.consultantLevel === "red"
-            ? "bg-gradient-to-r from-red-400 to-red-600"
-            : clientData?.consultantLevel === "yellow"
-              ? "bg-gradient-to-r from-yellow-400 to-yellow-600"
-              : clientData?.consultantLevel === "purple"
-                ? "bg-gradient-to-r from-purple-400 to-purple-600"
-                : "bg-gradient-to-r from-red-400 to-red-600"
-        }`}
-      />
+      {/* Enhanced gradient bar with clickable sections */}
+      <div className="flex h-3 w-full rounded-full overflow-hidden mb-4 shadow-sm">
+        <button
+          onClick={() => handleConsultantLevelChange("red")}
+          className={`flex-1 bg-gradient-to-r from-red-400 to-red-600 hover:from-red-500 hover:to-red-700 transition-all duration-200 relative ${
+            clientData?.consultantLevel === "red" ? "ring-2 ring-red-300 ring-offset-1" : ""
+          }`}
+          title="Red Level (+5%)"
+        >
+          {clientData?.consultantLevel === "red" && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-2 h-2 bg-white rounded-full shadow-sm"></div>
+            </div>
+          )}
+        </button>
+        <button
+          onClick={() => handleConsultantLevelChange("yellow")}
+          className={`flex-1 bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 transition-all duration-200 relative ${
+            clientData?.consultantLevel === "yellow" ? "ring-2 ring-yellow-300 ring-offset-1" : ""
+          }`}
+          title="Yellow Level (+10%)"
+        >
+          {clientData?.consultantLevel === "yellow" && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-2 h-2 bg-white rounded-full shadow-sm"></div>
+            </div>
+          )}
+        </button>
+        <button
+          onClick={() => handleConsultantLevelChange("purple")}
+          className={`flex-1 bg-gradient-to-r from-purple-400 to-purple-600 hover:from-purple-500 hover:to-purple-700 transition-all duration-200 relative ${
+            clientData?.consultantLevel === "purple" ? "ring-2 ring-purple-300 ring-offset-1" : ""
+          }`}
+          title="Purple Level (+15%)"
+        >
+          {clientData?.consultantLevel === "purple" && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-2 h-2 bg-white rounded-full shadow-sm"></div>
+            </div>
+          )}
+        </button>
+      </div>
+
+      {/* Level indicator text */}
+      <div className="text-center mb-6">
+        <p className="text-sm text-gray-600">
+          Current Level: <span className="font-semibold capitalize">{clientData?.consultantLevel || "red"}</span>
+          {clientData?.consultantLevel === "red" && " (+5%)"}
+          {clientData?.consultantLevel === "yellow" && " (+10%)"}
+          {clientData?.consultantLevel === "purple" && " (+15%)"}
+        </p>
+      </div>
 
       <div className="p-6 md:p-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
@@ -606,57 +645,6 @@ export default function ProductsPage() {
                 </span>
               )}
             </Link>
-
-            {/* 3-dot menu for consultant level */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-                  aria-label="Consultant Level Settings"
-                >
-                  <MoreVertical className="h-6 w-6 text-gray-600" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <div className="px-3 py-2 text-sm font-medium text-gray-700 border-b">Consultant Level</div>
-                <DropdownMenuItem
-                  onClick={() => handleConsultantLevelChange("red")}
-                  className="flex items-center gap-3 cursor-pointer"
-                >
-                  <div
-                    className={`w-4 h-4 rounded-full bg-red-500 ${
-                      clientData?.consultantLevel === "red" ? "ring-2 ring-red-200" : ""
-                    }`}
-                  />
-                  <span>Red Level (+5%)</span>
-                  {clientData?.consultantLevel === "red" && <span className="ml-auto text-green-600">✓</span>}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => handleConsultantLevelChange("yellow")}
-                  className="flex items-center gap-3 cursor-pointer"
-                >
-                  <div
-                    className={`w-4 h-4 rounded-full bg-yellow-500 ${
-                      clientData?.consultantLevel === "yellow" ? "ring-2 ring-yellow-200" : ""
-                    }`}
-                  />
-                  <span>Yellow Level (+10%)</span>
-                  {clientData?.consultantLevel === "yellow" && <span className="ml-auto text-green-600">✓</span>}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => handleConsultantLevelChange("purple")}
-                  className="flex items-center gap-3 cursor-pointer"
-                >
-                  <div
-                    className={`w-4 h-4 rounded-full bg-purple-600 ${
-                      clientData?.consultantLevel === "purple" ? "ring-2 ring-purple-200" : ""
-                    }`}
-                  />
-                  <span>Purple Level (+15%)</span>
-                  {clientData?.consultantLevel === "purple" && <span className="ml-auto text-green-600">✓</span>}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
         </div>
 
