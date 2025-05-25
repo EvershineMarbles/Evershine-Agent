@@ -467,126 +467,116 @@ export default function WishlistPage() {
               }
 
               return (
-                <div key={itemId} className="p-4 flex flex-col md:flex-row md:items-start">
-                  <div className="relative h-20 w-20 rounded-md overflow-hidden flex-shrink-0 mb-4 md:mb-0">
-                    <Image
-                      src={item.image && item.image.length > 0 ? item.image[0] : "/placeholder.svg?height=80&width=80"}
-                      alt={item.name}
-                      fill
-                      className="object-cover"
-                      unoptimized={true}
-                    />
-                  </div>
-                  <div className="md:ml-4 flex-grow">
-                    <h3 className="font-medium">{item.name || "Unknown Product"}</h3>
-                    <p className="text-sm text-muted-foreground">{item.category || "Uncategorized"}</p>
+                <div key={itemId} className="p-6">
+                  {/* Main Product Row */}
+                  <div className="flex flex-col md:flex-row gap-6">
+                    {/* Product Image */}
+                    <Link href={`/client-dashboard/${clientId}/product/${itemId}`} className="flex-shrink-0">
+                      <div className="relative h-32 w-32 md:h-28 md:w-28 rounded-lg overflow-hidden border-2 border-gray-100 hover:border-primary/30 transition-all duration-200 hover:shadow-md cursor-pointer group">
+                        <Image
+                          src={
+                            item.image && item.image.length > 0
+                              ? item.image[0]
+                              : "/placeholder.svg?height=128&width=128"
+                          }
+                          alt={item.name}
+                          fill
+                          className="object-cover group-hover:scale-105 transition-transform duration-200"
+                          unoptimized={true}
+                        />
+                      </div>
+                    </Link>
 
-                    {/* DISPLAY BACKEND CALCULATED PRICE */}
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2">
-                      {hasCommission ? (
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-green-600">₹{displayPrice.toLocaleString()}</span>
-                            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
-                              Commission Applied ✓
-                            </span>
+                    {/* Product Details */}
+                    <div className="flex-grow min-w-0">
+                      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4">
+                        <div className="flex-grow">
+                          <Link href={`/client-dashboard/${clientId}/product/${itemId}`} className="block group">
+                            <h3 className="font-semibold text-lg text-gray-900 group-hover:text-primary transition-colors duration-200 cursor-pointer line-clamp-2">
+                              {item.name || "Unknown Product"}
+                            </h3>
+                          </Link>
+                          <p className="text-sm text-gray-500 mt-1">{item.category || "Uncategorized"}</p>
+
+                          {/* Price Display */}
+                          <div className="mt-3">
+                            {hasCommission ? (
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-bold text-xl text-green-600">
+                                    ₹{displayPrice.toLocaleString()}
+                                  </span>
+                                  <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
+                                    Commission Applied ✓
+                                  </span>
+                                </div>
+                                <p className="text-sm text-gray-500 line-through">₹{originalPrice.toLocaleString()}</p>
+                                {item.commissionInfo && (
+                                  <p className="text-xs text-gray-600">
+                                    +{item.commissionInfo.totalCommission}% total commission
+                                  </p>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="font-bold text-xl text-primary">₹{displayPrice.toLocaleString()}</span>
+                            )}
                           </div>
-                          <p className="text-sm text-gray-500 line-through">₹{originalPrice.toLocaleString()}</p>
-                          {item.commissionInfo && (
-                            <p className="text-xs text-gray-600">
-                              +{item.commissionInfo.totalCommission}% total commission
-                            </p>
-                          )}
                         </div>
-                      ) : (
-                        <span className="font-semibold">₹{displayPrice.toLocaleString()}</span>
-                      )}
-                    </div>
 
-                    <div className="mt-4 space-y-3 bg-muted/20 p-3 rounded-md">
-                      <h4 className="text-sm font-medium">Custom Specifications</h4>
-
-                      <div className="flex items-center gap-2">
-                        <label className="text-sm text-muted-foreground w-20">Quantity:</label>
-                        {isEditing ? (
-                          <Input
-                            type="number"
-                            value={currentCustomFields.customQuantity || ""}
-                            onChange={(e) => handleCustomFieldChange(itemId, "customQuantity", Number(e.target.value))}
-                            className="h-8 w-24"
-                            placeholder="sqft"
-                          />
-                        ) : (
-                          <span className="text-sm">
-                            {item.customQuantity ? `${item.customQuantity} sqft` : "Not specified"}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <label className="text-sm text-muted-foreground w-20">Finish:</label>
-                        {isEditing ? (
-                          <select
-                            value={currentCustomFields.customFinish || ""}
-                            onChange={(e) => handleCustomFieldChange(itemId, "customFinish", e.target.value)}
-                            className="h-8 px-2 border rounded text-sm"
-                          >
-                            <option value="">Select finish</option>
-                            {finishOptions.map((option) => (
-                              <option key={option} value={option}>
-                                {option}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <span className="text-sm">{item.customFinish || "Not specified"}</span>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <label className="text-sm text-muted-foreground w-20">Thickness:</label>
-                        {isEditing ? (
-                          <Input
-                            type="text"
-                            value={currentCustomFields.customThickness || ""}
-                            onChange={(e) => handleCustomFieldChange(itemId, "customThickness", e.target.value)}
-                            className="h-8 w-24"
-                            placeholder="mm"
-                          />
-                        ) : (
-                          <span className="text-sm">
-                            {item.customThickness ? `${item.customThickness} mm` : "Not specified"}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex gap-2">
-                        {isEditing ? (
-                          <>
+                        {/* Actions Section */}
+                        <div className="flex flex-col sm:flex-row lg:flex-col xl:flex-row items-start sm:items-center lg:items-end xl:items-center gap-4 lg:flex-shrink-0">
+                          <div className="flex items-center gap-3">
+                            <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Qty:</label>
+                            <div className="flex items-center border-2 border-gray-200 rounded-lg overflow-hidden focus-within:border-primary">
+                              <Input
+                                type="number"
+                                min="1"
+                                value={quantities[itemId] || 1000}
+                                onChange={(e) => handleQuantityChange(itemId, e.target.value)}
+                                className="h-10 w-20 text-center border-0 focus:ring-0 focus:border-0"
+                              />
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => addToCart(itemId)}
+                              disabled={actionLoading[itemId]?.addingToCart}
+                              className="flex items-center gap-2 px-4 py-2"
+                            >
+                              {actionLoading[itemId]?.addingToCart ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <ShoppingCart className="h-4 w-4" />
+                              )}
+                              Add to Cart
+                            </Button>
                             <Button
                               variant="outline"
-                              size="sm"
-                              onClick={() => saveCustomFields(itemId)}
-                              className="h-7 text-xs"
+                              size="icon"
+                              onClick={() => removeFromWishlist(itemId)}
+                              disabled={actionLoading[itemId]?.removing}
+                              className="text-red-500 hover:text-red-700 hover:bg-red-50 border-red-200 h-10 w-10 flex-shrink-0"
                             >
-                              Save
+                              {actionLoading[itemId]?.removing ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() =>
-                                setEditingCustomFields((prev) => {
-                                  const newState = { ...prev }
-                                  delete newState[itemId]
-                                  return newState
-                                })
-                              }
-                              className="h-7 text-xs"
-                            >
-                              Cancel
-                            </Button>
-                          </>
-                        ) : (
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Custom Specifications */}
+                  {(item.customQuantity || item.customFinish || item.customThickness || isEditing) && (
+                    <div className="mt-6 bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-sm font-semibold text-gray-900">Custom Specifications</h4>
+                        {!isEditing && (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -600,55 +590,99 @@ export default function WishlistPage() {
                                 },
                               }))
                             }
-                            className="h-7 text-xs"
+                            className="h-8 text-xs px-3 text-primary hover:text-primary/80"
                           >
                             Edit Specs
                           </Button>
                         )}
                       </div>
-                    </div>
-                  </div>
 
-                  <div className="flex flex-col md:flex-row items-center gap-4 mt-4 md:mt-0">
-                    <div className="flex items-center">
-                      <Input
-                        type="number"
-                        min="1"
-                        value={quantities[itemId] || 1000}
-                        onChange={(e) => handleQuantityChange(itemId, e.target.value)}
-                        className="h-9 w-24 text-center"
-                      />
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium text-gray-600 uppercase tracking-wide">Quantity</label>
+                          {isEditing ? (
+                            <Input
+                              type="number"
+                              value={currentCustomFields.customQuantity || ""}
+                              onChange={(e) =>
+                                handleCustomFieldChange(itemId, "customQuantity", Number(e.target.value))
+                              }
+                              className="h-9 text-sm"
+                              placeholder="sqft"
+                            />
+                          ) : (
+                            <p className="text-sm font-medium text-gray-900">
+                              {item.customQuantity ? `${item.customQuantity} sqft` : "Not specified"}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium text-gray-600 uppercase tracking-wide">Finish</label>
+                          {isEditing ? (
+                            <select
+                              value={currentCustomFields.customFinish || ""}
+                              onChange={(e) => handleCustomFieldChange(itemId, "customFinish", e.target.value)}
+                              className="h-9 w-full px-3 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+                            >
+                              <option value="">Select finish</option>
+                              {finishOptions.map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <p className="text-sm font-medium text-gray-900">{item.customFinish || "Not specified"}</p>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium text-gray-600 uppercase tracking-wide">Thickness</label>
+                          {isEditing ? (
+                            <Input
+                              type="text"
+                              value={currentCustomFields.customThickness || ""}
+                              onChange={(e) => handleCustomFieldChange(itemId, "customThickness", e.target.value)}
+                              className="h-9 text-sm"
+                              placeholder="mm"
+                            />
+                          ) : (
+                            <p className="text-sm font-medium text-gray-900">
+                              {item.customThickness ? `${item.customThickness} mm` : "Not specified"}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {isEditing && (
+                        <div className="flex gap-3 mt-4 pt-4 border-t border-gray-200">
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => saveCustomFields(itemId)}
+                            className="h-8 text-xs px-4"
+                          >
+                            Save Changes
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              setEditingCustomFields((prev) => {
+                                const newState = { ...prev }
+                                delete newState[itemId]
+                                return newState
+                              })
+                            }
+                            className="h-8 text-xs px-4"
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => addToCart(itemId)}
-                        disabled={actionLoading[itemId]?.addingToCart}
-                        className="flex items-center"
-                      >
-                        {actionLoading[itemId]?.addingToCart ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        ) : (
-                          <ShoppingCart className="h-4 w-4 mr-2" />
-                        )}
-                        Add to Cart
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeFromWishlist(itemId)}
-                        disabled={actionLoading[itemId]?.removing}
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                      >
-                        {actionLoading[itemId]?.removing ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
+                  )}
                 </div>
               )
             })}

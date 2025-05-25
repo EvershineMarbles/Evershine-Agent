@@ -492,47 +492,132 @@ export default function CartPage() {
                   }
 
                   return (
-                    <div key={item.postId} className="p-6 flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                      <div className="relative h-24 w-24 rounded-md overflow-hidden flex-shrink-0 border">
-                        <Image
-                          src={
-                            item.image && item.image.length > 0 ? item.image[0] : "/placeholder.svg?height=96&width=96"
-                          }
-                          alt={item.name}
-                          fill
-                          className="object-cover"
-                        />
-                      </div>
-                      <div className="flex-grow">
-                        <h3 className="font-medium text-lg">{item.name}</h3>
-                        <p className="text-sm text-muted-foreground mb-2">{item.category}</p>
+                    <div key={item.postId} className="p-6">
+                      {/* Main Product Row */}
+                      <div className="flex flex-col md:flex-row gap-6">
+                        {/* Product Image */}
+                        <Link href={`/client-dashboard/${clientId}/product/${item.postId}`} className="flex-shrink-0">
+                          <div className="relative h-32 w-32 md:h-28 md:w-28 rounded-lg overflow-hidden border-2 border-gray-100 hover:border-primary/30 transition-all duration-200 hover:shadow-md cursor-pointer group">
+                            <Image
+                              src={
+                                item.image && item.image.length > 0
+                                  ? item.image[0]
+                                  : "/placeholder.svg?height=128&width=128"
+                              }
+                              alt={item.name}
+                              fill
+                              className="object-cover group-hover:scale-105 transition-transform duration-200"
+                            />
+                          </div>
+                        </Link>
 
-                        {/* DISPLAY BACKEND CALCULATED PRICE */}
-                        {hasCommission ? (
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <p className="font-semibold text-lg text-green-600">₹{displayPrice.toLocaleString()}</p>
-                              <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
-                                Commission Applied ✓
-                              </span>
+                        {/* Product Details */}
+                        <div className="flex-grow min-w-0">
+                          <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
+                            <div className="flex-grow">
+                              <Link
+                                href={`/client-dashboard/${clientId}/product/${item.postId}`}
+                                className="block group"
+                              >
+                                <h3 className="font-semibold text-lg text-gray-900 group-hover:text-primary transition-colors duration-200 cursor-pointer line-clamp-2">
+                                  {item.name}
+                                </h3>
+                              </Link>
+                              <p className="text-sm text-gray-500 mt-1">{item.category}</p>
+
+                              {/* Price Display */}
+                              <div className="mt-3">
+                                {hasCommission ? (
+                                  <div className="space-y-1">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="font-bold text-xl text-green-600">
+                                        ₹{displayPrice.toLocaleString()}
+                                      </span>
+                                      <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
+                                        Commission Applied ✓
+                                      </span>
+                                    </div>
+                                    <p className="text-sm text-gray-500 line-through">
+                                      ₹{originalPrice.toLocaleString()}
+                                    </p>
+                                    {item.commissionInfo && (
+                                      <p className="text-xs text-gray-600">
+                                        +{item.commissionInfo.totalCommission}% total commission
+                                      </p>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="font-bold text-xl text-primary">
+                                    ₹{displayPrice.toLocaleString()}
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                            <p className="text-sm text-gray-500 line-through">₹{originalPrice.toLocaleString()}</p>
-                            {item.commissionInfo && (
-                              <p className="text-xs text-gray-600">
-                                +{item.commissionInfo.totalCommission}% total commission
-                              </p>
+
+                            {/* Quantity and Actions */}
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 md:flex-shrink-0">
+                              <div className="flex items-center gap-3">
+                                <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Qty:</label>
+                                <div className="flex items-center border-2 border-gray-200 rounded-lg overflow-hidden focus-within:border-primary">
+                                  <Input
+                                    type="number"
+                                    min="1"
+                                    value={item.quantity}
+                                    onChange={(e) => handleQuantityChange(item.postId, e.target.value)}
+                                    className="h-10 w-20 text-center border-0 focus:ring-0 focus:border-0"
+                                    disabled={updating[item.postId]}
+                                  />
+                                </div>
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => removeFromCart(item.postId)}
+                                disabled={removing[item.postId]}
+                                className="text-red-500 hover:text-red-700 hover:bg-red-50 border-red-200 h-10 w-10 flex-shrink-0"
+                              >
+                                {removing[item.postId] ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Custom Specifications */}
+                      {(item.customQuantity || item.customFinish || item.customThickness || isEditing) && (
+                        <div className="mt-6 bg-gray-50 rounded-lg p-4 border border-gray-200">
+                          <div className="flex items-center justify-between mb-4">
+                            <h4 className="text-sm font-semibold text-gray-900">Custom Specifications</h4>
+                            {!isEditing && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  setEditingCustomFields((prev) => ({
+                                    ...prev,
+                                    [item.postId]: {
+                                      customQuantity: item.customQuantity,
+                                      customFinish: item.customFinish,
+                                      customThickness: item.customThickness,
+                                    },
+                                  }))
+                                }
+                                className="h-8 text-xs px-3 text-primary hover:text-primary/80"
+                              >
+                                Edit Specs
+                              </Button>
                             )}
                           </div>
-                        ) : (
-                          <p className="font-semibold text-lg text-primary">₹{displayPrice.toLocaleString()}</p>
-                        )}
 
-                        {(item.customQuantity || item.customFinish || item.customThickness || isEditing) && (
-                          <div className="mt-3 space-y-2 bg-muted/20 p-3 rounded-md">
-                            <h4 className="text-sm font-medium">Custom Specifications</h4>
-
-                            <div className="flex items-center gap-2">
-                              <label className="text-sm text-muted-foreground w-20">Quantity:</label>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-2">
+                              <label className="text-xs font-medium text-gray-600 uppercase tracking-wide">
+                                Quantity
+                              </label>
                               {isEditing ? (
                                 <Input
                                   type="number"
@@ -540,23 +625,25 @@ export default function CartPage() {
                                   onChange={(e) =>
                                     handleCustomFieldChange(item.postId, "customQuantity", Number(e.target.value))
                                   }
-                                  className="h-7 w-20 text-xs"
+                                  className="h-9 text-sm"
                                   placeholder="sqft"
                                 />
                               ) : (
-                                <span className="text-sm">
+                                <p className="text-sm font-medium text-gray-900">
                                   {item.customQuantity ? `${item.customQuantity} sqft` : "Not specified"}
-                                </span>
+                                </p>
                               )}
                             </div>
 
-                            <div className="flex items-center gap-2">
-                              <label className="text-sm text-muted-foreground w-20">Finish:</label>
+                            <div className="space-y-2">
+                              <label className="text-xs font-medium text-gray-600 uppercase tracking-wide">
+                                Finish
+                              </label>
                               {isEditing ? (
                                 <select
                                   value={currentCustomFields.customFinish || ""}
                                   onChange={(e) => handleCustomFieldChange(item.postId, "customFinish", e.target.value)}
-                                  className="h-7 px-2 border rounded text-xs"
+                                  className="h-9 w-full px-3 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-primary focus:border-primary"
                                 >
                                   <option value="">Select finish</option>
                                   {finishOptions.map((option) => (
@@ -566,12 +653,16 @@ export default function CartPage() {
                                   ))}
                                 </select>
                               ) : (
-                                <span className="text-sm">{item.customFinish || "Not specified"}</span>
+                                <p className="text-sm font-medium text-gray-900">
+                                  {item.customFinish || "Not specified"}
+                                </p>
                               )}
                             </div>
 
-                            <div className="flex items-center gap-2">
-                              <label className="text-sm text-muted-foreground w-20">Thickness:</label>
+                            <div className="space-y-2">
+                              <label className="text-xs font-medium text-gray-600 uppercase tracking-wide">
+                                Thickness
+                              </label>
                               {isEditing ? (
                                 <Input
                                   type="text"
@@ -579,90 +670,45 @@ export default function CartPage() {
                                   onChange={(e) =>
                                     handleCustomFieldChange(item.postId, "customThickness", e.target.value)
                                   }
-                                  className="h-7 w-20 text-xs"
+                                  className="h-9 text-sm"
                                   placeholder="mm"
                                 />
                               ) : (
-                                <span className="text-sm">
+                                <p className="text-sm font-medium text-gray-900">
                                   {item.customThickness ? `${item.customThickness} mm` : "Not specified"}
-                                </span>
-                              )}
-                            </div>
-
-                            <div className="flex gap-2">
-                              {isEditing ? (
-                                <>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => saveCustomFields(item.postId)}
-                                    className="h-6 text-xs px-2"
-                                  >
-                                    Save
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() =>
-                                      setEditingCustomFields((prev) => {
-                                        const newState = { ...prev }
-                                        delete newState[item.postId]
-                                        return newState
-                                      })
-                                    }
-                                    className="h-6 text-xs px-2"
-                                  >
-                                    Cancel
-                                  </Button>
-                                </>
-                              ) : (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() =>
-                                    setEditingCustomFields((prev) => ({
-                                      ...prev,
-                                      [item.postId]: {
-                                        customQuantity: item.customQuantity,
-                                        customFinish: item.customFinish,
-                                        customThickness: item.customThickness,
-                                      },
-                                    }))
-                                  }
-                                  className="h-6 text-xs px-2"
-                                >
-                                  Edit Specs
-                                </Button>
+                                </p>
                               )}
                             </div>
                           </div>
-                        )}
-                      </div>
-                      <div className="flex flex-col sm:flex-row items-center gap-4 mt-2 sm:mt-0">
-                        <div className="flex items-center border rounded-md">
-                          <Input
-                            type="number"
-                            min="1"
-                            value={item.quantity}
-                            onChange={(e) => handleQuantityChange(item.postId, e.target.value)}
-                            className="h-10 w-20 text-center"
-                            disabled={updating[item.postId]}
-                          />
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => removeFromCart(item.postId)}
-                          disabled={removing[item.postId]}
-                          className="text-red-500 hover:text-red-700 hover:bg-red-50 h-10 w-10"
-                        >
-                          {removing[item.postId] ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="h-4 w-4" />
+
+                          {isEditing && (
+                            <div className="flex gap-3 mt-4 pt-4 border-t border-gray-200">
+                              <Button
+                                variant="default"
+                                size="sm"
+                                onClick={() => saveCustomFields(item.postId)}
+                                className="h-8 text-xs px-4"
+                              >
+                                Save Changes
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  setEditingCustomFields((prev) => {
+                                    const newState = { ...prev }
+                                    delete newState[item.postId]
+                                    return newState
+                                  })
+                                }
+                                className="h-8 text-xs px-4"
+                              >
+                                Cancel
+                              </Button>
+                            </div>
                           )}
-                        </Button>
-                      </div>
+                        </div>
+                      )}
                     </div>
                   )
                 })}
