@@ -400,14 +400,27 @@ export default function SettingsPage() {
                       Consultant Level
                     </Label>
                     <div className="flex items-center gap-6 mt-2">
-                      <button
+                    <button
                         type="button"
                         onClick={() => handleConsultantLevelChange("red")}
-                        className={`w-8 h-8 rounded-full bg-red-500 transition-all ${
-                          settings.consultantLevel === "red" ? "ring-4 ring-red-200 scale-110" : "hover:scale-105"
+                        className={`w-8 h-8 rounded-full transition-all ${
+                          settings.consultantLevel === "red" ? "ring-4 ring-green-200 scale-110" : "hover:scale-105"
                         }`}
+                        style={{
+                          backgroundColor: settings.consultantLevel === "red" ? "#86D800" : "#86D800",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (settings.consultantLevel !== "red") {
+                            e.currentTarget.style.backgroundColor = "#6BA000"
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (settings.consultantLevel !== "red") {
+                            e.currentTarget.style.backgroundColor = "#86D800"
+                          }
+                        }}
                         aria-label="Red consultant level (+5%)"
-                      />
+                        />
                       <button
                         type="button"
                         onClick={() => handleConsultantLevelChange("yellow")}
