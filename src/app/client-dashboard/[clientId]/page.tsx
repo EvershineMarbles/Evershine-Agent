@@ -639,7 +639,7 @@ export default function ProductsPage() {
       <div
         className={`w-full ${
           clientData?.consultantLevel === "red"
-            ? "bg-gradient-to-b from-pink-50 via-pink-25 to-transparent"
+            ? "bg-gradient-to-b from-green-50 via-green-25 to-transparent"
             : clientData?.consultantLevel === "yellow"
               ? "bg-gradient-to-b from-yellow-50 via-yellow-25 to-transparent"
               : clientData?.consultantLevel === "purple"
@@ -667,19 +667,19 @@ export default function ProductsPage() {
                 <button
                   onClick={() => handleConsultantLevelChange("red")}
                   className={`w-6 h-6 rounded-full transition-all ${
-                    clientData?.consultantLevel === "red" ? "ring-2 ring-pink-300 scale-110" : "hover:scale-105"
+                    clientData?.consultantLevel === "red" ? "ring-2 ring-green-300 scale-110" : "hover:scale-105"
                   }`}
                   style={{
-                    backgroundColor: "#FB2056",
+                    backgroundColor: "#86D800",
                   }}
                   onMouseEnter={(e) => {
                     if (clientData?.consultantLevel !== "red") {
-                      e.currentTarget.style.backgroundColor = "#E91E63"
+                      e.currentTarget.style.backgroundColor = "#6BA000"
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (clientData?.consultantLevel !== "red") {
-                      e.currentTarget.style.backgroundColor = "#FB2056"
+                      e.currentTarget.style.backgroundColor = "#86D800"
                     }
                   }}
                   title="Red Level"
