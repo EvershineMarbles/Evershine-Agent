@@ -4,12 +4,13 @@ import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode } from "lucide-react"
+import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode, MoreVertical } from "lucide-react"
 import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { Button } from "@/components/ui/button"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 // Define the Product interface with updatedPrice
 interface Product {
@@ -224,6 +225,60 @@ export default function ProductsPage() {
 
     return () => clearInterval(interval)
   }, [fetchProducts])
+
+  // Handle consultant level change with auto-save
+  const handleConsultantLevelChange = async (level: string) => {
+    try {
+      const token = localStorage.getItem("clientImpersonationToken")
+      if (!token) {
+        toast({
+          title: "Error",
+          description: "No authentication token found",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Optimistically update the UI
+      setClientData((prev: any) => ({ ...prev, consultantLevel: level }))
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"}/api/update-client`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            ...clientData,
+            consultantLevel: level,
+          }),
+        },
+      )
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`)
+      }
+
+      toast({
+        title: "Consultant Level Updated",
+        description: `Changed to ${level} level`,
+      })
+
+      // Refresh products to get updated pricing
+      fetchProducts()
+    } catch (error: any) {
+      console.error("Error updating consultant level:", error)
+      // Revert the optimistic update
+      setClientData((prev: any) => ({ ...prev, consultantLevel: clientData?.consultantLevel || "red" }))
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update consultant level",
+        variant: "destructive",
+      })
+    }
+  }
 
   // Navigate to wishlist page
   const goToWishlist = () => {
@@ -499,6 +554,19 @@ export default function ProductsPage() {
 
   return (
     <ErrorBoundary>
+      {/* Gradient bar showing consultant level */}
+      <div
+        className={`h-1 w-full ${
+          clientData?.consultantLevel === "red"
+            ? "bg-gradient-to-r from-red-400 to-red-600"
+            : clientData?.consultantLevel === "yellow"
+              ? "bg-gradient-to-r from-yellow-400 to-yellow-600"
+              : clientData?.consultantLevel === "purple"
+                ? "bg-gradient-to-r from-purple-400 to-purple-600"
+                : "bg-gradient-to-r from-red-400 to-red-600"
+        }`}
+      />
+
       <div className="p-6 md:p-8">
         {error && (
           <Alert variant="destructive" className="mb-4">
@@ -543,6 +611,57 @@ export default function ProductsPage() {
                 </span>
               )}
             </Link>
+
+            {/* 3-dot menu for consultant level */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                  aria-label="Consultant Level Settings"
+                >
+                  <MoreVertical className="h-6 w-6 text-gray-600" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <div className="px-3 py-2 text-sm font-medium text-gray-700 border-b">Consultant Level</div>
+                <DropdownMenuItem
+                  onClick={() => handleConsultantLevelChange("red")}
+                  className="flex items-center gap-3 cursor-pointer"
+                >
+                  <div
+                    className={`w-4 h-4 rounded-full bg-red-500 ${
+                      clientData?.consultantLevel === "red" ? "ring-2 ring-red-200" : ""
+                    }`}
+                  />
+                  <span>Red Level (+5%)</span>
+                  {clientData?.consultantLevel === "red" && <span className="ml-auto text-green-600">✓</span>}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => handleConsultantLevelChange("yellow")}
+                  className="flex items-center gap-3 cursor-pointer"
+                >
+                  <div
+                    className={`w-4 h-4 rounded-full bg-yellow-500 ${
+                      clientData?.consultantLevel === "yellow" ? "ring-2 ring-yellow-200" : ""
+                    }`}
+                  />
+                  <span>Yellow Level (+10%)</span>
+                  {clientData?.consultantLevel === "yellow" && <span className="ml-auto text-green-600">✓</span>}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => handleConsultantLevelChange("purple")}
+                  className="flex items-center gap-3 cursor-pointer"
+                >
+                  <div
+                    className={`w-4 h-4 rounded-full bg-purple-600 ${
+                      clientData?.consultantLevel === "purple" ? "ring-2 ring-purple-200" : ""
+                    }`}
+                  />
+                  <span>Purple Level (+15%)</span>
+                  {clientData?.consultantLevel === "purple" && <span className="ml-auto text-green-600">✓</span>}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 

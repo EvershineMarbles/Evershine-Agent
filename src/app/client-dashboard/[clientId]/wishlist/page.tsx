@@ -87,7 +87,7 @@ export default function WishlistPage() {
       const apiUrl = getApiUrl()
 
       // Use client-specific wishlist endpoint
-      const response = await axios.get(`${apiUrl}/api/getClientWishlist`, {
+      const response = await axios.get(`${apiUrl}/api/getUserWishlist`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

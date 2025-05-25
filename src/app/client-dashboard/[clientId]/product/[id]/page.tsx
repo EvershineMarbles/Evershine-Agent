@@ -81,7 +81,7 @@ export default function ProductDetail() {
         }
 
         // Use client-specific endpoint for pricing
-        const response = await axios.get<ApiResponse>(`${API_URL}/api/getClientProductById`, {
+        const response = await axios.get<ApiResponse>(`${API_URL}/api/getProductById`, {
           params: { id: params.id },
           headers: {
             Authorization: `Bearer ${localStorage.getItem("clientImpersonationToken")}`,

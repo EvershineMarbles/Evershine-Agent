@@ -172,7 +172,7 @@ export default function CartPage() {
       const apiUrl = getApiUrl()
 
       // Use client-specific cart endpoint
-      const response = await fetch(`${apiUrl}/api/getClientCart`, {
+      const response = await fetch(`${apiUrl}/api/getUserCart`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
