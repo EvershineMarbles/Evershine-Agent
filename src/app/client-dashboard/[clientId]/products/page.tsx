@@ -636,16 +636,16 @@ export default function ProductsPage() {
 
   return (
     <ErrorBoundary>
-      {/* Background wash showing consultant level - STICKY */}
+      {/* Background wash showing consultant level */}
       <div
-        className={`sticky top-0 z-10 w-full ${
+        className={`w-full ${
           clientData?.consultantLevel === "red"
-            ? "bg-gradient-to-b from-orange-100 via-peach-50 to-transparent"
+            ? "bg-gradient-to-b from-pink-50 via-pink-25 to-transparent"
             : clientData?.consultantLevel === "yellow"
               ? "bg-gradient-to-b from-yellow-50 via-yellow-25 to-transparent"
               : clientData?.consultantLevel === "purple"
                 ? "bg-gradient-to-b from-purple-50 via-purple-25 to-transparent"
-                : "bg-gradient-to-b from-orange-100 via-peach-50 to-transparent"
+                : "bg-gradient-to-b from-red-50 via-red-25 to-transparent"
         }`}
       >
         <div className="p-6 md:p-8">
@@ -664,9 +664,22 @@ export default function ProductsPage() {
               <div className="flex items-center gap-2 mr-2">
                 <button
                   onClick={() => handleConsultantLevelChange("red")}
-                  className={`w-6 h-6 rounded-full bg-red-500 hover:bg-red-600 transition-all ${
-                    clientData?.consultantLevel === "red" ? "ring-2 ring-red-300 scale-110" : "hover:scale-105"
+                  className={`w-6 h-6 rounded-full transition-all ${
+                    clientData?.consultantLevel === "red" ? "ring-2 ring-pink-300 scale-110" : "hover:scale-105"
                   }`}
+                  style={{
+                    backgroundColor: "#FB2056",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (clientData?.consultantLevel !== "red") {
+                      e.currentTarget.style.backgroundColor = "#E91E63"
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (clientData?.consultantLevel !== "red") {
+                      e.currentTarget.style.backgroundColor = "#FB2056"
+                    }
+                  }}
                   title="Red Level"
                 />
                 <button
