@@ -198,21 +198,21 @@ export default function ProductDetail() {
     fetchProduct()
   }, [params.id])
 
-  // Check if product is in wishlist
+  // Check if product is in wishlist - prioritize server response over localStorage
   const checkWishlistStatus = async (productId: string) => {
     try {
-      const savedWishlist = localStorage.getItem("wishlist")
-      if (savedWishlist) {
-        const wishlistItems = JSON.parse(savedWishlist)
-        if (wishlistItems.includes(productId)) {
-          setInWishlist(true)
-          return
+      const token = localStorage.getItem("clientImpersonationToken")
+      if (!token) {
+        // If no token, check localStorage only
+        const savedWishlist = localStorage.getItem("wishlist")
+        if (savedWishlist) {
+          const wishlistItems = JSON.parse(savedWishlist)
+          setInWishlist(wishlistItems.includes(productId))
         }
+        return
       }
 
-      const token = localStorage.getItem("clientImpersonationToken")
-      if (!token) return
-
+      // First, get the server state
       const response = await fetch(`${API_URL}/api/getUserWishlist`, {
         method: "GET",
         headers: {
@@ -224,12 +224,39 @@ export default function ProductDetail() {
       if (response.ok) {
         const data = await response.json()
         if (data.success && data.data && Array.isArray(data.data.items)) {
-          const isInWishlist = data.data.items.some((item: any) => item.postId === productId)
-          setInWishlist(isInWishlist)
+          const serverWishlistIds = data.data.items.map((item: any) => item.postId)
+          const isInServerWishlist = serverWishlistIds.includes(productId)
+
+          // Update localStorage to match server state
+          localStorage.setItem("wishlist", JSON.stringify(serverWishlistIds))
+
+          // Set the wishlist status based on server response
+          setInWishlist(isInServerWishlist)
+
+          console.log(`Product ${productId} wishlist status: ${isInServerWishlist}`)
+          return
         }
+      }
+
+      // If API call fails, fall back to localStorage but log the issue
+      console.warn("Failed to fetch wishlist from server, using localStorage")
+      const savedWishlist = localStorage.getItem("wishlist")
+      if (savedWishlist) {
+        const wishlistItems = JSON.parse(savedWishlist)
+        setInWishlist(wishlistItems.includes(productId))
+      } else {
+        setInWishlist(false)
       }
     } catch (error) {
       console.error("Error checking wishlist status:", error)
+      // Fall back to localStorage
+      const savedWishlist = localStorage.getItem("wishlist")
+      if (savedWishlist) {
+        const wishlistItems = JSON.parse(savedWishlist)
+        setInWishlist(wishlistItems.includes(productId))
+      } else {
+        setInWishlist(false)
+      }
     }
   }
 
@@ -316,6 +343,27 @@ export default function ProductDetail() {
           body: JSON.stringify({ productId: product.postId }),
         })
 
+        // Handle 404 specifically - item might not exist on server
+        if (response.status === 404) {
+          console.warn(`Product ${product.postId} not found in server wishlist, removing from localStorage`)
+
+          // Remove from localStorage anyway
+          const savedWishlist = localStorage.getItem("wishlist")
+          if (savedWishlist) {
+            const wishlistItems = JSON.parse(savedWishlist)
+            const updatedWishlist = wishlistItems.filter((id: string) => id !== product.postId)
+            localStorage.setItem("wishlist", JSON.stringify(updatedWishlist))
+          }
+
+          setInWishlist(false)
+
+          toast({
+            title: "Removed from wishlist",
+            description: `${product.name} has been removed from your wishlist.`,
+          })
+          return
+        }
+
         if (!response.ok) {
           throw new Error(`API error: ${response.status} ${response.statusText}`)
         }
@@ -328,6 +376,7 @@ export default function ProductDetail() {
 
         setInWishlist(false)
 
+        // Update localStorage
         const savedWishlist = localStorage.getItem("wishlist")
         if (savedWishlist) {
           const wishlistItems = JSON.parse(savedWishlist)
@@ -367,6 +416,7 @@ export default function ProductDetail() {
 
         setInWishlist(true)
 
+        // Update localStorage
         const savedWishlist = localStorage.getItem("wishlist")
         const wishlistItems = savedWishlist ? JSON.parse(savedWishlist) : []
         if (!wishlistItems.includes(product.postId)) {
