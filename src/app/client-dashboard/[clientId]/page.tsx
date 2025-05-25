@@ -214,6 +214,16 @@ export default function ProductsPage() {
   useEffect(() => {
     fetchProducts()
   }, [fetchProducts])
+  
+  // Auto-refresh products every 30 seconds
+useEffect(() => {
+  const interval = setInterval(() => {
+    console.log("🔄 Auto-refreshing products...")
+    fetchProducts()
+  }, 30000) // 30 seconds
+
+  return () => clearInterval(interval)
+}, [fetchProducts])
 
   // Navigate to wishlist page
   const goToWishlist = () => {
