@@ -435,49 +435,49 @@ export default function CartPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-8">
+    <div className="container mx-auto px-3 py-4">
+      <div className="flex items-center justify-between mb-4">
         <div className="flex items-center">
-          <Button variant="ghost" size="icon" onClick={() => router.back()} className="mr-4">
+          <Button variant="ghost" size="icon" onClick={() => router.back()} className="mr-3">
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-3xl font-bold">Your Cart</h1>
+          <h1 className="text-xl md:text-2xl font-bold">Your Cart</h1>
         </div>
 
         {cartItems.length > 0 && (
-          <Button variant="outline" onClick={clearCart} className="text-red-500 border-red-200 hover:bg-red-50">
-            <Trash2 className="h-4 w-4 mr-2" />
+          <Button variant="outline" onClick={clearCart} className="text-red-500 border-red-200 hover:bg-red-50 text-xs">
+            <Trash2 className="h-3 w-3 mr-1" />
             Clear Cart
           </Button>
         )}
       </div>
 
       {checkoutError && (
-        <Alert variant="destructive" className="mb-6">
+        <Alert variant="destructive" className="mb-4">
           <AlertDescription>{checkoutError}</AlertDescription>
         </Alert>
       )}
 
       {cartItems.length === 0 ? (
-        <div className="text-center py-16 bg-muted/20 rounded-lg shadow-sm">
-          <ShoppingBag className="h-20 w-20 mx-auto text-muted-foreground mb-6" />
-          <p className="text-2xl font-medium mb-4">Your cart is empty</p>
-          <p className="text-muted-foreground mb-8 max-w-md mx-auto">
+        <div className="text-center py-12 bg-muted/20 rounded-lg shadow-sm">
+          <ShoppingBag className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+          <p className="text-xl font-medium mb-3">Your cart is empty</p>
+          <p className="text-muted-foreground mb-6 max-w-md mx-auto">
             Looks like you haven't added any products to your cart yet.
           </p>
           <Button
             onClick={() => router.push(`/client-dashboard/${clientId}/products`)}
-            className="bg-primary hover:bg-primary/90 px-8 py-6 h-auto text-lg"
+            className="bg-primary hover:bg-primary/90 px-6 py-3 h-auto text-base"
           >
             Browse Products
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="lg:col-span-2">
             <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
-              <div className="p-4 bg-muted/20 border-b">
-                <h2 className="font-semibold text-lg">Cart Items ({cartItems.length})</h2>
+              <div className="p-3 bg-muted/20 border-b">
+                <h2 className="font-medium">Cart Items ({cartItems.length})</h2>
               </div>
               <div className="divide-y">
                 {cartItems.map((item) => {
@@ -492,17 +492,17 @@ export default function CartPage() {
                   }
 
                   return (
-                    <div key={item.postId} className="p-6">
-                      {/* Main Product Row */}
-                      <div className="flex flex-col md:flex-row gap-6">
+                    <div key={item.postId} className="p-3">
+                      {/* Main Product Row - Tablet Layout */}
+                      <div className="flex items-center gap-3">
                         {/* Product Image */}
                         <Link href={`/client-dashboard/${clientId}/product/${item.postId}`} className="flex-shrink-0">
-                          <div className="relative h-32 w-32 md:h-28 md:w-28 rounded-lg overflow-hidden border-2 border-gray-100 hover:border-primary/30 transition-all duration-200 hover:shadow-md cursor-pointer group">
+                          <div className="relative h-16 w-16 rounded-lg overflow-hidden border border-gray-200 hover:border-primary/30 transition-all duration-200 hover:shadow-sm cursor-pointer group">
                             <Image
                               src={
                                 item.image && item.image.length > 0
                                   ? item.image[0]
-                                  : "/placeholder.svg?height=128&width=128"
+                                  : "/placeholder.svg?height=64&width=64"
                               }
                               alt={item.name}
                               fill
@@ -513,85 +513,71 @@ export default function CartPage() {
 
                         {/* Product Details */}
                         <div className="flex-grow min-w-0">
-                          <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
-                            <div className="flex-grow">
-                              <Link
-                                href={`/client-dashboard/${clientId}/product/${item.postId}`}
-                                className="block group"
-                              >
-                                <h3 className="font-semibold text-lg text-gray-900 group-hover:text-primary transition-colors duration-200 cursor-pointer line-clamp-2">
-                                  {item.name}
-                                </h3>
-                              </Link>
-                              <p className="text-sm text-gray-500 mt-1">{item.category}</p>
+                          <Link href={`/client-dashboard/${clientId}/product/${item.postId}`} className="block group">
+                            <h3 className="font-medium text-sm text-gray-900 group-hover:text-primary transition-colors duration-200 cursor-pointer line-clamp-1">
+                              {item.name}
+                            </h3>
+                          </Link>
+                          <p className="text-xs text-gray-500 mt-0.5">{item.category}</p>
 
-                              {/* Price Display */}
-                              <div className="mt-3">
-                                {hasCommission ? (
-                                  <div className="space-y-1">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <span className="font-bold text-xl text-green-600">
-                                        ₹{displayPrice.toLocaleString()}
-                                      </span>
-                                      <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
-                                        Commission Applied ✓
-                                      </span>
-                                    </div>
-                                    <p className="text-sm text-gray-500 line-through">
-                                      ₹{originalPrice.toLocaleString()}
-                                    </p>
-                                    {item.commissionInfo && (
-                                      <p className="text-xs text-gray-600">
-                                        +{item.commissionInfo.totalCommission}% total commission
-                                      </p>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <span className="font-bold text-xl text-primary">
+                          {/* Price Display */}
+                          <div className="mt-1">
+                            {hasCommission ? (
+                              <div className="space-y-0.5">
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  <span className="font-semibold text-sm text-green-600">
                                     ₹{displayPrice.toLocaleString()}
                                   </span>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Quantity and Actions */}
-                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 md:flex-shrink-0">
-                              <div className="flex items-center gap-3">
-                                <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Qty:</label>
-                                <div className="flex items-center border-2 border-gray-200 rounded-lg overflow-hidden focus-within:border-primary">
-                                  <Input
-                                    type="number"
-                                    min="1"
-                                    value={item.quantity}
-                                    onChange={(e) => handleQuantityChange(item.postId, e.target.value)}
-                                    className="h-10 w-20 text-center border-0 focus:ring-0 focus:border-0"
-                                    disabled={updating[item.postId]}
-                                  />
+                                  <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">
+                                    Commission ✓
+                                  </span>
                                 </div>
+                                <p className="text-xs text-gray-500 line-through">₹{originalPrice.toLocaleString()}</p>
                               </div>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                onClick={() => removeFromCart(item.postId)}
-                                disabled={removing[item.postId]}
-                                className="text-red-500 hover:text-red-700 hover:bg-red-50 border-red-200 h-10 w-10 flex-shrink-0"
-                              >
-                                {removing[item.postId] ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Trash2 className="h-4 w-4" />
-                                )}
-                              </Button>
+                            ) : (
+                              <span className="font-semibold text-sm text-primary">
+                                ₹{displayPrice.toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Quantity and Actions - Right Side */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <div className="flex items-center gap-1">
+                            <label className="text-xs font-medium text-gray-700 whitespace-nowrap">Qty:</label>
+                            <div className="flex items-center border border-gray-300 rounded-md overflow-hidden focus-within:border-primary">
+                              <Input
+                                type="number"
+                                min="1"
+                                value={item.quantity}
+                                onChange={(e) => handleQuantityChange(item.postId, e.target.value)}
+                                className="h-8 w-16 text-center border-0 focus:ring-0 focus:border-0 text-xs"
+                                disabled={updating[item.postId]}
+                              />
                             </div>
                           </div>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => removeFromCart(item.postId)}
+                            disabled={removing[item.postId]}
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50 border-red-200 h-8 w-8 flex-shrink-0"
+                          >
+                            {removing[item.postId] ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-3 w-3" />
+                            )}
+                          </Button>
                         </div>
                       </div>
 
-                      {/* Custom Specifications */}
+                      {/* Custom Specifications - Ultra Compact */}
                       {(item.customQuantity || item.customFinish || item.customThickness || isEditing) && (
-                        <div className="mt-6 bg-gray-50 rounded-lg p-4 border border-gray-200">
-                          <div className="flex items-center justify-between mb-4">
-                            <h4 className="text-sm font-semibold text-gray-900">Custom Specifications</h4>
+                        <div className="mt-2 bg-gray-50 rounded-md p-2 border border-gray-200">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-xs font-medium text-gray-900">Custom Specifications</h4>
                             {!isEditing && (
                               <Button
                                 variant="ghost"
@@ -606,15 +592,15 @@ export default function CartPage() {
                                     },
                                   }))
                                 }
-                                className="h-8 text-xs px-3 text-primary hover:text-primary/80"
+                                className="h-6 text-xs px-2 text-primary hover:text-primary/80"
                               >
-                                Edit Specs
+                                Edit
                               </Button>
                             )}
                           </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="space-y-2">
+                          <div className="grid grid-cols-3 gap-2">
+                            <div className="space-y-1">
                               <label className="text-xs font-medium text-gray-600 uppercase tracking-wide">
                                 Quantity
                               </label>
@@ -625,17 +611,17 @@ export default function CartPage() {
                                   onChange={(e) =>
                                     handleCustomFieldChange(item.postId, "customQuantity", Number(e.target.value))
                                   }
-                                  className="h-9 text-sm"
+                                  className="h-7 text-xs"
                                   placeholder="sqft"
                                 />
                               ) : (
-                                <p className="text-sm font-medium text-gray-900">
+                                <p className="text-xs font-medium text-gray-900">
                                   {item.customQuantity ? `${item.customQuantity} sqft` : "Not specified"}
                                 </p>
                               )}
                             </div>
 
-                            <div className="space-y-2">
+                            <div className="space-y-1">
                               <label className="text-xs font-medium text-gray-600 uppercase tracking-wide">
                                 Finish
                               </label>
@@ -643,7 +629,7 @@ export default function CartPage() {
                                 <select
                                   value={currentCustomFields.customFinish || ""}
                                   onChange={(e) => handleCustomFieldChange(item.postId, "customFinish", e.target.value)}
-                                  className="h-9 w-full px-3 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+                                  className="h-7 w-full px-1 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-primary focus:border-primary"
                                 >
                                   <option value="">Select finish</option>
                                   {finishOptions.map((option) => (
@@ -653,13 +639,13 @@ export default function CartPage() {
                                   ))}
                                 </select>
                               ) : (
-                                <p className="text-sm font-medium text-gray-900">
+                                <p className="text-xs font-medium text-gray-900">
                                   {item.customFinish || "Not specified"}
                                 </p>
                               )}
                             </div>
 
-                            <div className="space-y-2">
+                            <div className="space-y-1">
                               <label className="text-xs font-medium text-gray-600 uppercase tracking-wide">
                                 Thickness
                               </label>
@@ -670,11 +656,11 @@ export default function CartPage() {
                                   onChange={(e) =>
                                     handleCustomFieldChange(item.postId, "customThickness", e.target.value)
                                   }
-                                  className="h-9 text-sm"
+                                  className="h-7 text-xs"
                                   placeholder="mm"
                                 />
                               ) : (
-                                <p className="text-sm font-medium text-gray-900">
+                                <p className="text-xs font-medium text-gray-900">
                                   {item.customThickness ? `${item.customThickness} mm` : "Not specified"}
                                 </p>
                               )}
@@ -682,14 +668,14 @@ export default function CartPage() {
                           </div>
 
                           {isEditing && (
-                            <div className="flex gap-3 mt-4 pt-4 border-t border-gray-200">
+                            <div className="flex gap-2 mt-2 pt-2 border-t border-gray-200">
                               <Button
                                 variant="default"
                                 size="sm"
                                 onClick={() => saveCustomFields(item.postId)}
-                                className="h-8 text-xs px-4"
+                                className="h-6 text-xs px-2"
                               >
-                                Save Changes
+                                Save
                               </Button>
                               <Button
                                 variant="outline"
@@ -701,7 +687,7 @@ export default function CartPage() {
                                     return newState
                                   })
                                 }
-                                className="h-8 text-xs px-4"
+                                className="h-6 text-xs px-2"
                               >
                                 Cancel
                               </Button>
@@ -718,25 +704,25 @@ export default function CartPage() {
 
           <div className="lg:col-span-1">
             <div className="bg-white rounded-lg border shadow-sm overflow-hidden sticky top-4">
-              <div className="p-4 bg-muted/20 border-b">
-                <h2 className="font-semibold text-lg">Order Summary</h2>
+              <div className="p-3 bg-muted/20 border-b">
+                <h2 className="font-medium">Order Summary</h2>
               </div>
-              <div className="p-6">
-                <div className="space-y-4">
+              <div className="p-3">
+                <div className="space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Subtotal</span>
-                    <span className="font-medium">₹{calculateTotal().toLocaleString()}</span>
+                    <span className="text-sm text-muted-foreground">Subtotal</span>
+                    <span className="text-sm font-medium">₹{calculateTotal().toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Shipping</span>
-                    <span>Calculated at checkout</span>
+                    <span className="text-sm text-muted-foreground">Shipping</span>
+                    <span className="text-sm">Calculated at checkout</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Tax</span>
-                    <span>Calculated at checkout</span>
+                    <span className="text-sm text-muted-foreground">Tax</span>
+                    <span className="text-sm">Calculated at checkout</span>
                   </div>
-                  <div className="border-t pt-4 mt-2">
-                    <div className="flex justify-between font-semibold text-lg">
+                  <div className="border-t pt-2 mt-2">
+                    <div className="flex justify-between font-semibold">
                       <span>Total</span>
                       <span className="text-primary">₹{calculateTotal().toLocaleString()}</span>
                     </div>
@@ -745,12 +731,12 @@ export default function CartPage() {
 
                 <Button
                   onClick={handleCheckout}
-                  className="w-full mt-8 bg-primary hover:bg-primary/90 py-6 h-auto text-lg"
+                  className="w-full mt-4 bg-primary hover:bg-primary/90 py-2 h-auto text-sm"
                   disabled={isCheckingOut || cartItems.length === 0}
                 >
                   {isCheckingOut ? (
                     <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Processing...
                     </>
                   ) : (
@@ -758,10 +744,10 @@ export default function CartPage() {
                   )}
                 </Button>
 
-                <div className="mt-6 text-center">
+                <div className="mt-3 text-center">
                   <Link
                     href={`/client-dashboard/${clientId}/products`}
-                    className="text-primary hover:underline font-medium"
+                    className="text-primary hover:underline font-medium text-xs"
                   >
                     Continue Shopping
                   </Link>

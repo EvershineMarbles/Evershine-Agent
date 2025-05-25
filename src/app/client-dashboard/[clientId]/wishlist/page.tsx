@@ -441,27 +441,27 @@ export default function WishlistPage() {
   }
 
   return (
-    <div className="p-6 md:p-8">
-      <div className="flex items-center justify-between mb-8">
+    <div className="p-3 md:p-4">
+      <div className="flex items-center justify-between mb-4">
         <div className="flex items-center">
-          <Button variant="ghost" size="icon" onClick={() => router.back()} className="mr-4">
+          <Button variant="ghost" size="icon" onClick={() => router.back()} className="mr-3">
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-3xl font-bold">Your Wishlist</h1>
+          <h1 className="text-xl md:text-2xl font-bold">Your Wishlist</h1>
         </div>
 
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" onClick={handleRefresh} disabled={refreshing} className="relative">
-            <RefreshCw className={`h-5 w-5 ${refreshing ? "animate-spin" : ""}`} />
+            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
           </Button>
 
           <Link
             href={`/client-dashboard/${clientId}/cart`}
             className="relative p-2 rounded-full hover:bg-gray-100 transition-colors"
           >
-            <ShoppingCart className="h-6 w-6 text-gray-600" />
+            <ShoppingCart className="h-5 w-5 text-gray-600" />
             {cartCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-primary text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 bg-primary text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
                 {cartCount}
               </span>
             )}
@@ -470,10 +470,10 @@ export default function WishlistPage() {
       </div>
 
       {wishlistItems.length === 0 ? (
-        <div className="text-center py-12 bg-muted/20 rounded-lg">
-          <Heart className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-          <p className="text-xl font-medium mb-4">Your wishlist is empty</p>
-          <p className="text-muted-foreground mb-6">Add some products to your wishlist to see them here</p>
+        <div className="text-center py-8 bg-muted/20 rounded-lg">
+          <Heart className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+          <p className="text-lg font-medium mb-2">Your wishlist is empty</p>
+          <p className="text-muted-foreground mb-4">Add some products to your wishlist to see them here</p>
           <Button
             onClick={() => router.push(`/client-dashboard/${clientId}/products`)}
             className="bg-primary hover:bg-primary/90"
@@ -483,8 +483,8 @@ export default function WishlistPage() {
         </div>
       ) : (
         <div className="bg-card rounded-lg border border-border overflow-hidden">
-          <div className="p-4 bg-muted/20 border-b border-border">
-            <h2 className="font-semibold">Wishlist Items ({wishlistItems.length})</h2>
+          <div className="p-3 bg-muted/20 border-b border-border">
+            <h2 className="font-medium">Wishlist Items ({wishlistItems.length})</h2>
           </div>
           <div className="divide-y divide-border">
             {wishlistItems.map((item) => {
@@ -500,17 +500,15 @@ export default function WishlistPage() {
               }
 
               return (
-                <div key={itemId} className="p-6">
-                  {/* Main Product Row */}
-                  <div className="flex flex-col md:flex-row gap-6">
+                <div key={itemId} className="p-3">
+                  {/* Main Product Row - Tablet Layout */}
+                  <div className="flex items-center gap-3">
                     {/* Product Image */}
                     <Link href={`/client-dashboard/${clientId}/product/${itemId}`} className="flex-shrink-0">
-                      <div className="relative h-32 w-32 md:h-28 md:w-28 rounded-lg overflow-hidden border-2 border-gray-100 hover:border-primary/30 transition-all duration-200 hover:shadow-md cursor-pointer group">
+                      <div className="relative h-16 w-16 rounded-lg overflow-hidden border border-gray-200 hover:border-primary/30 transition-all duration-200 hover:shadow-sm cursor-pointer group">
                         <Image
                           src={
-                            item.image && item.image.length > 0
-                              ? item.image[0]
-                              : "/placeholder.svg?height=128&width=128"
+                            item.image && item.image.length > 0 ? item.image[0] : "/placeholder.svg?height=64&width=64"
                           }
                           alt={item.name}
                           fill
@@ -522,93 +520,82 @@ export default function WishlistPage() {
 
                     {/* Product Details */}
                     <div className="flex-grow min-w-0">
-                      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4">
-                        <div className="flex-grow">
-                          <Link href={`/client-dashboard/${clientId}/product/${itemId}`} className="block group">
-                            <h3 className="font-semibold text-lg text-gray-900 group-hover:text-primary transition-colors duration-200 cursor-pointer line-clamp-2">
-                              {item.name || "Unknown Product"}
-                            </h3>
-                          </Link>
-                          <p className="text-sm text-gray-500 mt-1">{item.category || "Uncategorized"}</p>
+                      <Link href={`/client-dashboard/${clientId}/product/${itemId}`} className="block group">
+                        <h3 className="font-medium text-sm text-gray-900 group-hover:text-primary transition-colors duration-200 cursor-pointer line-clamp-1">
+                          {item.name || "Unknown Product"}
+                        </h3>
+                      </Link>
+                      <p className="text-xs text-gray-500 mt-0.5">{item.category || "Uncategorized"}</p>
 
-                          {/* Price Display */}
-                          <div className="mt-3">
-                            {hasCommission ? (
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="font-bold text-xl text-green-600">
-                                    ₹{displayPrice.toLocaleString()}
-                                  </span>
-                                  <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
-                                    Commission Applied ✓
-                                  </span>
-                                </div>
-                                <p className="text-sm text-gray-500 line-through">₹{originalPrice.toLocaleString()}</p>
-                                {item.commissionInfo && (
-                                  <p className="text-xs text-gray-600">
-                                    +{item.commissionInfo.totalCommission}% total commission
-                                  </p>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="font-bold text-xl text-primary">₹{displayPrice.toLocaleString()}</span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Actions Section */}
-                        <div className="flex flex-col sm:flex-row lg:flex-col xl:flex-row items-start sm:items-center lg:items-end xl:items-center gap-4 lg:flex-shrink-0">
-                          <div className="flex items-center gap-3">
-                            <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Qty:</label>
-                            <div className="flex items-center border-2 border-gray-200 rounded-lg overflow-hidden focus-within:border-primary">
-                              <Input
-                                type="number"
-                                min="1"
-                                value={quantities[itemId] || 1000}
-                                onChange={(e) => handleQuantityChange(itemId, e.target.value)}
-                                className="h-10 w-20 text-center border-0 focus:ring-0 focus:border-0"
-                              />
+                      {/* Price Display */}
+                      <div className="mt-1">
+                        {hasCommission ? (
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-1 flex-wrap">
+                              <span className="font-semibold text-sm text-green-600">
+                                ₹{displayPrice.toLocaleString()}
+                              </span>
+                              <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">
+                                Commission ✓
+                              </span>
                             </div>
+                            <p className="text-xs text-gray-500 line-through">₹{originalPrice.toLocaleString()}</p>
                           </div>
-                          <div className="flex items-center gap-3">
-                            <Button
-                              variant="default"
-                              size="sm"
-                              onClick={() => addToCart(itemId)}
-                              disabled={actionLoading[itemId]?.addingToCart}
-                              className="flex items-center gap-2 px-4 py-2"
-                            >
-                              {actionLoading[itemId]?.addingToCart ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <ShoppingCart className="h-4 w-4" />
-                              )}
-                              Add to Cart
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              onClick={() => removeFromWishlist(itemId)}
-                              disabled={actionLoading[itemId]?.removing}
-                              className="text-red-500 hover:text-red-700 hover:bg-red-50 border-red-200 h-10 w-10 flex-shrink-0"
-                            >
-                              {actionLoading[itemId]?.removing ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Trash2 className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </div>
+                        ) : (
+                          <span className="font-semibold text-sm text-primary">₹{displayPrice.toLocaleString()}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Quantity and Actions - Right Side */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="flex items-center gap-1">
+                        <label className="text-xs font-medium text-gray-700 whitespace-nowrap">Qty:</label>
+                        <div className="flex items-center border border-gray-300 rounded-md overflow-hidden focus-within:border-primary">
+                          <Input
+                            type="number"
+                            min="1"
+                            value={quantities[itemId] || 1000}
+                            onChange={(e) => handleQuantityChange(itemId, e.target.value)}
+                            className="h-8 w-16 text-center border-0 focus:ring-0 focus:border-0 text-xs"
+                          />
                         </div>
                       </div>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => addToCart(itemId)}
+                        disabled={actionLoading[itemId]?.addingToCart}
+                        className="flex items-center gap-1 px-2 py-1 h-8 text-xs"
+                      >
+                        {actionLoading[itemId]?.addingToCart ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <ShoppingCart className="h-3 w-3" />
+                        )}
+                        Add to Cart
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => removeFromWishlist(itemId)}
+                        disabled={actionLoading[itemId]?.removing}
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 border-red-200 h-8 w-8 flex-shrink-0"
+                      >
+                        {actionLoading[itemId]?.removing ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-3 w-3" />
+                        )}
+                      </Button>
                     </div>
                   </div>
 
-                  {/* Custom Specifications */}
+                  {/* Custom Specifications - Ultra Compact */}
                   {(item.customQuantity || item.customFinish || item.customThickness || isEditing) && (
-                    <div className="mt-6 bg-gray-50 rounded-lg p-4 border border-gray-200">
-                      <div className="flex items-center justify-between mb-4">
-                        <h4 className="text-sm font-semibold text-gray-900">Custom Specifications</h4>
+                    <div className="mt-2 bg-gray-50 rounded-md p-2 border border-gray-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-xs font-medium text-gray-900">Custom Specifications</h4>
                         {!isEditing && (
                           <Button
                             variant="ghost"
@@ -623,15 +610,15 @@ export default function WishlistPage() {
                                 },
                               }))
                             }
-                            className="h-8 text-xs px-3 text-primary hover:text-primary/80"
+                            className="h-6 text-xs px-2 text-primary hover:text-primary/80"
                           >
-                            Edit Specs
+                            Edit
                           </Button>
                         )}
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="space-y-2">
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="space-y-1">
                           <label className="text-xs font-medium text-gray-600 uppercase tracking-wide">Quantity</label>
                           {isEditing ? (
                             <Input
@@ -640,23 +627,23 @@ export default function WishlistPage() {
                               onChange={(e) =>
                                 handleCustomFieldChange(itemId, "customQuantity", Number(e.target.value))
                               }
-                              className="h-9 text-sm"
+                              className="h-7 text-xs"
                               placeholder="sqft"
                             />
                           ) : (
-                            <p className="text-sm font-medium text-gray-900">
+                            <p className="text-xs font-medium text-gray-900">
                               {item.customQuantity ? `${item.customQuantity} sqft` : "Not specified"}
                             </p>
                           )}
                         </div>
 
-                        <div className="space-y-2">
+                        <div className="space-y-1">
                           <label className="text-xs font-medium text-gray-600 uppercase tracking-wide">Finish</label>
                           {isEditing ? (
                             <select
                               value={currentCustomFields.customFinish || ""}
                               onChange={(e) => handleCustomFieldChange(itemId, "customFinish", e.target.value)}
-                              className="h-9 w-full px-3 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+                              className="h-7 w-full px-1 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-primary focus:border-primary"
                             >
                               <option value="">Select finish</option>
                               {finishOptions.map((option) => (
@@ -666,22 +653,22 @@ export default function WishlistPage() {
                               ))}
                             </select>
                           ) : (
-                            <p className="text-sm font-medium text-gray-900">{item.customFinish || "Not specified"}</p>
+                            <p className="text-xs font-medium text-gray-900">{item.customFinish || "Not specified"}</p>
                           )}
                         </div>
 
-                        <div className="space-y-2">
+                        <div className="space-y-1">
                           <label className="text-xs font-medium text-gray-600 uppercase tracking-wide">Thickness</label>
                           {isEditing ? (
                             <Input
                               type="text"
                               value={currentCustomFields.customThickness || ""}
                               onChange={(e) => handleCustomFieldChange(itemId, "customThickness", e.target.value)}
-                              className="h-9 text-sm"
+                              className="h-7 text-xs"
                               placeholder="mm"
                             />
                           ) : (
-                            <p className="text-sm font-medium text-gray-900">
+                            <p className="text-xs font-medium text-gray-900">
                               {item.customThickness ? `${item.customThickness} mm` : "Not specified"}
                             </p>
                           )}
@@ -689,14 +676,14 @@ export default function WishlistPage() {
                       </div>
 
                       {isEditing && (
-                        <div className="flex gap-3 mt-4 pt-4 border-t border-gray-200">
+                        <div className="flex gap-2 mt-2 pt-2 border-t border-gray-200">
                           <Button
                             variant="default"
                             size="sm"
                             onClick={() => saveCustomFields(itemId)}
-                            className="h-8 text-xs px-4"
+                            className="h-6 text-xs px-2"
                           >
-                            Save Changes
+                            Save
                           </Button>
                           <Button
                             variant="outline"
@@ -708,7 +695,7 @@ export default function WishlistPage() {
                                 return newState
                               })
                             }
-                            className="h-8 text-xs px-4"
+                            className="h-6 text-xs px-2"
                           >
                             Cancel
                           </Button>
@@ -720,9 +707,9 @@ export default function WishlistPage() {
               )
             })}
           </div>
-          <div className="p-4 bg-muted/10 border-t border-border">
+          <div className="p-2 bg-muted/10 border-t border-border">
             <div className="flex justify-end">
-              <Link href={`/client-dashboard/${clientId}/products`} className="text-sm text-primary hover:underline">
+              <Link href={`/client-dashboard/${clientId}/products`} className="text-xs text-primary hover:underline">
                 Continue Shopping
               </Link>
             </div>
