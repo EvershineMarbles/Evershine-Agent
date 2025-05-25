@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode } from 'lucide-react'
+import { Search, Loader2, Heart, ShoppingCart, AlertCircle, QrCode } from "lucide-react"
 import Image from "next/image"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -214,16 +214,16 @@ export default function ProductsPage() {
   useEffect(() => {
     fetchProducts()
   }, [fetchProducts])
-  
-  // Auto-refresh products every 30 seconds
-useEffect(() => {
-  const interval = setInterval(() => {
-    console.log("🔄 Auto-refreshing products...")
-    fetchProducts()
-  }, 30000) // 30 seconds
 
-  return () => clearInterval(interval)
-}, [fetchProducts])
+  // Auto-refresh products every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log("🔄 Auto-refreshing products...")
+      fetchProducts()
+    }, 30000) // 30 seconds
+
+    return () => clearInterval(interval)
+  }, [fetchProducts])
 
   // Navigate to wishlist page
   const goToWishlist = () => {

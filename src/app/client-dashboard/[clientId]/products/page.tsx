@@ -376,13 +376,17 @@ export default function ProductsPage() {
         throw new Error("No authentication token found. Please refresh the token and try again.")
       }
 
+      // Make API request - let backend calculate price
       const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ productId }),
+        body: JSON.stringify({
+          productId,
+          // Don't send price - let backend calculate it
+        }),
       })
 
       if (!response.ok) {
@@ -569,6 +573,11 @@ export default function ProductsPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             {filteredProducts.map((product) => {
+              // USE BACKEND CALCULATED PRICE
+              const displayPrice = product.updatedPrice || product.price
+              const hasCommission = product.updatedPrice && product.updatedPrice !== product.price
+              const originalPrice = product.basePrice || product.price
+
               return (
                 <div
                   key={product._id}
@@ -581,12 +590,11 @@ export default function ProductsPage() {
                         src={imageError[product._id] ? "/placeholder.svg" : product.image?.[0] || "/placeholder.svg"}
                         alt={product.name}
                         fill
-                        unoptimized={true} // This bypasses Vercel's image optimization
+                        unoptimized={true}
                         className="object-cover transition-transform group-hover:scale-105 duration-300"
                         onError={() => handleImageError(product._id)}
                       />
 
-                      {/* Wishlist button overlay */}
                       <button
                         onClick={(e) => toggleWishlist(e, product.postId)}
                         className="absolute top-2 right-2 p-2 rounded-full bg-white/80 hover:bg-white transition-colors z-10"
@@ -610,11 +618,26 @@ export default function ProductsPage() {
                   <div className="p-4">
                     <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
 
-                    {/* Simplified price display - just the adjusted price */}
+                    {/* DISPLAY BACKEND CALCULATED PRICE */}
                     <div className="mt-2">
-                      <p className="text-lg font-bold">
-                        ₹{product.updatedPrice?.toLocaleString() || product.price.toLocaleString()}/sqft
-                      </p>
+                      {hasCommission ? (
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <p className="text-lg font-bold text-green-600">₹{displayPrice.toLocaleString()}/sqft</p>
+                            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+                              Commission Applied ✓
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-500 line-through">₹{originalPrice.toLocaleString()}/sqft</p>
+                          {product.commissionInfo && (
+                            <p className="text-xs text-gray-600">
+                              +{product.commissionInfo.totalCommission}% total commission
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-lg font-bold">₹{displayPrice.toLocaleString()}/sqft</p>
+                      )}
                     </div>
 
                     <p className="text-sm text-muted-foreground mt-1">
