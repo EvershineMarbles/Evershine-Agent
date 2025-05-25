@@ -265,10 +265,7 @@ export default function ProductsPage() {
         throw new Error(`API error: ${response.status} ${response.statusText}`)
       }
 
-      toast({
-        title: "Consultant Level Updated",
-        description: `Changed to ${level} level`,
-      })
+  
 
       // Refresh products to get updated pricing
       fetchProducts()
@@ -552,57 +549,27 @@ export default function ProductsPage() {
 
   return (
     <ErrorBoundary>
-      {/* Enhanced gradient bar with clickable sections */}
-      <div className="flex h-3 w-full rounded-full overflow-hidden mb-4 shadow-sm">
-        <button
-          onClick={() => handleConsultantLevelChange("red")}
-          className={`flex-1 bg-gradient-to-r from-red-400 to-red-600 hover:from-red-500 hover:to-red-700 transition-all duration-200 relative ${
-            clientData?.consultantLevel === "red" ? "ring-2 ring-red-300 ring-offset-1" : ""
-          }`}
-          title="Red Level (+5%)"
-        >
-          {clientData?.consultantLevel === "red" && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-2 h-2 bg-white rounded-full shadow-sm"></div>
-            </div>
-          )}
-        </button>
-        <button
-          onClick={() => handleConsultantLevelChange("yellow")}
-          className={`flex-1 bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 transition-all duration-200 relative ${
-            clientData?.consultantLevel === "yellow" ? "ring-2 ring-yellow-300 ring-offset-1" : ""
-          }`}
-          title="Yellow Level (+10%)"
-        >
-          {clientData?.consultantLevel === "yellow" && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-2 h-2 bg-white rounded-full shadow-sm"></div>
-            </div>
-          )}
-        </button>
-        <button
-          onClick={() => handleConsultantLevelChange("purple")}
-          className={`flex-1 bg-gradient-to-r from-purple-400 to-purple-600 hover:from-purple-500 hover:to-purple-700 transition-all duration-200 relative ${
-            clientData?.consultantLevel === "purple" ? "ring-2 ring-purple-300 ring-offset-1" : ""
-          }`}
-          title="Purple Level (+15%)"
-        >
-          {clientData?.consultantLevel === "purple" && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-2 h-2 bg-white rounded-full shadow-sm"></div>
-            </div>
-          )}
-        </button>
-      </div>
-
-      {/* Level indicator text */}
-      <div className="text-center mb-6">
-        <p className="text-sm text-gray-600">
-          Current Level: <span className="font-semibold capitalize">{clientData?.consultantLevel || "red"}</span>
-          {clientData?.consultantLevel === "red" && " (+5%)"}
-          {clientData?.consultantLevel === "yellow" && " (+10%)"}
-          {clientData?.consultantLevel === "purple" && " (+15%)"}
-        </p>
+      {/* Big gradient background showing consultant level */}
+      <div
+        className={`h-16 w-full flex items-center justify-center text-white font-medium ${
+          clientData?.consultantLevel === "red"
+            ? "bg-gradient-to-r from-red-400 via-red-500 to-red-600"
+            : clientData?.consultantLevel === "yellow"
+              ? "bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-600"
+              : clientData?.consultantLevel === "purple"
+                ? "bg-gradient-to-r from-purple-400 via-purple-500 to-purple-600"
+                : "bg-gradient-to-r from-red-400 via-red-500 to-red-600"
+        }`}
+      >
+        <span className="text-lg font-semibold">
+          {clientData?.consultantLevel === "red"
+            ? "Red Level - 5% Commission"
+            : clientData?.consultantLevel === "yellow"
+              ? "Yellow Level - 10% Commission"
+              : clientData?.consultantLevel === "purple"
+                ? "Purple Level - 15% Commission"
+                : "Red Level - 5% Commission"}
+        </span>
       </div>
 
       <div className="p-6 md:p-8">
@@ -620,6 +587,31 @@ export default function ProductsPage() {
           <h1 className="text-3xl font-bold">Products</h1>
 
           <div className="flex items-center gap-4">
+            {/* Color dots for consultant level switching */}
+            <div className="flex items-center gap-2 mr-2">
+              <button
+                onClick={() => handleConsultantLevelChange("red")}
+                className={`w-6 h-6 rounded-full bg-red-500 hover:bg-red-600 transition-all ${
+                  clientData?.consultantLevel === "red" ? "ring-2 ring-red-300 scale-110" : "hover:scale-105"
+                }`}
+                title="Red Level (+5%)"
+              />
+              <button
+                onClick={() => handleConsultantLevelChange("yellow")}
+                className={`w-6 h-6 rounded-full bg-yellow-500 hover:bg-yellow-600 transition-all ${
+                  clientData?.consultantLevel === "yellow" ? "ring-2 ring-yellow-300 scale-110" : "hover:scale-105"
+                }`}
+                title="Yellow Level (+10%)"
+              />
+              <button
+                onClick={() => handleConsultantLevelChange("purple")}
+                className={`w-6 h-6 rounded-full bg-purple-600 hover:bg-purple-700 transition-all ${
+                  clientData?.consultantLevel === "purple" ? "ring-2 ring-purple-300 scale-110" : "hover:scale-105"
+                }`}
+                title="Purple Level (+15%)"
+              />
+            </div>
+
             <button
               onClick={handleScanQR}
               className="p-2 rounded-full hover:bg-gray-100 transition-colors"
