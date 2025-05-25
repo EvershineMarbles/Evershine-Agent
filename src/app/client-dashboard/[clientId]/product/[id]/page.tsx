@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import axios, { AxiosError } from "axios"
 import { ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Heart, X } from "lucide-react"
@@ -83,6 +83,8 @@ export default function ProductDetail() {
   const [overrideCommissionRate, setOverrideCommissionRate] = useState<number | null>(null)
   const [commissionLoading, setCommissionLoading] = useState(false)
   const [basePrice, setBasePrice] = useState<number | null>(null)
+
+  const visualizerRef = useRef<HTMLDivElement>(null)
 
   // Add this useEffect after the clientId declaration
   useEffect(() => {
@@ -528,7 +530,20 @@ export default function ProductDetail() {
             {/* Product Visualizer Button */}
             <div className="mt-4">
               <Button
-                onClick={() => setShowVisualizer(!showVisualizer)}
+                onClick={() => {
+                  if (!showVisualizer) {
+                    setShowVisualizer(true)
+                    // Scroll to visualizer section after a short delay to ensure it's rendered
+                    setTimeout(() => {
+                      visualizerRef.current?.scrollIntoView({
+                        behavior: "smooth",
+                        block: "start",
+                      })
+                    }, 100)
+                  } else {
+                    setShowVisualizer(false)
+                  }
+                }}
                 className="w-full bg-[#194a95] hover:bg-[#0f3a7a] py-3 text-white rounded-xl"
               >
                 {showVisualizer ? "Hide Product Visualizer" : "Show Product Visualizer"}
@@ -684,7 +699,7 @@ export default function ProductDetail() {
         </div>
 
         {showVisualizer && product.image.length > 0 && (
-          <div className="mt-4">
+          <div ref={visualizerRef} className="mt-8 pt-4 border-t border-gray-200">
             <ProductVisualizer productImage={product.image[0]} productName={product.name} />
           </div>
         )}
