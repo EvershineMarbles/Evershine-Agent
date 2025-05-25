@@ -11,13 +11,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { Button } from "@/components/ui/button"
 
-// Define the Product interface with commission info
+// Define the Product interface
 interface Product {
   _id: string
   name: string
   price: number
+  updatedPrice?: number // Backend-calculated price with commission
   basePrice?: number
-  updatedPrice?: number
   image: string[]
   postId: string
   category: string
@@ -26,10 +26,9 @@ interface Product {
   applicationAreas?: string
   quantityAvailable?: number
   commissionInfo?: {
-    currentAgentCommission: number
-    consultantLevelCommission: number
-    totalCommission: number
-    consultantLevel: string
+    agentCommission: number
+    clientBonus: number
+    finalMarkup: number
   }
 }
 
@@ -49,7 +48,6 @@ interface WishlistItem {
 export default function ProductsPage() {
   console.log("ProductsPage rendering")
 
-  // Use the useParams hook to get the clientId
   const params = useParams()
   const router = useRouter()
   const clientId = params.clientId as string
@@ -59,7 +57,6 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [imageError, setImageError] = useState<Record<string, boolean>>({})
-  // Wishlist and cart state
   const [wishlist, setWishlist] = useState<string[]>([])
   const [cart, setCart] = useState<string[]>([])
   const [addingToCart, setAddingToCart] = useState<Record<string, boolean>>({})
@@ -93,12 +90,9 @@ export default function ProductsPage() {
       const data = await response.json()
 
       if (data.success && data.data && Array.isArray(data.data.items)) {
-        // Extract just the postIds from the wishlist items
         const wishlistIds = data.data.items.map((item: WishlistItem) => item.postId)
         console.log("Fetched wishlist from backend:", wishlistIds)
         setWishlist(wishlistIds)
-
-        // Update localStorage for optimistic UI updates
         localStorage.setItem(`wishlist-${clientId}`, JSON.stringify(wishlistIds))
       } else {
         console.log("No wishlist items found or invalid response format")
@@ -107,7 +101,6 @@ export default function ProductsPage() {
       }
     } catch (error) {
       console.error("Error fetching wishlist:", error)
-      // Fallback to localStorage if API fails
       try {
         const savedWishlist = localStorage.getItem(`wishlist-${clientId}`)
         if (savedWishlist) {
@@ -153,28 +146,20 @@ export default function ProductsPage() {
       setLoading(true)
       setError(null)
 
-      // Use environment variable if available, otherwise use a default URL
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
-      
-      // 🔥 NEW: Use client-specific endpoint that applies commission calculations
-      const endpoint = `${apiUrl}/api/getClientProducts`
-      console.log("🚀 Fetching client-specific products from:", endpoint)
+      console.log("🔥 Fetching CLIENT-SPECIFIC products from:", `${apiUrl}/api/getClientProducts`)
 
       const token = localStorage.getItem("clientImpersonationToken")
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
+      if (!token) {
+        throw new Error("No authentication token found")
       }
 
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`
-      } else {
-        throw new Error("No authentication token found. Please refresh the page.")
-      }
-
-      const response = await fetch(endpoint, {
+      const response = await fetch(`${apiUrl}/api/getClientProducts`, {
         method: "GET",
-        headers,
-        // Add a timeout to prevent long waiting times
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         signal: AbortSignal.timeout(10000), // 10 second timeout
       })
 
@@ -183,11 +168,23 @@ export default function ProductsPage() {
       }
 
       const data = await response.json()
-      
-      console.log("🎯 RAW BACKEND RESPONSE:", data)
+      console.log("🎯 Raw backend response:", data)
 
       if (data.success && Array.isArray(data.data)) {
-        console.log("✅ Products fetched successfully with commission calculations")
+        console.log("✅ Products fetched successfully with backend pricing:", data.data.length)
+
+        // Log detailed price information for each product
+        data.data.forEach((product: Product) => {
+          console.log(`🏷️ PRODUCT PRICE DEBUG - ${product.name}:`)
+          console.log(`   📊 Original Price: ₹${product.price}`)
+          console.log(`   💰 Updated Price: ₹${product.updatedPrice || 'Not provided'}`)
+          console.log(`   🔢 Base Price: ₹${product.basePrice || 'Not provided'}`)
+          console.log(`   ✅ DISPLAYING: ₹${product.updatedPrice || product.price}`)
+          if (product.commissionInfo) {
+            console.log(`   📈 Commission Info:`, product.commissionInfo)
+          }
+          console.log(`   ---`)
+        })
 
         // Filter out products with missing or invalid postId
         const validProducts = data.data.filter(
@@ -198,29 +195,14 @@ export default function ProductsPage() {
           console.warn(`Filtered out ${data.data.length - validProducts.length} products with invalid postId`)
         }
 
-        // Process the image URLs and log detailed price information
-        const processedProducts = validProducts.map((product: Product) => {
-          // 🔍 DETAILED PRICE DEBUGGING
-          console.log(`🏷️ PRODUCT PRICE DEBUG - ${product.name}:`)
-          console.log(`   📊 Original Price: ₹${product.price}`)
-          console.log(`   💰 Updated Price: ₹${product.updatedPrice || 'Not provided'}`)
-          console.log(`   🔢 Base Price: ₹${product.basePrice || 'Not provided'}`)
-          console.log(`   📈 Commission Info:`, product.commissionInfo || 'Not provided')
-          
-          const displayPrice = product.updatedPrice || product.price
-          console.log(`   ✅ DISPLAYING: ₹${displayPrice}`)
-          console.log(`   ---`)
-
-          return {
-            ...product,
-            image:
-              Array.isArray(product.image) && product.image.length > 0
-                ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
-                : ["/placeholder.svg"],
-            // Ensure basePrice is set
-            basePrice: product.basePrice || product.price,
-          }
-        })
+        // Process the image URLs to ensure they're valid
+        const processedProducts = validProducts.map((product: Product) => ({
+          ...product,
+          image:
+            Array.isArray(product.image) && product.image.length > 0
+              ? product.image.filter((url: string) => typeof url === "string" && url.trim() !== "")
+              : ["/placeholder.svg"],
+        }))
 
         setProducts(processedProducts)
       } else {
@@ -231,19 +213,17 @@ export default function ProductsPage() {
       console.error("❌ Error fetching products:", error)
       setError(errorMessage)
 
-      // Show error toast
       toast({
         title: "Error fetching products",
         description: "Could not load products from the server. Please try again later.",
         variant: "destructive",
       })
 
-      // Set empty products array
       setProducts([])
     } finally {
       setLoading(false)
     }
-  }, [toast])
+  }, [toast, clientId])
 
   // Fetch products on component mount
   useEffect(() => {
@@ -255,12 +235,11 @@ export default function ProductsPage() {
     router.push(`/client-dashboard/${clientId}/wishlist`)
   }
 
-  // Update the toggleWishlist function to make an API call instead of just updating local state
+  // Update the toggleWishlist function
   const toggleWishlist = useCallback(
     async (e: React.MouseEvent, productId: string) => {
-      e.preventDefault() // Prevent navigation
+      e.preventDefault()
 
-      // Add validation here
       if (!productId || typeof productId !== "string") {
         toast({
           title: "Error",
@@ -270,20 +249,16 @@ export default function ProductsPage() {
         return
       }
 
-      // Set loading state for this specific product
       setAddingToWishlist((prev) => ({ ...prev, [productId]: true }))
 
       // Optimistically update UI
       if (wishlist.includes(productId)) {
-        // Remove from wishlist
         setWishlist((prev) => prev.filter((id) => id !== productId))
       } else {
-        // Add to wishlist
         setWishlist((prev) => [...prev, productId])
       }
 
       try {
-        // Get the token
         const token = localStorage.getItem("clientImpersonationToken")
 
         if (!token) {
@@ -308,7 +283,6 @@ export default function ProductsPage() {
           const data = await response.json()
 
           if (data.success) {
-            // Update localStorage after successful API call
             const updatedWishlist = wishlist.filter((id) => id !== productId)
             localStorage.setItem(`wishlist-${clientId}`, JSON.stringify(updatedWishlist))
 
@@ -318,13 +292,12 @@ export default function ProductsPage() {
               variant: "default",
             })
 
-            // Refresh wishlist from backend to ensure sync
             fetchWishlist()
           } else {
             throw new Error(data.message || "Failed to remove from wishlist")
           }
         } else {
-          // Add to wishlist - let backend calculate the price
+          // Add to wishlist - NO PRICE CALCULATION, backend handles it
           const response = await fetch("https://evershinebackend-2.onrender.com/api/addToWishlist", {
             method: "POST",
             headers: {
@@ -333,7 +306,7 @@ export default function ProductsPage() {
             },
             body: JSON.stringify({
               productId,
-              // Don't send price - let backend calculate it
+              // Backend will calculate the price
             }),
           })
 
@@ -346,7 +319,6 @@ export default function ProductsPage() {
           const data = await response.json()
 
           if (data.success) {
-            // Update localStorage after successful API call
             const updatedWishlist = [...wishlist.filter((id) => id !== productId), productId]
             localStorage.setItem(`wishlist-${clientId}`, JSON.stringify(updatedWishlist))
 
@@ -363,7 +335,6 @@ export default function ProductsPage() {
               variant: "default",
             })
 
-            // Refresh wishlist from backend to ensure sync
             fetchWishlist()
           } else {
             throw new Error(data.message || "Failed to add to wishlist")
@@ -374,10 +345,8 @@ export default function ProductsPage() {
 
         // Revert the optimistic update
         if (wishlist.includes(productId)) {
-          // We were trying to remove, but failed, so add it back
           setWishlist((prev) => [...prev, productId])
         } else {
-          // We were trying to add, but failed, so remove it
           setWishlist((prev) => prev.filter((id) => id !== productId))
         }
 
@@ -393,9 +362,9 @@ export default function ProductsPage() {
     [wishlist, toast, clientId, router, fetchWishlist],
   )
 
-  // Add to cart function
+  // Add to cart function - NO PRICE CALCULATION
   const addToCart = async (e: React.MouseEvent, productId: string, productName: string) => {
-    e.preventDefault() // Prevent navigation
+    e.preventDefault()
 
     if (cart.includes(productId)) {
       toast({
@@ -407,10 +376,9 @@ export default function ProductsPage() {
     }
 
     try {
-      // Set loading state for this specific product
       setAddingToCart((prev) => ({ ...prev, [productId]: true }))
 
-      // Immediately update UI state to show item as added to cart
+      // Immediately update UI state
       setCart((prev) => [...prev, productId])
 
       // Update localStorage cart
@@ -418,14 +386,13 @@ export default function ProductsPage() {
       const cartItems = savedCart ? JSON.parse(savedCart) : []
       localStorage.setItem(`cart-${clientId}`, JSON.stringify([...cartItems, productId]))
 
-      // Get the token
       const token = localStorage.getItem("clientImpersonationToken")
 
       if (!token) {
         throw new Error("No authentication token found. Please refresh the token and try again.")
       }
 
-      // Make API request - let backend calculate price
+      // Make API request - NO PRICE CALCULATION, backend handles it
       const response = await fetch("https://evershinebackend-2.onrender.com/api/addToCart", {
         method: "POST",
         headers: {
@@ -434,7 +401,7 @@ export default function ProductsPage() {
         },
         body: JSON.stringify({
           productId,
-          // Don't send price - let backend calculate it
+          // Backend will calculate the price with commission
         }),
       })
 
@@ -466,18 +433,8 @@ export default function ProductsPage() {
         variant: "destructive",
       })
     } finally {
-      // Clear loading state
       setAddingToCart((prev) => ({ ...prev, [productId]: false }))
     }
-  }
-
-  // Add refresh wishlist function
-  const refreshWishlist = () => {
-    fetchWishlist()
-    toast({
-      title: "Refreshing wishlist",
-      description: "Getting the latest wishlist data from the server",
-    })
   }
 
   // Filter products based on search query
@@ -539,15 +496,12 @@ export default function ProductsPage() {
 
   // Add this function to handle product card clicks
   const handleProductClick = (e: React.MouseEvent, productId: string) => {
-    // Check if the click was on a button or its children
     const target = e.target as HTMLElement
     if (target.closest("button")) {
-      // If clicked on a button, don't navigate
       e.preventDefault()
       return
     }
 
-    // Otherwise, allow navigation to proceed
     router.push(`/client-dashboard/${clientId}/product/${productId}`)
   }
 
@@ -557,6 +511,7 @@ export default function ProductsPage() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <h1 className="text-3xl font-bold">Welcome, {clientData?.name?.split(" ")[0] || "Client"}</h1>
         </div>
+        
         {error && (
           <Alert variant="destructive" className="mb-4">
             <AlertCircle className="h-4 w-4" />
@@ -624,10 +579,9 @@ export default function ProductsPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             {filteredProducts.map((product) => {
-              // 🎯 DISPLAY BACKEND-CALCULATED PRICE
+              // Use backend-calculated price
               const displayPrice = product.updatedPrice || product.price
               const hasCommission = product.updatedPrice && product.updatedPrice !== product.price
-              const originalPrice = product.basePrice || product.price
 
               return (
                 <div
@@ -670,7 +624,7 @@ export default function ProductsPage() {
                   <div className="p-4">
                     <h3 className="font-semibold text-lg text-foreground line-clamp-1">{product.name}</h3>
 
-                    {/* 🎯 ENHANCED PRICE DISPLAY WITH BACKEND CALCULATIONS */}
+                    {/* Enhanced price display with backend pricing */}
                     <div className="mt-2">
                       {hasCommission ? (
                         <div className="space-y-1">
@@ -680,10 +634,10 @@ export default function ProductsPage() {
                               Commission Applied ✓
                             </span>
                           </div>
-                          <p className="text-sm text-gray-500 line-through">₹{originalPrice.toLocaleString()}/sqft</p>
+                          <p className="text-sm text-gray-500 line-through">₹{product.price.toLocaleString()}/sqft</p>
                           {product.commissionInfo && (
                             <p className="text-xs text-gray-600">
-                              +{product.commissionInfo.totalCommission}% total commission
+                              +{product.commissionInfo.finalMarkup.toFixed(1)}% markup
                             </p>
                           )}
                         </div>
@@ -731,7 +685,6 @@ export default function ProductsPage() {
           </div>
         )}
 
-        {/* Add extra space at the bottom to ensure scrolling is possible */}
         <div className="h-[500px]"></div>
       </div>
     </ErrorBoundary>
