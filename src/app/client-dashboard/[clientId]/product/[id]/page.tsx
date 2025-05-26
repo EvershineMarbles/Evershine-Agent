@@ -438,8 +438,42 @@ const ProductPage = () => {
                 {showVisualizer ? "Hide Product Visualizer" : "Show Product Visualizer"}
               </Button>
             </div>
+          </div>
 
-            {/* Custom Fields Section */}
+          {/* Right Column */}
+          <div>
+            {/* Product Details */}
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-lg font-semibold">Details</h2>
+                <ul className="list-disc pl-5 text-gray-700">
+                  <li>
+                    <strong>Price:</strong> ${product.price}
+                  </li>
+                  <li>
+                    <strong>Category:</strong> {product.category}
+                  </li>
+                  <li>
+                    <strong>Stock Quantity:</strong> {product.stockQuantity}
+                  </li>
+                </ul>
+              </div>
+
+              {/* Dates */}
+              <div>
+                <h2 className="text-lg font-semibold">Dates</h2>
+                <ul className="list-disc pl-5 text-gray-700">
+                  <li>
+                    <strong>Created At:</strong> {new Date(product.createdAt).toLocaleDateString()}
+                  </li>
+                  <li>
+                    <strong>Updated At:</strong> {new Date(product.updatedAt).toLocaleDateString()}
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Custom Fields Section - Moved for tablet optimization */}
             <div className="mt-6 space-y-4 p-4 bg-gray-50 rounded-xl">
               <h3 className="text-lg font-semibold text-gray-900">Customize Your Order</h3>
 
@@ -482,40 +516,6 @@ const ProductPage = () => {
                   onChange={(e) => setCustomThickness(e.target.value)}
                   className="w-full"
                 />
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column */}
-          <div>
-            {/* Product Details */}
-            <div className="space-y-4">
-              <div>
-                <h2 className="text-lg font-semibold">Details</h2>
-                <ul className="list-disc pl-5 text-gray-700">
-                  <li>
-                    <strong>Price:</strong> ${product.price}
-                  </li>
-                  <li>
-                    <strong>Category:</strong> {product.category}
-                  </li>
-                  <li>
-                    <strong>Stock Quantity:</strong> {product.stockQuantity}
-                  </li>
-                </ul>
-              </div>
-
-              {/* Dates */}
-              <div>
-                <h2 className="text-lg font-semibold">Dates</h2>
-                <ul className="list-disc pl-5 text-gray-700">
-                  <li>
-                    <strong>Created At:</strong> {new Date(product.createdAt).toLocaleDateString()}
-                  </li>
-                  <li>
-                    <strong>Updated At:</strong> {new Date(product.updatedAt).toLocaleDateString()}
-                  </li>
-                </ul>
               </div>
             </div>
 
