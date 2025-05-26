@@ -402,7 +402,7 @@ function AllQR() {
                           ) : (
                             <>
                               <Download className="h-4 w-4 mr-1" />
-                              <span className="hidden sm:inline">Download</span> QR
+                              <span className="hidden sm:inline">Download QR</span>
                             </>
                           )}
                         </Button>
