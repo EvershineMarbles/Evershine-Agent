@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Loader2, Package, FileText, RefreshCw } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 
+// Define interfaces for type safety
 interface OrderItem {
   name: string
   category: string
@@ -55,12 +56,15 @@ export default function OrdersPage() {
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
 
+  // Get API URL from environment or use default
   const getApiUrl = () => {
     return process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
   }
 
+  // Get token from localStorage
   const getToken = () => {
     try {
+      // Try both token storage options
       const token = localStorage.getItem("clientImpersonationToken") || localStorage.getItem("token")
       if (!token) {
         setError("No authentication token found. Please log in again.")
@@ -73,6 +77,7 @@ export default function OrdersPage() {
     }
   }
 
+  // Fetch orders
   const fetchOrders = async () => {
     try {
       setLoading(true)
@@ -85,9 +90,9 @@ export default function OrdersPage() {
       }
 
       const apiUrl = getApiUrl()
+      console.log("Fetching orders with token:", token.substring(0, 15) + "...")
 
-      // Use the correct backend endpoint: GET /order
-      const response = await fetch(`${apiUrl}/order`, {
+      const response = await fetch(`${apiUrl}/api/order`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -95,6 +100,7 @@ export default function OrdersPage() {
         },
       })
 
+      // Check for errors
       if (!response.ok) {
         if (response.status === 401) {
           throw new Error("Authentication failed. Please refresh the token and try again.")
@@ -104,13 +110,19 @@ export default function OrdersPage() {
       }
 
       const data = await response.json()
+      console.log("ORDERS - Full API response:", data)
 
+      // Your backend returns { message, data } format
       if (data && Array.isArray(data.data)) {
+        console.log("ORDERS - Orders data:", data.data)
         setOrders(data.data)
       } else {
+        // If data.data is not an array, check if the response itself is an array
         if (Array.isArray(data)) {
+          console.log("ORDERS - Orders data (direct array):", data)
           setOrders(data)
         } else {
+          console.warn("ORDERS - Unexpected response format:", data)
           setOrders([])
         }
       }
@@ -129,10 +141,12 @@ export default function OrdersPage() {
     }
   }
 
+  // Initialize data on component mount
   useEffect(() => {
     fetchOrders()
   }, [clientId, toast])
 
+  // Format date
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleDateString("en-US", {
@@ -143,18 +157,26 @@ export default function OrdersPage() {
   }
 
   // Calculate order total using backend prices
-  const calculateAdjustedTotal = (order: Order) => {
+  const calculateOrderTotal = (order: Order) => {
+    // If backend provides totalAmount, use it
+    if (order.totalAmount) {
+      return order.totalAmount
+    }
+
+    // Otherwise calculate from backend prices (updatedPrice or price)
     return order.items.reduce((total, item) => {
       const displayPrice = item.updatedPrice || item.price
       return total + displayPrice * item.quantity
     }, 0)
   }
 
+  // Handle refresh
   const handleRefresh = () => {
     setRefreshing(true)
     fetchOrders()
   }
 
+  // Loading state
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-[80vh]">
@@ -218,7 +240,9 @@ export default function OrdersPage() {
         </Card>
       ) : (
         <div className="space-y-6">
+          {/* Display only the most recent order */}
           {(() => {
+            // Sort orders by date (newest first) and take the first one
             const sortedOrders = [...orders].sort(
               (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
             )
@@ -268,6 +292,7 @@ export default function OrdersPage() {
                       <h3 className="font-medium mb-2">Items</h3>
                       <div className="space-y-2">
                         {currentOrder.items.map((item, index) => {
+                          // Use backend calculated price (updatedPrice) or fallback to price
                           const displayPrice = item.updatedPrice || item.price
                           const hasCommission = item.updatedPrice && item.updatedPrice !== item.price
                           const originalPrice = item.basePrice || item.price
@@ -277,6 +302,7 @@ export default function OrdersPage() {
                               <div>
                                 <p className="font-medium">{item.name}</p>
                                 <p className="text-sm text-muted-foreground">{item.category}</p>
+                                {/* Custom specifications - same as cart page */}
                                 {(item.customQuantity || item.customFinish || item.customThickness) && (
                                   <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
                                     {item.customQuantity && <div>Qty: {item.customQuantity} sqft</div>}
@@ -340,7 +366,7 @@ export default function OrdersPage() {
                         <span>Total</span>
                         <span>
                           ₹
-                          {calculateAdjustedTotal(currentOrder).toLocaleString(undefined, {
+                          {calculateOrderTotal(currentOrder).toLocaleString(undefined, {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2,
                           })}
