@@ -1,17 +1,12 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Loader2, Package, Printer, Download } from "lucide-react"
+import { ArrowLeft, Loader2, Package, FileText, RefreshCw } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
-import Link from "next/link"
-import { Separator } from "@/components/ui/separator"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { jsPDF } from "jspdf"
-import html2canvas from "html2canvas"
 
 interface OrderItem {
   name: string
@@ -49,18 +44,16 @@ interface Order {
   shippingAddress?: ShippingAddress
 }
 
-export default function OrderDetailsPage() {
+export default function OrdersPage() {
   const params = useParams()
   const router = useRouter()
   const { toast } = useToast()
   const clientId = params.clientId as string
-  const orderId = params.orderId as string
-  const invoiceRef = useRef<HTMLDivElement>(null)
 
-  const [order, setOrder] = useState<Order | null>(null)
+  const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [generatingPdf, setGeneratingPdf] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
 
   const getApiUrl = () => {
     return process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
@@ -80,7 +73,7 @@ export default function OrderDetailsPage() {
     }
   }
 
-  const fetchOrder = async () => {
+  const fetchOrders = async () => {
     try {
       setLoading(true)
       setError(null)
@@ -93,20 +86,40 @@ export default function OrderDetailsPage() {
 
       const apiUrl = getApiUrl()
 
-      // Use the correct backend endpoint: GET /order/:id
-      const response = await fetch(`${apiUrl}/order/${orderId}`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
+      // Try multiple possible endpoints until backend confirms the correct one
+      let response
+      try {
+        response = await fetch(`${apiUrl}/api/clients/${clientId}/orders`, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        })
+      } catch (error) {
+        // Fallback to other possible endpoints
+        try {
+          response = await fetch(`${apiUrl}/api/order`, {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          })
+        } catch (error) {
+          response = await fetch(`${apiUrl}/order`, {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          })
+        }
+      }
 
       if (!response.ok) {
         if (response.status === 401) {
           throw new Error("Authentication failed. Please refresh the token and try again.")
-        } else if (response.status === 404) {
-          throw new Error(`Order #${orderId} not found`)
         } else {
           throw new Error(`API error: ${response.status} ${response.statusText}`)
         }
@@ -114,16 +127,18 @@ export default function OrderDetailsPage() {
 
       const data = await response.json()
 
-      if (data && data.data && !Array.isArray(data.data)) {
-        setOrder(data.data)
-      } else if (data && !Array.isArray(data) && data.orderId) {
-        setOrder(data)
+      if (data && Array.isArray(data.data)) {
+        setOrders(data.data)
       } else {
-        throw new Error(`Order #${orderId} not found`)
+        if (Array.isArray(data)) {
+          setOrders(data)
+        } else {
+          setOrders([])
+        }
       }
     } catch (error: any) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to load order details. Please try again."
-      console.error("Error fetching order:", error)
+      const errorMessage = error instanceof Error ? error.message : "Failed to load orders. Please try again."
+      console.error("Error fetching orders:", error)
       setError(errorMessage)
       toast({
         title: "Error",
@@ -132,12 +147,13 @@ export default function OrderDetailsPage() {
       })
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }
 
   useEffect(() => {
-    fetchOrder()
-  }, [clientId, orderId, toast])
+    fetchOrders()
+  }, [clientId, toast])
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -148,449 +164,252 @@ export default function OrderDetailsPage() {
     })
   }
 
-  // Calculate order total using backend prices
-  const calculateAdjustedTotal = (order: Order) => {
+  // Use backend calculated total or calculate from backend prices
+  const calculateOrderTotal = (order: Order) => {
+    // If backend provides totalAmount, use it
+    if (order.totalAmount) {
+      return order.totalAmount
+    }
+
+    // Otherwise calculate from item prices (backend should provide correct prices)
     return order.items.reduce((total, item) => {
       const displayPrice = item.updatedPrice || item.price
       return total + displayPrice * item.quantity
     }, 0)
   }
 
-  const handlePrint = () => {
-    window.print()
-  }
-
-  const handleDownloadPdf = async () => {
-    if (!invoiceRef.current || !order) return
-
-    try {
-      setGeneratingPdf(true)
-      toast({
-        title: "Generating PDF",
-        description: "Please wait while we generate your invoice PDF...",
-      })
-
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4",
-      })
-
-      const element = invoiceRef.current
-
-      const originalStyles = {
-        background: element.style.background,
-        padding: element.style.padding,
-      }
-
-      element.style.background = "white"
-      element.style.padding = "15px"
-
-      const printElements = element.querySelectorAll(".print\\:block")
-      const printStyles = Array.from(printElements).map((el) => {
-        const style = (el as HTMLElement).style.display
-        ;(el as HTMLElement).style.display = "block"
-        return style
-      })
-
-      const hiddenElements = element.querySelectorAll(".print\\:hidden")
-      const hiddenStyles = Array.from(hiddenElements).map((el) => {
-        const style = (el as HTMLElement).style.display
-        ;(el as HTMLElement).style.display = "none"
-        return style
-      })
-
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: "#ffffff",
-      })
-
-      element.style.background = originalStyles.background
-      element.style.padding = originalStyles.padding
-
-      printElements.forEach((el, i) => {
-        ;(el as HTMLElement).style.display = printStyles[i]
-      })
-
-      hiddenElements.forEach((el, i) => {
-        ;(el as HTMLElement).style.display = hiddenStyles[i]
-      })
-
-      const imgData = canvas.toDataURL("image/jpeg", 1.0)
-      const imgWidth = 210
-      const pageHeight = 297
-      const imgHeight = (canvas.height * imgWidth) / canvas.width
-      let heightLeft = imgHeight
-      let position = 0
-
-      pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight)
-      heightLeft -= pageHeight
-
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight
-        pdf.addPage()
-        pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight)
-        heightLeft -= pageHeight
-      }
-
-      pdf.save(`Invoice-${order.orderId}.pdf`)
-
-      toast({
-        title: "PDF Generated",
-        description: "Your invoice has been downloaded successfully.",
-      })
-    } catch (error) {
-      console.error("Error generating PDF:", error)
-      toast({
-        title: "Error",
-        description: "Failed to generate PDF. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setGeneratingPdf(false)
-    }
+  const handleRefresh = () => {
+    setRefreshing(true)
+    fetchOrders()
   }
 
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-[80vh]">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-muted-foreground">Loading order details...</p>
+        <p className="text-muted-foreground">Loading orders...</p>
       </div>
     )
   }
 
-  if (error) {
-    return (
-      <div className="p-4 md:p-6">
-        <div className="flex items-center mb-6">
+  return (
+    <div className="p-6 md:p-8">
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center">
           <Button variant="ghost" size="icon" onClick={() => router.back()} className="mr-4">
             <ArrowLeft className="h-5 w-5" />
             <span className="sr-only">Go back</span>
           </Button>
-          <h1 className="text-2xl font-bold">Order Details</h1>
+          <h1 className="text-3xl font-bold">Your Current Order</h1>
         </div>
 
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="relative"
+          aria-label="Refresh orders"
+        >
+          <RefreshCw className={`h-5 w-5 ${refreshing ? "animate-spin" : ""}`} />
+        </Button>
+      </div>
+
+      {error && (
         <Card className="mb-6 border-red-200 bg-red-50">
           <CardContent className="p-4 text-red-800">
             <p>{error}</p>
             <Button
               variant="outline"
               className="mt-2 border-red-300 text-red-800 hover:bg-red-100"
-              onClick={() => fetchOrder()}
+              onClick={() => fetchOrders()}
             >
               Try Again
             </Button>
           </CardContent>
         </Card>
+      )}
 
-        <Button variant="outline" onClick={() => router.back()}>
-          Back to Orders
-        </Button>
-      </div>
-    )
-  }
-
-  if (!order) {
-    return (
-      <div className="p-4 md:p-6">
-        <div className="flex items-center mb-6">
-          <Button variant="ghost" size="icon" onClick={() => router.back()} className="mr-4">
-            <ArrowLeft className="h-5 w-5" />
-            <span className="sr-only">Go back</span>
-          </Button>
-          <h1 className="text-2xl font-bold">Order Details</h1>
-        </div>
-
-        <Card className="text-center py-8">
+      {orders.length === 0 ? (
+        <Card className="text-center py-12">
           <CardContent className="pt-6">
-            <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h2 className="text-lg font-medium mb-4">Order not found</h2>
-            <p className="text-muted-foreground mb-6">The requested order could not be found</p>
+            <Package className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+            <h2 className="text-xl font-medium mb-4">No orders found</h2>
+            <p className="text-muted-foreground mb-6">You haven&apos;t placed any orders yet</p>
             <Button
-              onClick={() => router.push(`/client-dashboard/${clientId}`)}
+              onClick={() => router.push(`/client-dashboard/${clientId}/products`)}
               className="bg-primary hover:bg-primary/90"
             >
-              Return to Dashboard
+              Browse Products
             </Button>
           </CardContent>
         </Card>
-      </div>
-    )
-  }
+      ) : (
+        <div className="space-y-6">
+          {(() => {
+            const sortedOrders = [...orders].sort(
+              (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+            )
+            const currentOrder = sortedOrders[0]
 
-  return (
-    <div className="p-4 md:p-6 max-w-4xl mx-auto">
-      <div ref={invoiceRef}>
-        <div className="hidden print:block mb-6">
-          <h1 className="text-2xl font-bold text-center">INVOICE</h1>
-          <p className="text-center text-muted-foreground">Order #{order.orderId}</p>
-        </div>
+            return (
+              <Card key={currentOrder.orderId} className="overflow-hidden">
+                <CardHeader className="bg-muted/20 pb-3">
+                  <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-2">
+                    <CardTitle className="text-lg">Order #{currentOrder.orderId}</CardTitle>
+                    <div className="flex flex-wrap gap-2 text-sm">
+                      <span className="text-muted-foreground">Placed on {formatDate(currentOrder.createdAt)}</span>
+                      <span className="mx-2 text-muted-foreground hidden md:inline">•</span>
+                      <Badge
+                        variant={
+                          currentOrder.status === "delivered"
+                            ? "success"
+                            : currentOrder.status === "shipped"
+                              ? "info"
+                              : currentOrder.status === "processing"
+                                ? "warning"
+                                : currentOrder.status === "cancelled"
+                                  ? "destructive"
+                                  : "outline"
+                        }
+                      >
+                        {currentOrder.status.charAt(0).toUpperCase() + currentOrder.status.slice(1)}
+                      </Badge>
+                      <Badge
+                        variant={
+                          currentOrder.paymentStatus === "paid"
+                            ? "success"
+                            : currentOrder.paymentStatus === "failed"
+                              ? "destructive"
+                              : "warning"
+                        }
+                      >
+                        Payment:{" "}
+                        {currentOrder.paymentStatus.charAt(0).toUpperCase() + currentOrder.paymentStatus.slice(1)}
+                      </Badge>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="md:col-span-2">
+                      <h3 className="font-medium mb-2">Items</h3>
+                      <div className="space-y-2">
+                        {currentOrder.items.map((item, index) => {
+                          // Use backend calculated price (updatedPrice) or fallback to price
+                          const displayPrice = item.updatedPrice || item.price
+                          const hasCommission = item.updatedPrice && item.updatedPrice !== item.price
+                          const originalPrice = item.basePrice || item.price
 
-        <div className="flex items-center justify-between mb-6 print:hidden">
-          <div className="flex items-center">
-            <Button variant="ghost" size="icon" onClick={() => router.back()} className="mr-4">
-              <ArrowLeft className="h-5 w-5" />
-              <span className="sr-only">Go back</span>
-            </Button>
-            <h1 className="text-2xl font-bold">Invoice</h1>
-          </div>
-
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handlePrint}>
-              <Printer className="h-4 w-4 mr-2" />
-              Print
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleDownloadPdf} disabled={generatingPdf}>
-              {generatingPdf ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Download className="h-4 w-4 mr-2" />
-                  Download PDF
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-
-        <Card className="mb-6 overflow-hidden">
-          <CardHeader className="bg-muted/20 pb-3">
-            <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-2">
-              <div>
-                <CardTitle className="text-lg">Order #{order.orderId}</CardTitle>
-                <p className="text-sm text-muted-foreground">Placed on {formatDate(order.createdAt)}</p>
-              </div>
-              <div className="flex flex-wrap gap-2 text-sm">
-                <Badge
-                  variant={
-                    order.status === "delivered"
-                      ? "default"
-                      : order.status === "shipped"
-                        ? "secondary"
-                        : order.status === "processing"
-                          ? "outline"
-                          : order.status === "cancelled"
-                            ? "destructive"
-                            : "outline"
-                  }
-                >
-                  {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                </Badge>
-                <Badge
-                  variant={
-                    order.paymentStatus === "paid"
-                      ? "default"
-                      : order.paymentStatus === "failed"
-                        ? "destructive"
-                        : "outline"
-                  }
-                >
-                  Payment: {order.paymentStatus.charAt(0).toUpperCase() + order.paymentStatus.slice(1)}
-                </Badge>
-              </div>
-            </div>
-          </CardHeader>
-
-          <CardContent className="p-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <div>
-                <h3 className="font-medium text-base mb-2">Billing Information</h3>
-                <div className="text-sm">
-                  <p className="font-medium">Client ID: {clientId}</p>
-                  {order.shippingAddress ? (
-                    <>
-                      <p className="mt-2">{order.shippingAddress.street}</p>
-                      <p>
-                        {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.postalCode}
-                      </p>
-                      <p>{order.shippingAddress.country}</p>
-                    </>
-                  ) : (
-                    <p className="text-muted-foreground mt-2">No billing address provided</p>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <h3 className="font-medium text-base mb-2">Shipping Information</h3>
-                <div className="text-sm">
-                  {order.shippingAddress ? (
-                    <>
-                      <p>{order.shippingAddress.street}</p>
-                      <p>
-                        {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.postalCode}
-                      </p>
-                      <p>{order.shippingAddress.country}</p>
-                    </>
-                  ) : (
-                    <p className="text-muted-foreground">No shipping address provided</p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <Separator className="my-4" />
-
-            <h3 className="font-medium text-base mb-3">Order Items</h3>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-xs">Item</TableHead>
-                    <TableHead className="text-xs">Category</TableHead>
-                    <TableHead className="text-xs">Custom Specs</TableHead>
-                    <TableHead className="text-right text-xs">Price</TableHead>
-                    <TableHead className="text-right text-xs">Qty</TableHead>
-                    <TableHead className="text-right text-xs">Total</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {order.items.map((item, index) => {
-                    const displayPrice = item.updatedPrice || item.price
-                    const hasCommission = item.updatedPrice && item.updatedPrice !== item.price
-                    const originalPrice = item.basePrice || item.price
-
-                    return (
-                      <TableRow key={index}>
-                        <TableCell className="font-medium text-sm">{item.name}</TableCell>
-                        <TableCell className="text-sm">{item.category}</TableCell>
-                        <TableCell>
-                          <div className="text-xs space-y-1">
-                            {item.customQuantity && <div>Qty: {item.customQuantity} sqft</div>}
-                            {item.customFinish && <div>Finish: {item.customFinish}</div>}
-                            {item.customThickness && <div>Thickness: {item.customThickness} mm</div>}
-                            {!item.customQuantity && !item.customFinish && !item.customThickness && (
-                              <div className="text-muted-foreground">Standard specs</div>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="space-y-1">
-                            {hasCommission ? (
-                              <>
-                                <div className="font-medium text-green-600 text-sm">
-                                  ₹
-                                  {displayPrice.toLocaleString(undefined, {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}
-                                </div>
-                                <div className="text-xs text-gray-500 line-through">
-                                  ₹
-                                  {originalPrice.toLocaleString(undefined, {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}
-                                </div>
-                                {item.commissionInfo && (
-                                  <div className="text-xs text-gray-600">+{item.commissionInfo.totalCommission}%</div>
+                          return (
+                            <div key={index} className="flex justify-between border-b pb-2">
+                              <div>
+                                <p className="font-medium">{item.name}</p>
+                                <p className="text-sm text-muted-foreground">{item.category}</p>
+                                {(item.customQuantity || item.customFinish || item.customThickness) && (
+                                  <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                                    {item.customQuantity && <div>Qty: {item.customQuantity} sqft</div>}
+                                    {item.customFinish && <div>Finish: {item.customFinish}</div>}
+                                    {item.customThickness && <div>Thickness: {item.customThickness} mm</div>}
+                                  </div>
                                 )}
-                              </>
-                            ) : (
-                              <div className="font-medium text-sm">
-                                ₹
-                                {displayPrice.toLocaleString(undefined, {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}
                               </div>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right text-sm">{item.quantity}</TableCell>
-                        <TableCell className="text-right text-sm">
+                              <div className="text-right">
+                                {hasCommission ? (
+                                  <div className="space-y-1">
+                                    <p className="text-green-600 font-medium">
+                                      ₹
+                                      {displayPrice.toLocaleString(undefined, {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      })}{" "}
+                                      × {item.quantity}
+                                    </p>
+                                    <p className="text-xs text-gray-500 line-through">
+                                      Base: ₹{originalPrice.toLocaleString()}
+                                    </p>
+                                    <p className="font-medium text-green-600">
+                                      ₹
+                                      {(displayPrice * item.quantity).toLocaleString(undefined, {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      })}
+                                    </p>
+                                    {item.commissionInfo && (
+                                      <p className="text-xs text-gray-600">
+                                        +{item.commissionInfo.totalCommission}% commission
+                                      </p>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div>
+                                    <p>
+                                      ₹
+                                      {displayPrice.toLocaleString(undefined, {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      })}{" "}
+                                      × {item.quantity}
+                                    </p>
+                                    <p className="font-medium">
+                                      ₹
+                                      {(displayPrice * item.quantity).toLocaleString(undefined, {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      })}
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                      <div className="flex justify-between mt-4 pt-2 font-bold">
+                        <span>Total</span>
+                        <span>
                           ₹
-                          {(displayPrice * item.quantity).toLocaleString(undefined, {
+                          {calculateOrderTotal(currentOrder).toLocaleString(undefined, {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2,
                           })}
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+                        </span>
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="font-medium mb-2">Shipping Address</h3>
+                      {currentOrder.shippingAddress ? (
+                        <div className="text-sm">
+                          <p>{currentOrder.shippingAddress.street}</p>
+                          <p>
+                            {currentOrder.shippingAddress.city}, {currentOrder.shippingAddress.state}{" "}
+                            {currentOrder.shippingAddress.postalCode}
+                          </p>
+                          <p>{currentOrder.shippingAddress.country}</p>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No shipping address provided</p>
+                      )}
 
-            <div className="mt-4 flex flex-col items-end">
-              <div className="w-full md:w-1/3 space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span>Subtotal:</span>
-                  <span>
-                    ₹
-                    {calculateAdjustedTotal(order).toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Shipping:</span>
-                  <span>₹0.00</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Tax:</span>
-                  <span>Included</span>
-                </div>
-                <Separator className="my-2" />
-                <div className="flex justify-between font-bold">
-                  <span>Total:</span>
-                  <span>
-                    ₹
-                    {calculateAdjustedTotal(order).toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-
-          <CardFooter className="bg-muted/10 justify-between py-3 print:hidden">
-            <Button variant="outline" onClick={() => router.back()}>
-              Back to Orders
-            </Button>
-            <Button variant="default">Track Order</Button>
-          </CardFooter>
-        </Card>
-
-        <div className="text-center text-sm text-muted-foreground mt-6 print:mt-12">
-          <p>Thank you for your business!</p>
-          <p className="mt-1">If you have any questions, please contact our support team.</p>
-          <p className="mt-4 print:hidden">
-            <Link href={`/client-dashboard/${clientId}`} className="text-primary hover:underline">
-              Back to Dashboard
-            </Link>
-          </p>
+                      <div className="mt-4">
+                        <Button
+                          variant="outline"
+                          className="w-full mt-2"
+                          size="sm"
+                          onClick={() => router.push(`/client-dashboard/${clientId}/orders/${currentOrder.orderId}`)}
+                        >
+                          <FileText className="h-4 w-4 mr-2" />
+                          View Invoice
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })()}
         </div>
-
-        <div className="hidden print:block mt-12 pt-6 border-t text-center text-sm text-muted-foreground">
-          <p>This is an electronically generated invoice and does not require a signature.</p>
-        </div>
-      </div>
-
-      <style jsx global>{`
-       @media print {
-         @page {
-           size: A4;
-           margin: 1cm;
-         }
-         body {
-           -webkit-print-color-adjust: exact !important;
-           print-color-adjust: exact !important;
-         }
-       }
-       .generating-pdf {
-         background-color: white !important;
-       }
-     `}</style>
+      )}
     </div>
   )
 }
