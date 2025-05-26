@@ -3,13 +3,12 @@
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import axios, { AxiosError } from "axios"
-import { ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Calculator } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Calculator } from "lucide-react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import ProductVisualizer from "@/components/ProductVisualizer"
-
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
@@ -22,6 +21,8 @@ interface Product {
   image: string[]
   postId: string
   quantityAvailable: number
+  price: number
+  basePrice?: number
   size?: string
   sizeUnit?: string
   numberOfPieces?: number | null
@@ -33,6 +34,15 @@ interface ApiResponse {
   success: boolean
   data?: Product[]
   msg?: string
+}
+
+// Commission data interface
+interface CommissionData {
+  agentId: string
+  name: string
+  email: string
+  commissionRate: number
+  categoryCommissions?: Record<string, number>
 }
 
 // Add this enhanced debugging function at the top of the component, before the useEffect
@@ -107,6 +117,76 @@ export default function ProductDetail() {
   const [galleryOpen, setGalleryOpen] = useState(false)
   const [showVisualizer, setShowVisualizer] = useState(false)
 
+  // Agent pricing state
+  const [commissionData, setCommissionData] = useState<CommissionData | null>(null)
+  const [agentPrice, setAgentPrice] = useState<number | null>(null)
+  const [priceLoading, setPriceLoading] = useState(false)
+
+  // Get agent token
+  const getAgentToken = () => {
+    try {
+      return localStorage.getItem("agentToken") || localStorage.getItem("adminToken")
+    } catch (e) {
+      console.error("Error accessing agent token:", e)
+      return null
+    }
+  }
+
+  // Fetch agent commission data
+  const fetchAgentCommissionData = async () => {
+    try {
+      const token = getAgentToken()
+      if (!token) return null
+
+      const response = await fetch(`${API_URL}/api/agent/commission`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (!response.ok) {
+        console.error("Failed to fetch agent commission data:", response.status)
+        return null
+      }
+
+      const data = await response.json()
+      if (data.success && data.data) {
+        setCommissionData(data.data)
+        return data.data
+      }
+      return null
+    } catch (error) {
+      console.error("Error fetching agent commission data:", error)
+      return null
+    }
+  }
+
+  // Calculate agent price (Base Price + Agent Commission only)
+  const calculateAgentPrice = (product: Product) => {
+    if (!product || (!product.price && !product.basePrice)) return null
+
+    const basePrice = product.basePrice || product.price
+
+    // Get agent commission rate
+    let agentCommissionRate = commissionData?.commissionRate || 10
+
+    // Check for category-specific commission
+    if (
+      commissionData?.categoryCommissions &&
+      product.category &&
+      commissionData.categoryCommissions[product.category]
+    ) {
+      agentCommissionRate = commissionData.categoryCommissions[product.category]
+    }
+
+    // Calculate agent price: Base Price + Agent Commission only
+    const finalAgentPrice = basePrice * (1 + agentCommissionRate / 100)
+
+    console.log(`AGENT DASHBOARD PRICING for ${product.name}:`)
+    console.log(`Base price: ${basePrice}`)
+    console.log(`Agent commission rate: ${agentCommissionRate}%`)
+    console.log(`Final agent price: ${finalAgentPrice.toFixed(2)}`)
+
+    return Math.round(finalAgentPrice * 100) / 100
+  }
 
   const openGallery = () => {
     setGalleryOpen(true)
@@ -122,10 +202,14 @@ export default function ProductDetail() {
       try {
         setLoading(true)
         setError("")
+        setPriceLoading(true)
 
         if (!params.id) {
           throw new Error("Product ID is missing")
         }
+
+        // Fetch commission data first
+        await fetchAgentCommissionData()
 
         const response = await axios.get<ApiResponse>(`${API_URL}/api/getPostDataById`, {
           params: { id: params.id },
@@ -176,11 +260,20 @@ export default function ProductDetail() {
         setError(errorMessage)
       } finally {
         setLoading(false)
+        setPriceLoading(false)
       }
     }
 
     fetchProduct()
   }, [params.id])
+
+  // Calculate agent price when commission data and product are available
+  useEffect(() => {
+    if (product && commissionData) {
+      const calculatedPrice = calculateAgentPrice(product)
+      setAgentPrice(calculatedPrice)
+    }
+  }, [product, commissionData])
 
   const handleThumbnailClick = (index: number) => {
     setCurrentImageIndex(index)
@@ -332,11 +425,12 @@ export default function ProductDetail() {
 
   // Also add debugging right before rendering
   if (product) {
-    console.log("========== PRODUCT DATA BEFORE RENDER ==========")
+    console.log("========== AGENT DASHBOARD PRODUCT DATA BEFORE RENDER ==========")
     console.log("Size:", product.size)
     console.log("Number of Pieces:", product.numberOfPieces)
     console.log("Thickness:", product.thickness)
-    console.log("=================================================")
+    console.log("Agent Price:", agentPrice)
+    console.log("=================================================================")
   }
 
   return (
@@ -428,6 +522,37 @@ export default function ProductDetail() {
             <div className="pb-4 border-b border-gray-200">
               <p className="text-gray-500">Product Category</p>
               <p className="text-xl font-bold mt-1">{product.category}</p>
+            </div>
+
+            {/* Agent Price Section - NEW */}
+            <div className="pb-4 border-b border-gray-200">
+              <p className="text-gray-500">Agent Price (per sqft)</p>
+              {priceLoading ? (
+                <div className="flex items-center mt-1">
+                  <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-[#194a95] mr-2"></div>
+                  <p className="text-lg text-gray-500">Calculating price...</p>
+                </div>
+              ) : agentPrice !== null ? (
+                <div className="mt-1">
+                  <p className="text-3xl font-bold text-[#194a95]">
+                    ₹
+                    {agentPrice.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </p>
+                  <p className="text-sm text-gray-500 mt-1">Base price + agent commission</p>
+                  {/* Show commission rate for debugging (can be removed in production) */}
+                  {process.env.NODE_ENV === "development" && commissionData && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      Commission:{" "}
+                      {commissionData.categoryCommissions?.[product.category] || commissionData.commissionRate}%
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xl font-bold mt-1 text-gray-500">Price not available</p>
+              )}
             </div>
 
             {/* Quantity Available */}
@@ -548,22 +673,21 @@ export default function ProductDetail() {
         </div>
       </div>
 
-         {/* Visualizer Button */}
-         <div className="pb-4 border-b border-gray-200 mt-4">
-              <Button
-                onClick={() => setShowVisualizer(!showVisualizer)}
-                className="w-full bg-[#194a95] hover:bg-[#0f3a7a] py-3 text-white"
-              >
-                {showVisualizer ? "Hide Visualizer" : "Show Product Visualizer"}
-              </Button>
-            </div>
-            {/* Product Visualizer Section */}
-            {showVisualizer && product.image.length > 0 && (
-              <div className="mt-4">
-                <ProductVisualizer productImage={product.image[0]} productName={product.name}  />
-              </div>
-            )}
-        
+      {/* Visualizer Button */}
+      <div className="pb-4 border-b border-gray-200 mt-4">
+        <Button
+          onClick={() => setShowVisualizer(!showVisualizer)}
+          className="w-full bg-[#194a95] hover:bg-[#0f3a7a] py-3 text-white"
+        >
+          {showVisualizer ? "Hide Visualizer" : "Show Product Visualizer"}
+        </Button>
+      </div>
+      {/* Product Visualizer Section */}
+      {showVisualizer && product.image.length > 0 && (
+        <div className="mt-4">
+          <ProductVisualizer productImage={product.image[0]} productName={product.name} />
+        </div>
+      )}
 
       {/* Disclaimer */}
       <div className="max-w-6xl mx-auto mt-8 pt-4 border-t">
@@ -597,8 +721,6 @@ export default function ProductDetail() {
                 priority
               />
             </div>
-
-           
 
             {/* Gallery navigation */}
             {product.image.length > 1 && (
@@ -643,7 +765,6 @@ export default function ProductDetail() {
           </div>
         </div>
       )}
-   
     </div>
   )
 }
