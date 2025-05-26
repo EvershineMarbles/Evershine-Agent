@@ -333,7 +333,7 @@ function AllQR() {
                     <tr key={product._id} className="hover:bg-gray-50">
                       <td className="px-4 py-4">
                         <div className="flex items-center">
-                        <Link href={`/product/${product.postId}`} className="h-10 w-10 flex-shrink-0 mr-3 block">
+                        <Link href={`/admin/dashboard/product/${product.postId}`} className="h-10 w-10 flex-shrink-0 mr-3 block">
                       
                             <Image
                               src={
