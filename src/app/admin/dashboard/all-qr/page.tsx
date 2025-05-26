@@ -352,7 +352,7 @@ function AllQR() {
                           </Link>
                           <div className="ml-2 min-w-0">
                             <Link
-                              href={`/product/${product.postId}`}
+                              href={`/admin/dashboard/product/${product.postId}`}
                               className="text-sm font-medium text-gray-900 hover:text-[#194a95] transition-colors cursor-pointer truncate block"
                             >
 
