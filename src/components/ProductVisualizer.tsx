@@ -313,13 +313,14 @@ export default function ProductVisualizer({ productImage, productName }: Product
         {MOCKUPS.map((mockup) => (
           <TabsContent key={mockup.id} value={mockup.id} className="mt-0">
             <div className="border rounded-lg p-2 bg-gray-50">
-              <div className="relative rounded-lg overflow-hidden bg-white border">
+              <div className="relative rounded-lg overflow-hidden bg-white border min-h-[400px] flex items-center justify-center">
                 {showLoading ? (
-                  <div className="flex items-center justify-center h-[200px]">
-                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#194a95]"></div>
+                  <div className="flex flex-col items-center justify-center h-[400px] w-full">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#194a95] mb-4"></div>
+                    <p className="text-sm text-gray-500">Loading visualization...</p>
                   </div>
                 ) : (
-                  <div className="flex justify-center">
+                  <div className="flex justify-center w-full">
                     <div
                       className="relative inline-block max-w-full"
                       style={{
