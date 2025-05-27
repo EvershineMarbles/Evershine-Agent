@@ -587,9 +587,10 @@ export default function ProductDetail() {
                     setTimeout(() => {
                       visualizerRef.current?.scrollIntoView({
                         behavior: "smooth",
-                        block: "start",
+                        block: "end",
+                        inline: "nearest",
                       })
-                    }, 100)
+                    }, 200)
                   } else {
                     setShowVisualizer(false)
                   }
@@ -644,8 +645,6 @@ export default function ProductDetail() {
             </div>
           </div>
 
-
-
           <div className="w-full md:w-1/2 md:order-1 space-y-6">
             <div className="pb-4 border-b border-gray-200">
               <p className="text-gray-500">Product Name</p>
@@ -694,8 +693,6 @@ export default function ProductDetail() {
                 </p>
               </div>
             </div>
-
-        
 
             <div className="pb-4 border-b border-gray-200">
               <p className="text-gray-500">Application Areas</p>
@@ -753,7 +750,7 @@ export default function ProductDetail() {
         </div>
 
         {showVisualizer && product.image.length > 0 && (
-          <div ref={visualizerRef} className="mt-8 pt-4 border-t border-gray-200">
+          <div ref={visualizerRef} className="mt-8 pt-8 border-t border-gray-200 pb-8">
             <ProductVisualizer productImage={product.image[0]} productName={product.name} />
           </div>
         )}
