@@ -583,14 +583,13 @@ export default function ProductDetail() {
                 onClick={() => {
                   if (!showVisualizer) {
                     setShowVisualizer(true)
-                    // Scroll to visualizer section after a short delay to ensure it's rendered
+                    // Scroll to complete bottom of the page after visualizer loads
                     setTimeout(() => {
-                      visualizerRef.current?.scrollIntoView({
+                      window.scrollTo({
+                        top: document.documentElement.scrollHeight,
                         behavior: "smooth",
-                        block: "end",
-                        inline: "nearest",
                       })
-                    }, 200)
+                    }, 300)
                   } else {
                     setShowVisualizer(false)
                   }
