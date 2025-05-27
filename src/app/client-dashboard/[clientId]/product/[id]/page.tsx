@@ -583,14 +583,14 @@ export default function ProductDetail() {
                 onClick={() => {
                   if (!showVisualizer) {
                     setShowVisualizer(true)
-                    // Multiple attempts to scroll to bottom
+                    // Scroll to visualizer section after a short delay to ensure it's rendered
                     setTimeout(() => {
-                      // Method 1: Scroll to document bottom
-                      window.scrollTo({
-                        top: document.documentElement.scrollHeight,
+                      visualizerRef.current?.scrollIntoView({
                         behavior: "smooth",
+                        block: "end",
+                        inline: "nearest",
                       })
-                    }, 1000)
+                    }, 200)
                   } else {
                     setShowVisualizer(false)
                   }
@@ -750,10 +750,8 @@ export default function ProductDetail() {
         </div>
 
         {showVisualizer && product.image.length > 0 && (
-          <div ref={visualizerRef} className="mt-12 pt-8 border-t border-gray-200 pb-32">
+          <div ref={visualizerRef} className="mt-8 pt-8 border-t border-gray-200 pb-8">
             <ProductVisualizer productImage={product.image[0]} productName={product.name} />
-            {/* Large bottom spacer to ensure scroll reaches the end */}
-            <div className="h-96 w-full"></div>
           </div>
         )}
 
