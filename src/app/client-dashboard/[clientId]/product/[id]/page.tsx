@@ -599,7 +599,52 @@ export default function ProductDetail() {
                 {showVisualizer ? "Hide Product Visualizer" : "Show Product Visualizer"}
               </Button>
             </div>
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="customQuantity">Quantity (sqft)</Label>
+                <Input
+                  type="number"
+                  id="customQuantity"
+                  placeholder="Enter quantity"
+                  value={customQuantity}
+                  onChange={(e) => setCustomQuantity(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="customFinish">Finish</Label>
+                <Select onValueChange={(value) => setCustomFinish(value)} defaultValue={customFinish}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select finish" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="polish">Polish</SelectItem>
+                    <SelectItem value="leather">Leather</SelectItem>
+                    <SelectItem value="flute">Flute</SelectItem>
+                    <SelectItem value="river">River</SelectItem>
+                    <SelectItem value="satin">Satin</SelectItem>
+                    <SelectItem value="dual">Dual</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="customThickness">Thickness (mm)</Label>
+                <Input
+                  type="text"
+                  id="customThickness"
+                  placeholder="Enter thickness"
+                  value={customThickness}
+                  onChange={(e) => setCustomThickness(e.target.value)}
+                  className="w-full"
+                />
+              </div>
+            </div>
           </div>
+
+
 
           <div className="w-full md:w-1/2 md:order-1 space-y-6">
             <div className="pb-4 border-b border-gray-200">
@@ -650,48 +695,7 @@ export default function ProductDetail() {
               </div>
             </div>
 
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="customQuantity">Quantity (sqft)</Label>
-                <Input
-                  type="number"
-                  id="customQuantity"
-                  placeholder="Enter quantity"
-                  value={customQuantity}
-                  onChange={(e) => setCustomQuantity(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="customFinish">Finish</Label>
-                <Select onValueChange={(value) => setCustomFinish(value)} defaultValue={customFinish}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select finish" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="polish">Polish</SelectItem>
-                    <SelectItem value="leather">Leather</SelectItem>
-                    <SelectItem value="flute">Flute</SelectItem>
-                    <SelectItem value="river">River</SelectItem>
-                    <SelectItem value="satin">Satin</SelectItem>
-                    <SelectItem value="dual">Dual</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="customThickness">Thickness (mm)</Label>
-                <Input
-                  type="text"
-                  id="customThickness"
-                  placeholder="Enter thickness"
-                  value={customThickness}
-                  onChange={(e) => setCustomThickness(e.target.value)}
-                  className="w-full"
-                />
-              </div>
-            </div>
+        
 
             <div className="pb-4 border-b border-gray-200">
               <p className="text-gray-500">Application Areas</p>
