@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Home, ShoppingCart, Heart, QrCode, Package, Settings, LogOut, User } from "lucide-react"
+import { Home, ShoppingCart, Heart, QrCode, Package, Settings, LogOut, User, PackageSearch } from "lucide-react"
 
 interface IconSidebarProps {
   clientId: string
@@ -37,6 +37,11 @@ export function IconSidebar({ clientId }: IconSidebarProps) {
       name: "Cart",
       href: `/client-dashboard/${clientId}/cart`,
       icon: ShoppingCart,
+    },
+    {
+      name: "Past Orders",
+      href: `/client-dashboard/${clientId}/past-orders`,
+      icon: PackageSearch,
     },
     {
       name: "Settings",
