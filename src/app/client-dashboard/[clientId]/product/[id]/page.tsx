@@ -583,14 +583,20 @@ export default function ProductDetail() {
                 onClick={() => {
                   if (!showVisualizer) {
                     setShowVisualizer(true)
-                    // Scroll to visualizer section after a short delay to ensure it's rendered
+                    // Scroll to visualizer section after a longer delay to ensure it's fully rendered
                     setTimeout(() => {
-                      visualizerRef.current?.scrollIntoView({
-                        behavior: "smooth",
-                        block: "end",
-                        inline: "nearest",
-                      })
-                    }, 200)
+                      if (visualizerRef.current) {
+                        // Get the bottom position of the visualizer
+                        const rect = visualizerRef.current.getBoundingClientRect()
+                        const absoluteBottom = window.pageYOffset + rect.bottom
+
+                        // Scroll to the absolute bottom with extra padding
+                        window.scrollTo({
+                          top: absoluteBottom + 100, // Add 100px extra padding
+                          behavior: "smooth",
+                        })
+                      }
+                    }, 800) // Increased delay to 800ms
                   } else {
                     setShowVisualizer(false)
                   }
@@ -750,8 +756,10 @@ export default function ProductDetail() {
         </div>
 
         {showVisualizer && product.image.length > 0 && (
-          <div ref={visualizerRef} className="mt-8 pt-8 border-t border-gray-200 pb-8">
+          <div ref={visualizerRef} className="mt-12 pt-8 border-t border-gray-200 pb-16">
             <ProductVisualizer productImage={product.image[0]} productName={product.name} />
+            {/* Add extra space at bottom to ensure full visibility */}
+            <div className="h-20"></div>
           </div>
         )}
 
