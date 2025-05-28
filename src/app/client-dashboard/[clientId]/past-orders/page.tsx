@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Loader2, Package, FileText, RefreshCw, Calendar, User, TrendingUp } from 'lucide-react'
+import { ArrowLeft, Loader2, Package, FileText, RefreshCw, Calendar, User, TrendingUp } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
@@ -19,12 +19,6 @@ interface OrderItem {
   customQuantity?: number
   customFinish?: string
   customThickness?: string
-  commissionInfo?: {
-    agentCommission: number
-    consultantCommission: number
-    totalCommission: number
-    consultantLevel: string
-  }
 }
 
 interface ShippingAddress {
@@ -336,7 +330,7 @@ export default function PastOrdersPage() {
                   </div>
                 </div>
 
-                {/* NEW: Agent and Commission Information */}
+                {/* Agent and Commission Information */}
                 {(order.agentInfo || order.clientInfo) && (
                   <div className="mt-3 pt-3 border-t border-muted-foreground/20">
                     <div className="flex flex-wrap gap-4 text-sm">
@@ -355,7 +349,8 @@ export default function PastOrdersPage() {
                           <TrendingUp className="h-4 w-4 text-muted-foreground" />
                           <span className="text-muted-foreground">Level:</span>
                           <Badge className={getConsultantLevelColor(order.clientInfo.consultantLevel)}>
-                            {order.clientInfo.consultantLevel.charAt(0).toUpperCase() + order.clientInfo.consultantLevel.slice(1)}
+                            {order.clientInfo.consultantLevel.charAt(0).toUpperCase() +
+                              order.clientInfo.consultantLevel.slice(1)}
                           </Badge>
                         </div>
                       )}
@@ -392,15 +387,7 @@ export default function PastOrdersPage() {
                                   {item.customThickness && <div>Thickness: {item.customThickness} mm</div>}
                                 </div>
                               )}
-                              {/* NEW: Show commission info for each item */}
-                              {item.commissionInfo && (
-                                <div className="text-xs text-green-600 mt-1">
-                                  Commission Applied: {item.commissionInfo.totalCommission}%
-                                  <span className="text-muted-foreground ml-1">
-                                    (Agent: {item.commissionInfo.agentCommission}% + Level: {item.commissionInfo.consultantCommission}%)
-                                  </span>
-                                </div>
-                              )}
+                              {hasCommission && <div className="text-xs text-green-600 mt-1">Commission Applied ✓</div>}
                             </div>
                             <div className="text-right">
                               {hasCommission ? (
