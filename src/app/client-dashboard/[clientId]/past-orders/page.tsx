@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Loader2, Package, FileText, RefreshCw, Calendar } from "lucide-react"
+import { ArrowLeft, Loader2, Package, FileText, RefreshCw, Calendar, User, Award } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
@@ -43,6 +43,9 @@ interface Order {
   paymentStatus: string
   createdAt: string
   shippingAddress?: ShippingAddress
+  agentName?: string
+  consultantLevel?: string
+  commissionPercentage?: number
 }
 
 export default function PastOrdersPage() {
@@ -197,14 +200,18 @@ export default function PastOrdersPage() {
     }
   }
 
-  const getPaymentStatusColor = (status: string) => {
-    switch (status) {
-      case "paid":
-        return "bg-green-100 text-green-800"
-      case "failed":
-        return "bg-red-100 text-red-800"
-      default:
+  const getConsultantLevelColor = (level: string) => {
+    switch (level?.toLowerCase()) {
+      case "platinum":
+        return "bg-purple-100 text-purple-800"
+      case "gold":
         return "bg-yellow-100 text-yellow-800"
+      case "silver":
+        return "bg-gray-100 text-gray-800"
+      case "bronze":
+        return "bg-orange-100 text-orange-800"
+      default:
+        return "bg-blue-100 text-blue-800"
     }
   }
 
@@ -304,9 +311,6 @@ export default function PastOrdersPage() {
                     <Badge className={getStatusColor(order.status)}>
                       {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                     </Badge>
-                    <Badge className={getPaymentStatusColor(order.paymentStatus)}>
-                      Payment: {order.paymentStatus.charAt(0).toUpperCase() + order.paymentStatus.slice(1)}
-                    </Badge>
                   </div>
                 </div>
               </CardHeader>
@@ -370,12 +374,40 @@ export default function PastOrdersPage() {
                         <span className="text-muted-foreground">Status:</span>
                         <span className="ml-2 font-medium">{order.status}</span>
                       </div>
-                      <div>
-                        <span className="text-muted-foreground">Payment:</span>
-                        <span className="ml-2 font-medium">{order.paymentStatus}</span>
-                      </div>
+
+                      {/* Agent Information */}
+                      {order.agentName && (
+                        <div className="bg-blue-50 p-3 rounded-lg mt-3">
+                          <div className="flex items-center gap-2 mb-2">
+                            <User className="h-4 w-4 text-blue-600" />
+                            <span className="font-medium text-blue-800">Agent Details</span>
+                          </div>
+                          <div className="space-y-1">
+                            <div>
+                              <span className="text-muted-foreground">Agent:</span>
+                              <span className="ml-2 font-medium">{order.agentName}</span>
+                            </div>
+                            {order.consultantLevel && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-muted-foreground">Level:</span>
+                                <Badge className={getConsultantLevelColor(order.consultantLevel)}>
+                                  <Award className="h-3 w-3 mr-1" />
+                                  {order.consultantLevel}
+                                </Badge>
+                              </div>
+                            )}
+                            {order.commissionPercentage && (
+                              <div>
+                                <span className="text-muted-foreground">Commission:</span>
+                                <span className="ml-2 font-medium text-green-600">{order.commissionPercentage}%</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
                       {order.shippingAddress && (
-                        <div>
+                        <div className="mt-3">
                           <span className="text-muted-foreground">Shipped to:</span>
                           <div className="mt-1">
                             <p>
