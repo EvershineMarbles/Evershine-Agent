@@ -102,7 +102,6 @@ export default function PastOrdersPage() {
         ...order,
         agentInfo: {
           name: getRandomAgentName(),
-          consultantLevel: getRandomConsultantLevel(),
           commissionRate: getRandomCommissionRate(),
         },
       }))
@@ -335,14 +334,7 @@ export default function PastOrdersPage() {
                                 <span className="text-muted-foreground">Agent:</span>
                                 <span className="font-medium">{order.agentInfo.name}</span>
                               </div>
-                              <div className="flex justify-between items-center">
-                                <span className="text-muted-foreground flex items-center">
-                                  <Award className="h-3 w-3 mr-1" /> Level:
-                                </span>
-                                <Badge className={getConsultantLevelColor(order.agentInfo.consultantLevel)}>
-                                  {order.agentInfo.consultantLevel}
-                                </Badge>
-                              </div>
+                           
                               <div className="flex justify-between">
                                 <span className="text-muted-foreground flex items-center">
                                   <Percent className="h-3 w-3 mr-1" /> Commission:
@@ -368,13 +360,7 @@ export default function PastOrdersPage() {
                   </div>
                 </div>
               </CardContent>
-              <CardFooter className="bg-muted/10 p-4 flex justify-end">
-                <Button variant="ghost" size="sm" asChild>
-                  <Link href={`/client-dashboard/${clientId}/orders/${order.orderId}`}>
-                    Order Details <ChevronRight className="h-4 w-4 ml-1" />
-                  </Link>
-                </Button>
-              </CardFooter>
+         
             </Card>
           ))}
         </div>
