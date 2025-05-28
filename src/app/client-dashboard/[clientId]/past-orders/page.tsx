@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Loader2, Package, FileText, RefreshCw, Calendar, Filter } from "lucide-react"
+import { ArrowLeft, Loader2, Package, FileText, RefreshCw, Calendar } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
@@ -56,7 +56,6 @@ export default function PastOrdersPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
-  const [statusFilter, setStatusFilter] = useState<string>("all")
   const [sortBy, setSortBy] = useState<string>("newest")
 
   const getApiUrl = () => {
@@ -137,12 +136,7 @@ export default function PastOrdersPage() {
   }, [clientId, toast])
 
   useEffect(() => {
-    let filtered = [...orders]
-
-    // Filter by status
-    if (statusFilter !== "all") {
-      filtered = filtered.filter((order) => order.status === statusFilter)
-    }
+    const filtered = [...orders]
 
     // Sort orders
     filtered.sort((a, b) => {
@@ -162,7 +156,7 @@ export default function PastOrdersPage() {
     })
 
     setFilteredOrders(filtered)
-  }, [orders, statusFilter, sortBy])
+  }, [orders, sortBy])
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -249,22 +243,6 @@ export default function PastOrdersPage() {
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
         <div className="flex items-center gap-2">
-          <Filter className="h-4 w-4 text-muted-foreground" />
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Orders</SelectItem>
-              <SelectItem value="delivered">Delivered</SelectItem>
-              <SelectItem value="shipped">Shipped</SelectItem>
-              <SelectItem value="processing">Processing</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex items-center gap-2">
           <Calendar className="h-4 w-4 text-muted-foreground" />
           <Select value={sortBy} onValueChange={setSortBy}>
             <SelectTrigger className="w-[180px]">
@@ -299,14 +277,8 @@ export default function PastOrdersPage() {
         <Card className="text-center py-12">
           <CardContent className="pt-6">
             <Package className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-            <h2 className="text-xl font-medium mb-4">
-              {statusFilter === "all" ? "No orders found" : `No ${statusFilter} orders found`}
-            </h2>
-            <p className="text-muted-foreground mb-6">
-              {statusFilter === "all"
-                ? "You haven't placed any orders yet"
-                : `You don't have any ${statusFilter} orders`}
-            </p>
+            <h2 className="text-xl font-medium mb-4">No orders found</h2>
+            <p className="text-muted-foreground mb-6">You haven't placed any orders yet</p>
             <Button
               onClick={() => router.push(`/client-dashboard/${clientId}/products`)}
               className="bg-primary hover:bg-primary/90"
