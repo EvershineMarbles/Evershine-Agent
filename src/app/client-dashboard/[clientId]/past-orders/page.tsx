@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Loader2, Package, FileText, RefreshCw, Calendar, User, Award } from "lucide-react"
+import { ArrowLeft, Loader2, Package, FileText, RefreshCw, Calendar, User, TrendingUp } from 'lucide-react'
 import { useToast } from "@/components/ui/use-toast"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
@@ -51,6 +51,7 @@ interface Order {
   items: OrderItem[]
   totalAmount: number
   status: string
+  paymentStatus: string
   createdAt: string
   shippingAddress?: ShippingAddress
   agentInfo?: AgentInfo
@@ -209,6 +210,17 @@ export default function PastOrdersPage() {
     }
   }
 
+  const getPaymentStatusColor = (status: string) => {
+    switch (status) {
+      case "paid":
+        return "bg-green-100 text-green-800"
+      case "failed":
+        return "bg-red-100 text-red-800"
+      default:
+        return "bg-yellow-100 text-yellow-800"
+    }
+  }
+
   const getConsultantLevelColor = (level: string) => {
     switch (level) {
       case "red":
@@ -219,19 +231,6 @@ export default function PastOrdersPage() {
         return "bg-purple-100 text-purple-800"
       default:
         return "bg-gray-100 text-gray-800"
-    }
-  }
-
-  const getConsultantLevelLabel = (level: string) => {
-    switch (level) {
-      case "red":
-        return "Red Level (+5%)"
-      case "yellow":
-        return "Yellow Level (+10%)"
-      case "purple":
-        return "Purple Level (+15%)"
-      default:
-        return "Red Level (+5%)"
     }
   }
 
@@ -331,31 +330,44 @@ export default function PastOrdersPage() {
                     <Badge className={getStatusColor(order.status)}>
                       {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                     </Badge>
+                    <Badge className={getPaymentStatusColor(order.paymentStatus)}>
+                      Payment: {order.paymentStatus.charAt(0).toUpperCase() + order.paymentStatus.slice(1)}
+                    </Badge>
                   </div>
                 </div>
 
-                {/* Agent and Client Info */}
+                {/* NEW: Agent and Commission Information */}
                 {(order.agentInfo || order.clientInfo) && (
-                  <div className="flex flex-wrap gap-4 mt-3 pt-3 border-t border-muted">
-                    {order.agentInfo && (
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">Agent:</span>
-                        <span className="text-sm font-medium">{order.agentInfo.name}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {order.agentInfo.commissionRate}% Commission
-                        </Badge>
-                      </div>
-                    )}
-                    {order.clientInfo && (
-                      <div className="flex items-center gap-2">
-                        <Award className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">Consultant Level:</span>
-                        <Badge className={getConsultantLevelColor(order.clientInfo.consultantLevel)}>
-                          {getConsultantLevelLabel(order.clientInfo.consultantLevel)}
-                        </Badge>
-                      </div>
-                    )}
+                  <div className="mt-3 pt-3 border-t border-muted-foreground/20">
+                    <div className="flex flex-wrap gap-4 text-sm">
+                      {/* Agent Name */}
+                      {order.agentInfo && (
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-muted-foreground">Agent:</span>
+                          <span className="font-medium text-blue-600">{order.agentInfo.name}</span>
+                        </div>
+                      )}
+
+                      {/* Consultant Level */}
+                      {order.clientInfo && (
+                        <div className="flex items-center gap-2">
+                          <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-muted-foreground">Level:</span>
+                          <Badge className={getConsultantLevelColor(order.clientInfo.consultantLevel)}>
+                            {order.clientInfo.consultantLevel.charAt(0).toUpperCase() + order.clientInfo.consultantLevel.slice(1)}
+                          </Badge>
+                        </div>
+                      )}
+
+                      {/* Commission Rate */}
+                      {order.agentInfo && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">Commission:</span>
+                          <span className="font-medium text-green-600">{order.agentInfo.commissionRate}%</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </CardHeader>
@@ -380,9 +392,13 @@ export default function PastOrdersPage() {
                                   {item.customThickness && <div>Thickness: {item.customThickness} mm</div>}
                                 </div>
                               )}
+                              {/* NEW: Show commission info for each item */}
                               {item.commissionInfo && (
                                 <div className="text-xs text-green-600 mt-1">
                                   Commission Applied: {item.commissionInfo.totalCommission}%
+                                  <span className="text-muted-foreground ml-1">
+                                    (Agent: {item.commissionInfo.agentCommission}% + Level: {item.commissionInfo.consultantCommission}%)
+                                  </span>
                                 </div>
                               )}
                             </div>
@@ -395,6 +411,11 @@ export default function PastOrdersPage() {
                                   <p className="font-medium text-green-600">
                                     ₹{(displayPrice * item.quantity).toLocaleString()}
                                   </p>
+                                  {item.basePrice && (
+                                    <p className="text-xs text-muted-foreground line-through">
+                                      Base: ₹{item.basePrice.toLocaleString()}
+                                    </p>
+                                  )}
                                 </div>
                               ) : (
                                 <div>
@@ -423,6 +444,10 @@ export default function PastOrdersPage() {
                       <div>
                         <span className="text-muted-foreground">Status:</span>
                         <span className="ml-2 font-medium">{order.status}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Payment:</span>
+                        <span className="ml-2 font-medium">{order.paymentStatus}</span>
                       </div>
                       {order.shippingAddress && (
                         <div>
