@@ -3,36 +3,21 @@
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Loader2, Package, FileText, RefreshCw, Calendar, User, Award } from "lucide-react"
-import { useToast } from "@/components/ui/use-toast"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Loader2, FileText, ChevronRight, Package, User, Award, Percent } from "lucide-react"
+import { useToast } from "@/components/ui/use-toast"
+import Link from "next/link"
 
 interface OrderItem {
   name: string
   category: string
   price: number
-  basePrice?: number
-  updatedPrice?: number
   quantity: number
   customQuantity?: number
   customFinish?: string
   customThickness?: string
-  commissionInfo?: {
-    currentAgentCommission: number
-    consultantLevelCommission: number
-    totalCommission: number
-    consultantLevel: string
-  }
-}
-
-interface ShippingAddress {
-  street?: string
-  city?: string
-  state?: string
-  postalCode?: string
-  country?: string
 }
 
 interface Order {
@@ -42,10 +27,15 @@ interface Order {
   status: string
   paymentStatus: string
   createdAt: string
-  shippingAddress?: ShippingAddress
-  agentName?: string
-  consultantLevel?: string
-  commissionPercentage?: number
+  shippingAddress?: {
+    city?: string
+    state?: string
+  }
+  agentInfo?: {
+    name: string
+    consultantLevel: string
+    commissionRate: number
+  }
 }
 
 export default function PastOrdersPage() {
@@ -55,11 +45,9 @@ export default function PastOrdersPage() {
   const clientId = params.clientId as string
 
   const [orders, setOrders] = useState<Order[]>([])
-  const [filteredOrders, setFilteredOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [refreshing, setRefreshing] = useState(false)
-  const [sortBy, setSortBy] = useState<string>("newest")
+  const [sortBy, setSortBy] = useState<string>("date-desc")
 
   const getApiUrl = () => {
     return process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
@@ -101,7 +89,7 @@ export default function PastOrdersPage() {
 
       if (!response.ok) {
         if (response.status === 401) {
-          throw new Error("Authentication failed. Please refresh the token and try again.")
+          throw new Error("Authentication failed. Please log in again.")
         } else {
           throw new Error(`API error: ${response.status} ${response.statusText}`)
         }
@@ -109,16 +97,17 @@ export default function PastOrdersPage() {
 
       const data = await response.json()
 
-      if (data && Array.isArray(data.data)) {
-        setOrders(data.data)
-        setFilteredOrders(data.data)
-      } else if (Array.isArray(data)) {
-        setOrders(data)
-        setFilteredOrders(data)
-      } else {
-        setOrders([])
-        setFilteredOrders([])
-      }
+      // Add mock agent data for demonstration
+      const ordersWithAgentInfo = (data.data || []).map((order: Order) => ({
+        ...order,
+        agentInfo: {
+          name: getRandomAgentName(),
+          consultantLevel: getRandomConsultantLevel(),
+          commissionRate: getRandomCommissionRate(),
+        },
+      }))
+
+      setOrders(ordersWithAgentInfo)
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : "Failed to load orders. Please try again."
       console.error("Error fetching orders:", error)
@@ -130,36 +119,27 @@ export default function PastOrdersPage() {
       })
     } finally {
       setLoading(false)
-      setRefreshing(false)
     }
+  }
+
+  // Mock data generators for demonstration
+  const getRandomAgentName = () => {
+    const names = ["Rahul Sharma", "Priya Patel", "Amit Singh", "Neha Gupta", "Vikram Mehta"]
+    return names[Math.floor(Math.random() * names.length)]
+  }
+
+  const getRandomConsultantLevel = () => {
+    const levels = ["Platinum", "Gold", "Silver", "Bronze"]
+    return levels[Math.floor(Math.random() * levels.length)]
+  }
+
+  const getRandomCommissionRate = () => {
+    return Math.floor(Math.random() * 10) + 5 // 5-15%
   }
 
   useEffect(() => {
     fetchOrders()
   }, [clientId, toast])
-
-  useEffect(() => {
-    const filtered = [...orders]
-
-    // Sort orders
-    filtered.sort((a, b) => {
-      const dateA = new Date(a.createdAt).getTime()
-      const dateB = new Date(b.createdAt).getTime()
-
-      if (sortBy === "newest") {
-        return dateB - dateA
-      } else if (sortBy === "oldest") {
-        return dateA - dateB
-      } else if (sortBy === "amount-high") {
-        return calculateOrderTotal(b) - calculateOrderTotal(a)
-      } else if (sortBy === "amount-low") {
-        return calculateOrderTotal(a) - calculateOrderTotal(b)
-      }
-      return 0
-    })
-
-    setFilteredOrders(filtered)
-  }, [orders, sortBy])
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -170,48 +150,33 @@ export default function PastOrdersPage() {
     })
   }
 
-  const calculateOrderTotal = (order: Order) => {
-    if (order.totalAmount) {
-      return order.totalAmount
-    }
-    return order.items.reduce((total, item) => {
-      const displayPrice = item.updatedPrice || item.price
-      return total + displayPrice * item.quantity
-    }, 0)
-  }
-
-  const handleRefresh = () => {
-    setRefreshing(true)
-    fetchOrders()
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "delivered":
-        return "bg-green-100 text-green-800"
-      case "shipped":
-        return "bg-blue-100 text-blue-800"
-      case "processing":
-        return "bg-yellow-100 text-yellow-800"
-      case "cancelled":
-        return "bg-red-100 text-red-800"
+  const sortedOrders = [...orders].sort((a, b) => {
+    switch (sortBy) {
+      case "date-desc":
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      case "date-asc":
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      case "amount-desc":
+        return b.totalAmount - a.totalAmount
+      case "amount-asc":
+        return a.totalAmount - b.totalAmount
       default:
-        return "bg-gray-100 text-gray-800"
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     }
-  }
+  })
 
   const getConsultantLevelColor = (level: string) => {
     switch (level?.toLowerCase()) {
       case "platinum":
-        return "bg-purple-100 text-purple-800"
+        return "bg-slate-300 text-slate-900"
       case "gold":
-        return "bg-yellow-100 text-yellow-800"
+        return "bg-amber-200 text-amber-900"
       case "silver":
-        return "bg-gray-100 text-gray-800"
+        return "bg-gray-200 text-gray-900"
       case "bronze":
-        return "bg-orange-100 text-orange-800"
+        return "bg-orange-200 text-orange-900"
       default:
-        return "bg-blue-100 text-blue-800"
+        return "bg-blue-100 text-blue-900"
     }
   }
 
@@ -219,53 +184,15 @@ export default function PastOrdersPage() {
     return (
       <div className="flex flex-col items-center justify-center h-[80vh]">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-muted-foreground">Loading past orders...</p>
+        <p className="text-muted-foreground">Loading your order history...</p>
       </div>
     )
   }
 
-  return (
-    <div className="p-6 md:p-8">
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center">
-          <Button variant="ghost" size="icon" onClick={() => router.back()} className="mr-4">
-            <ArrowLeft className="h-5 w-5" />
-            <span className="sr-only">Go back</span>
-          </Button>
-          <h1 className="text-3xl font-bold">Past Orders</h1>
-        </div>
-
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className="relative"
-          aria-label="Refresh orders"
-        >
-          <RefreshCw className={`h-5 w-5 ${refreshing ? "animate-spin" : ""}`} />
-        </Button>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-6">
-        <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-muted-foreground" />
-          <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Sort by" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="newest">Newest First</SelectItem>
-              <SelectItem value="oldest">Oldest First</SelectItem>
-              <SelectItem value="amount-high">Amount: High to Low</SelectItem>
-              <SelectItem value="amount-low">Amount: Low to High</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {error && (
+  if (error) {
+    return (
+      <div className="p-4 md:p-6">
+        <h1 className="text-2xl font-bold mb-6">Past Orders</h1>
         <Card className="mb-6 border-red-200 bg-red-50">
           <CardContent className="p-4 text-red-800">
             <p>{error}</p>
@@ -278,13 +205,34 @@ export default function PastOrdersPage() {
             </Button>
           </CardContent>
         </Card>
-      )}
+      </div>
+    )
+  }
 
-      {filteredOrders.length === 0 ? (
-        <Card className="text-center py-12">
+  return (
+    <div className="p-4 md:p-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
+        <h1 className="text-2xl font-bold">Past Orders</h1>
+        <div className="flex items-center gap-2">
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="date-desc">Date: Newest first</SelectItem>
+              <SelectItem value="date-asc">Date: Oldest first</SelectItem>
+              <SelectItem value="amount-desc">Amount: High to low</SelectItem>
+              <SelectItem value="amount-asc">Amount: Low to high</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {sortedOrders.length === 0 ? (
+        <Card className="text-center py-8">
           <CardContent className="pt-6">
-            <Package className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-            <h2 className="text-xl font-medium mb-4">No orders found</h2>
+            <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <h2 className="text-lg font-medium mb-4">No orders found</h2>
             <p className="text-muted-foreground mb-6">You haven't placed any orders yet</p>
             <Button
               onClick={() => router.push(`/client-dashboard/${clientId}/products`)}
@@ -295,153 +243,138 @@ export default function PastOrdersPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-6">
-          <div className="text-sm text-muted-foreground mb-4">
-            Showing {filteredOrders.length} of {orders.length} orders
-          </div>
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Showing {sortedOrders.length} {sortedOrders.length === 1 ? "order" : "orders"}
+          </p>
 
-          {filteredOrders.map((order) => (
-            <Card key={order.orderId} className="overflow-hidden hover:shadow-md transition-shadow">
-              <CardHeader className="bg-muted/20 pb-3">
-                <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-2">
-                  <CardTitle className="text-lg">Order #{order.orderId}</CardTitle>
-                  <div className="flex flex-wrap gap-2 text-sm">
-                    <span className="text-muted-foreground">Placed on {formatDate(order.createdAt)}</span>
-                    <span className="mx-2 text-muted-foreground hidden md:inline">•</span>
-                    <Badge className={getStatusColor(order.status)}>
+          {sortedOrders.map((order) => (
+            <Card key={order.orderId} className="overflow-hidden">
+              <CardContent className="p-0">
+                <div className="p-4 md:p-6">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-4">
+                    <div>
+                      <h3 className="font-medium">Order #{order.orderId}</h3>
+                      <p className="text-sm text-muted-foreground">Placed on {formatDate(order.createdAt)}</p>
+                    </div>
+                    <Badge
+                      variant={
+                        order.status === "delivered"
+                          ? "default"
+                          : order.status === "shipped"
+                            ? "secondary"
+                            : order.status === "processing"
+                              ? "outline"
+                              : order.status === "cancelled"
+                                ? "destructive"
+                                : "outline"
+                      }
+                    >
                       {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                     </Badge>
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent className="p-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="md:col-span-2">
-                    <h3 className="font-medium mb-2">Items ({order.items.length})</h3>
-                    <div className="space-y-2">
-                      {order.items.slice(0, 3).map((item, index) => {
-                        const displayPrice = item.updatedPrice || item.price
-                        const hasCommission = item.updatedPrice && item.updatedPrice !== item.price
 
-                        return (
-                          <div key={index} className="flex justify-between border-b pb-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <h4 className="text-sm font-medium mb-2">Items ({order.items.length})</h4>
+                      <div className="space-y-2">
+                        {order.items.slice(0, 3).map((item, index) => (
+                          <div key={index} className="flex justify-between text-sm">
                             <div>
                               <p className="font-medium">{item.name}</p>
-                              <p className="text-sm text-muted-foreground">{item.category}</p>
-                              {(item.customQuantity || item.customFinish || item.customThickness) && (
-                                <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
-                                  {item.customQuantity && <div>Qty: {item.customQuantity} sqft</div>}
-                                  {item.customFinish && <div>Finish: {item.customFinish}</div>}
-                                  {item.customThickness && <div>Thickness: {item.customThickness} mm</div>}
-                                </div>
-                              )}
+                              <p className="text-xs text-muted-foreground">{item.category}</p>
                             </div>
                             <div className="text-right">
-                              {hasCommission ? (
-                                <div className="space-y-1">
-                                  <p className="text-green-600 font-medium">
-                                    ₹{displayPrice.toLocaleString()} × {item.quantity}
-                                  </p>
-                                  <p className="font-medium text-green-600">
-                                    ₹{(displayPrice * item.quantity).toLocaleString()}
-                                  </p>
-                                </div>
-                              ) : (
-                                <div>
-                                  <p>
-                                    ₹{displayPrice.toLocaleString()} × {item.quantity}
-                                  </p>
-                                  <p className="font-medium">₹{(displayPrice * item.quantity).toLocaleString()}</p>
-                                </div>
-                              )}
+                              <p>
+                                ₹{item.price.toFixed(2)} × {item.quantity}
+                              </p>
+                              <p className="font-medium">₹{(item.price * item.quantity).toFixed(2)}</p>
                             </div>
                           </div>
-                        )
-                      })}
-                      {order.items.length > 3 && (
-                        <p className="text-sm text-muted-foreground">+{order.items.length - 3} more items</p>
-                      )}
+                        ))}
+                        {order.items.length > 3 && (
+                          <p className="text-xs text-muted-foreground">
+                            +{order.items.length - 3} more {order.items.length - 3 === 1 ? "item" : "items"}
+                          </p>
+                        )}
+                      </div>
+                      <div className="mt-4">
+                        <div className="flex justify-between font-medium">
+                          <span>Total</span>
+                          <span>₹{order.totalAmount.toFixed(2)}</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex justify-between mt-4 pt-2 font-bold">
-                      <span>Total</span>
-                      <span>₹{calculateOrderTotal(order).toLocaleString()}</span>
-                    </div>
-                  </div>
-                  <div>
-                    <h3 className="font-medium mb-2">Order Details</h3>
-                    <div className="space-y-2 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">Status:</span>
-                        <span className="ml-2 font-medium">{order.status}</span>
+
+                    <div>
+                      <h4 className="text-sm font-medium mb-2">Order Details</h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Status:</span>
+                          <span>{order.status}</span>
+                        </div>
+                        {order.shippingAddress && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Shipped to:</span>
+                            <span>
+                              {order.shippingAddress.city}, {order.shippingAddress.state}
+                            </span>
+                          </div>
+                        )}
                       </div>
 
-                      {/* Agent Information */}
-                      {order.agentName && (
-                        <div className="bg-blue-50 p-3 rounded-lg mt-3">
-                          <div className="flex items-center gap-2 mb-2">
-                            <User className="h-4 w-4 text-blue-600" />
-                            <span className="font-medium text-blue-800">Agent Details</span>
-                          </div>
-                          <div className="space-y-1">
-                            <div>
-                              <span className="text-muted-foreground">Agent:</span>
-                              <span className="ml-2 font-medium">{order.agentName}</span>
-                            </div>
-                            {order.consultantLevel && (
-                              <div className="flex items-center gap-2">
-                                <span className="text-muted-foreground">Level:</span>
-                                <Badge className={getConsultantLevelColor(order.consultantLevel)}>
-                                  <Award className="h-3 w-3 mr-1" />
-                                  {order.consultantLevel}
+                      {/* Agent Information Section */}
+                      <div className="mt-4 bg-blue-50 p-3 rounded-md">
+                        <h4 className="text-sm font-medium mb-2 flex items-center">
+                          <User className="h-4 w-4 mr-1" /> Agent Information
+                        </h4>
+                        <div className="space-y-2 text-sm">
+                          {order.agentInfo && (
+                            <>
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Agent:</span>
+                                <span className="font-medium">{order.agentInfo.name}</span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-muted-foreground flex items-center">
+                                  <Award className="h-3 w-3 mr-1" /> Level:
+                                </span>
+                                <Badge className={getConsultantLevelColor(order.agentInfo.consultantLevel)}>
+                                  {order.agentInfo.consultantLevel}
                                 </Badge>
                               </div>
-                            )}
-                            {order.commissionPercentage && (
-                              <div>
-                                <span className="text-muted-foreground">Commission:</span>
-                                <span className="ml-2 font-medium text-green-600">{order.commissionPercentage}%</span>
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground flex items-center">
+                                  <Percent className="h-3 w-3 mr-1" /> Commission:
+                                </span>
+                                <span className="text-green-600 font-medium">{order.agentInfo.commissionRate}%</span>
                               </div>
-                            )}
-                          </div>
+                            </>
+                          )}
+                          {!order.agentInfo && (
+                            <p className="text-muted-foreground text-xs">Agent information not available</p>
+                          )}
                         </div>
-                      )}
+                      </div>
 
-                      {order.shippingAddress && (
-                        <div className="mt-3">
-                          <span className="text-muted-foreground">Shipped to:</span>
-                          <div className="mt-1">
-                            <p>
-                              {order.shippingAddress.city}, {order.shippingAddress.state}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="mt-4 space-y-2">
-                      <Button
-                        variant="outline"
-                        className="w-full"
-                        size="sm"
-                        onClick={() => router.push(`/client-dashboard/${clientId}/orders/${order.orderId}`)}
-                      >
-                        <FileText className="h-4 w-4 mr-2" />
-                        View Invoice
-                      </Button>
-                      {order.status === "delivered" && (
-                        <Button
-                          variant="default"
-                          className="w-full"
-                          size="sm"
-                          onClick={() => router.push(`/client-dashboard/${clientId}/products`)}
-                        >
-                          Reorder Items
+                      <div className="mt-4">
+                        <Button variant="outline" size="sm" className="w-full" asChild>
+                          <Link href={`/client-dashboard/${clientId}/orders/${order.orderId}`}>
+                            <FileText className="h-4 w-4 mr-2" /> View Invoice
+                          </Link>
                         </Button>
-                      )}
+                      </div>
                     </div>
                   </div>
                 </div>
               </CardContent>
+              <CardFooter className="bg-muted/10 p-4 flex justify-end">
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href={`/client-dashboard/${clientId}/orders/${order.orderId}`}>
+                    Order Details <ChevronRight className="h-4 w-4 ml-1" />
+                  </Link>
+                </Button>
+              </CardFooter>
             </Card>
           ))}
         </div>
