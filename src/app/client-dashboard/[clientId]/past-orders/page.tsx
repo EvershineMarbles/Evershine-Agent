@@ -347,7 +347,7 @@ export default function PastOrdersPage() {
                       <div className="flex items-center gap-2">
                         <User className="h-4 w-4 text-blue-600" />
                         <div>
-                          <span className="text-xs text-muted-foreground">Agent:</span>
+                          <span className="text-xs text-muted-foreground">Consultant Name:</span>
                           <span className="ml-1 font-semibold text-blue-700">{order.agentName}</span>
                         </div>
                       </div>
