@@ -212,16 +212,35 @@ export default function PastOrdersPage() {
     }
   }
 
+  // Updated function to include percentage
   const getConsultantLevelColor = (level: string) => {
     switch (level) {
-      case "red":
-        return "bg-red-100 text-red-800"
+      case "green":
+        return "bg-green-100 text-green-800"
       case "yellow":
         return "bg-yellow-100 text-yellow-800"
       case "purple":
         return "bg-purple-100 text-purple-800"
+      case "red": // Keep for backward compatibility
+        return "bg-green-100 text-green-800" // Show as green
       default:
         return "bg-gray-100 text-gray-800"
+    }
+  }
+
+  // New function to get consultant level display text with percentage
+  const getConsultantLevelDisplay = (level: string) => {
+    switch (level) {
+      case "green":
+        return "Green Level (5%)"
+      case "yellow":
+        return "Yellow Level (10%)"
+      case "purple":
+        return "Purple Level (15%)"
+      case "red": // Keep for backward compatibility
+        return "Green Level (5%)" // Show as green
+      default:
+        return `${level.charAt(0).toUpperCase() + level.slice(1)} Level`
     }
   }
 
@@ -320,54 +339,28 @@ export default function PastOrdersPage() {
                   </div>
                 </div>
 
-                {/* Agent and Consultant Information - Prominent Display */}
-                <div className="mt-3 pt-3 border-t border-muted-foreground/20 bg-blue-50/50 rounded-lg p-3">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Agent Name */}
+                {/* Agent and Consultant Information - Clean & Concise */}
+                <div className="mt-3 pt-3 border-t border-muted-foreground/20">
+                  <div className="flex items-center justify-between">
+                    {/* Agent Name - Compact */}
                     {order.agentName && (
-                      <div className="flex items-center gap-3">
-                        <div className="bg-blue-100 p-2 rounded-full">
-                          <User className="h-4 w-4 text-blue-600" />
-                        </div>
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-blue-600" />
                         <div>
-                          <p className="text-xs text-muted-foreground uppercase tracking-wide">Agent</p>
-                          <p className="font-bold text-blue-700 text-lg">{order.agentName}</p>
+                          <span className="text-xs text-muted-foreground">Agent:</span>
+                          <span className="ml-1 font-semibold text-blue-700">{order.agentName}</span>
                         </div>
                       </div>
                     )}
 
-                    {/* Consultant Level */}
+                    {/* Consultant Level - Compact with Percentage */}
                     {order.consultantLevel && (
-                      <div className="flex items-center gap-3">
-                        <div className="bg-purple-100 p-2 rounded-full">
-                          <TrendingUp className="h-4 w-4 text-purple-600" />
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground uppercase tracking-wide">Consultant Level</p>
-                          <Badge
-                            className={`${getConsultantLevelColor(order.consultantLevel)} text-sm font-bold px-3 py-1 text-lg`}
-                          >
-                            {order.consultantLevel.charAt(0).toUpperCase() + order.consultantLevel.slice(1)} Level
-                          </Badge>
-                        </div>
-                      </div>
+                      <Badge className={`${getConsultantLevelColor(order.consultantLevel)} font-medium px-3 py-1`}>
+                        <TrendingUp className="h-3 w-3 mr-1" />
+                        {getConsultantLevelDisplay(order.consultantLevel)}
+                      </Badge>
                     )}
                   </div>
-
-                  {/* Client Name if available */}
-                  {order.clientName && (
-                    <div className="mt-3 pt-3 border-t border-gray-200">
-                      <div className="flex items-center gap-3">
-                        <div className="bg-gray-100 p-2 rounded-full">
-                          <User className="h-4 w-4 text-gray-600" />
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground uppercase tracking-wide">Client</p>
-                          <p className="font-semibold text-gray-700">{order.clientName}</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </CardHeader>
               <CardContent className="p-4">
