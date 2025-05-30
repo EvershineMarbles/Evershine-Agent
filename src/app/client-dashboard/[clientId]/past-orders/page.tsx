@@ -319,43 +319,56 @@ export default function PastOrdersPage() {
                     <span className="text-muted-foreground">Placed on {formatDate(order.createdAt)}</span>
                   </div>
                 </div>
-                {/* Agent and Consultant Information */}
-                {(order.agentName || order.clientName || order.consultantLevel) && (
-                  <div className="mt-3 pt-3 border-t border-muted-foreground/20">
-                    <div className="flex flex-wrap gap-6 text-sm">
-                      {/* Agent Name */}
-                      {order.agentName && (
-                        <div className="flex items-center gap-2">
+
+                {/* Agent and Consultant Information - Prominent Display */}
+                <div className="mt-3 pt-3 border-t border-muted-foreground/20 bg-blue-50/50 rounded-lg p-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Agent Name */}
+                    {order.agentName && (
+                      <div className="flex items-center gap-3">
+                        <div className="bg-blue-100 p-2 rounded-full">
                           <User className="h-4 w-4 text-blue-600" />
-                          <span className="text-muted-foreground">Agent:</span>
-                          <span className="font-semibold text-blue-700 text-base">{order.agentName}</span>
                         </div>
-                      )}
-
-                      {/* Client Name */}
-                      {order.clientName && (
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-gray-600" />
-                          <span className="text-muted-foreground">Client:</span>
-                          <span className="font-semibold text-gray-700 text-base">{order.clientName}</span>
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase tracking-wide">Agent</p>
+                          <p className="font-bold text-blue-700 text-lg">{order.agentName}</p>
                         </div>
-                      )}
+                      </div>
+                    )}
 
-                      {/* Consultant Level */}
-                      {order.consultantLevel && (
-                        <div className="flex items-center gap-2">
+                    {/* Consultant Level */}
+                    {order.consultantLevel && (
+                      <div className="flex items-center gap-3">
+                        <div className="bg-purple-100 p-2 rounded-full">
                           <TrendingUp className="h-4 w-4 text-purple-600" />
-                          <span className="text-muted-foreground">Consultant Level:</span>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase tracking-wide">Consultant Level</p>
                           <Badge
-                            className={`${getConsultantLevelColor(order.consultantLevel)} text-sm font-semibold px-3 py-1`}
+                            className={`${getConsultantLevelColor(order.consultantLevel)} text-sm font-bold px-3 py-1 text-lg`}
                           >
                             {order.consultantLevel.charAt(0).toUpperCase() + order.consultantLevel.slice(1)} Level
                           </Badge>
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
-                )}
+
+                  {/* Client Name if available */}
+                  {order.clientName && (
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <div className="flex items-center gap-3">
+                        <div className="bg-gray-100 p-2 rounded-full">
+                          <User className="h-4 w-4 text-gray-600" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase tracking-wide">Client</p>
+                          <p className="font-semibold text-gray-700">{order.clientName}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="p-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
