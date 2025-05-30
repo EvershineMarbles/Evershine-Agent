@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Loader2, Package, FileText, RefreshCw, Calendar, User, TrendingUp } from 'lucide-react'
+import { ArrowLeft, Loader2, Package, FileText, RefreshCw, Calendar, User, TrendingUp } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
@@ -317,45 +317,39 @@ export default function PastOrdersPage() {
                   <CardTitle className="text-lg">Order #{order.orderId}</CardTitle>
                   <div className="flex flex-wrap gap-2 text-sm">
                     <span className="text-muted-foreground">Placed on {formatDate(order.createdAt)}</span>
-                    <span className="mx-2 text-muted-foreground hidden md:inline">•</span>
-                    <Badge className={getStatusColor(order.status)}>
-                      {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                    </Badge>
-                    <Badge className={getPaymentStatusColor(order.paymentStatus)}>
-                      Payment: {order.paymentStatus.charAt(0).toUpperCase() + order.paymentStatus.slice(1)}
-                    </Badge>
                   </div>
                 </div>
-
                 {/* Agent and Consultant Information */}
                 {(order.agentName || order.clientName || order.consultantLevel) && (
                   <div className="mt-3 pt-3 border-t border-muted-foreground/20">
-                    <div className="flex flex-wrap gap-4 text-sm">
+                    <div className="flex flex-wrap gap-6 text-sm">
                       {/* Agent Name */}
                       {order.agentName && (
                         <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-muted-foreground" />
+                          <User className="h-4 w-4 text-blue-600" />
                           <span className="text-muted-foreground">Agent:</span>
-                          <span className="font-medium text-blue-600">{order.agentName}</span>
+                          <span className="font-semibold text-blue-700 text-base">{order.agentName}</span>
                         </div>
                       )}
 
                       {/* Client Name */}
                       {order.clientName && (
                         <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-muted-foreground" />
+                          <User className="h-4 w-4 text-gray-600" />
                           <span className="text-muted-foreground">Client:</span>
-                          <span className="font-medium text-gray-600">{order.clientName}</span>
+                          <span className="font-semibold text-gray-700 text-base">{order.clientName}</span>
                         </div>
                       )}
 
                       {/* Consultant Level */}
                       {order.consultantLevel && (
                         <div className="flex items-center gap-2">
-                          <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-muted-foreground">Level:</span>
-                          <Badge className={getConsultantLevelColor(order.consultantLevel)}>
-                            {order.consultantLevel.charAt(0).toUpperCase() + order.consultantLevel.slice(1)}
+                          <TrendingUp className="h-4 w-4 text-purple-600" />
+                          <span className="text-muted-foreground">Consultant Level:</span>
+                          <Badge
+                            className={`${getConsultantLevelColor(order.consultantLevel)} text-sm font-semibold px-3 py-1`}
+                          >
+                            {order.consultantLevel.charAt(0).toUpperCase() + order.consultantLevel.slice(1)} Level
                           </Badge>
                         </div>
                       )}
@@ -425,14 +419,6 @@ export default function PastOrdersPage() {
                   <div>
                     <h3 className="font-medium mb-2">Order Details</h3>
                     <div className="space-y-2 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">Status:</span>
-                        <span className="ml-2 font-medium">{order.status}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Payment:</span>
-                        <span className="ml-2 font-medium">{order.paymentStatus}</span>
-                      </div>
                       {order.shippingAddress && (
                         <div>
                           <span className="text-muted-foreground">Shipped to:</span>
