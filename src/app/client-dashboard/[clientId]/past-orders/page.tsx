@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Loader2, Package, FileText, RefreshCw, Calendar, User, TrendingUp } from "lucide-react"
+import { ArrowLeft, Loader2, Package, FileText, RefreshCw, Calendar, User, TrendingUp } from 'lucide-react'
 import { useToast } from "@/components/ui/use-toast"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
@@ -19,11 +19,6 @@ interface OrderItem {
   customQuantity?: number
   customFinish?: string
   customThickness?: string
-  commissionInfo?: {
-    agentCommission: number
-    consultantCommission: number
-    totalCommission: number
-  }
 }
 
 interface ShippingAddress {
@@ -36,19 +31,15 @@ interface ShippingAddress {
 
 interface Order {
   orderId: string
-  clientId: string
-  agentId: string
   items: OrderItem[]
   totalAmount: number
   status: string
   paymentStatus: string
   createdAt: string
-  updatedAt: string
   shippingAddress?: ShippingAddress
-  // These will be populated from separate API calls
+  // Updated to match backend structure
   agentName?: string
-  agentEmail?: string
-  agentCommissionRate?: number
+  clientName?: string
   consultantLevel?: string
 }
 
@@ -83,51 +74,6 @@ export default function PastOrdersPage() {
     }
   }
 
-  // Fetch client details to get consultant level
-  const fetchClientDetails = async (clientId: string, token: string) => {
-    try {
-      const apiUrl = getApiUrl()
-      const response = await fetch(`${apiUrl}/api/getClientDetailsById/${clientId}`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        return data.data || data
-      }
-    } catch (error) {
-      console.error("Error fetching client details:", error)
-    }
-    return null
-  }
-
-  // Fetch agent details to get agent name and commission rate
-  const fetchAgentDetails = async (agentId: string, token: string) => {
-    try {
-      const apiUrl = getApiUrl()
-      // Try the agent commission endpoint first
-      const response = await fetch(`${apiUrl}/api/agent/commission`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        return data.data || data
-      }
-    } catch (error) {
-      console.error("Error fetching agent details:", error)
-    }
-    return null
-  }
-
   const fetchOrders = async () => {
     try {
       setLoading(true)
@@ -140,9 +86,7 @@ export default function PastOrdersPage() {
       }
 
       const apiUrl = getApiUrl()
-
-      // Fetch orders using the correct endpoint from your backend
-      const response = await fetch(`${apiUrl}/api/getClientOrders/${clientId}`, {
+      const response = await fetch(`${apiUrl}/api/clients/${clientId}/orders`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -159,37 +103,18 @@ export default function PastOrdersPage() {
       }
 
       const data = await response.json()
-      let ordersData: Order[] = []
+      console.log("Orders API Response:", data) // Debug log
 
       if (data && Array.isArray(data.data)) {
-        ordersData = data.data
+        setOrders(data.data)
+        setFilteredOrders(data.data)
       } else if (Array.isArray(data)) {
-        ordersData = data
+        setOrders(data)
+        setFilteredOrders(data)
       } else {
-        ordersData = []
+        setOrders([])
+        setFilteredOrders([])
       }
-
-      // Fetch additional details for each order
-      const enrichedOrders = await Promise.all(
-        ordersData.map(async (order) => {
-          // Fetch client details to get consultant level
-          const clientDetails = await fetchClientDetails(order.clientId, token)
-
-          // Fetch agent details to get name and commission rate
-          const agentDetails = await fetchAgentDetails(order.agentId, token)
-
-          return {
-            ...order,
-            consultantLevel: clientDetails?.consultantLevel || "red",
-            agentName: agentDetails?.name || "Unknown Agent",
-            agentEmail: agentDetails?.email || "",
-            agentCommissionRate: agentDetails?.commissionRate || 0,
-          }
-        }),
-      )
-
-      setOrders(enrichedOrders)
-      setFilteredOrders(enrichedOrders)
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : "Failed to load orders. Please try again."
       console.error("Error fetching orders:", error)
@@ -295,19 +220,6 @@ export default function PastOrdersPage() {
     }
   }
 
-  const getConsultantLevelCommission = (level: string) => {
-    switch (level) {
-      case "red":
-        return 5
-      case "yellow":
-        return 10
-      case "purple":
-        return 15
-      default:
-        return 5
-    }
-  }
-
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-[80vh]">
@@ -410,51 +322,41 @@ export default function PastOrdersPage() {
                   </div>
                 </div>
 
-                {/* Agent and Commission Information - CORRECTED SECTION */}
-                <div className="mt-3 pt-3 border-t border-muted-foreground/20">
-                  <div className="flex flex-wrap gap-4 text-sm">
-                    {/* 1. Agent Name - Fetched from backend */}
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Agent:</span>
-                      <span className="font-medium text-blue-600">{order.agentName || "Loading..."}</span>
-                    </div>
+                {/* Agent and Consultant Level Information - Updated */}
+                {(order.agentName || order.consultantLevel) && (
+                  <div className="mt-3 pt-3 border-t border-muted-foreground/20">
+                    <div className="flex flex-wrap gap-4 text-sm">
+                      {/* Agent Name */}
+                      {order.agentName && (
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-muted-foreground">Agent:</span>
+                          <span className="font-medium text-blue-600">{order.agentName}</span>
+                        </div>
+                      )}
 
-                    {/* 2. Consultant Level - Fetched from backend */}
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Level:</span>
-                      <Badge className={getConsultantLevelColor(order.consultantLevel || "red")}>
-                        {(order.consultantLevel || "red").charAt(0).toUpperCase() +
-                          (order.consultantLevel || "red").slice(1)}
-                      </Badge>
-                    </div>
+                      {/* Client Name */}
+                      {order.clientName && (
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-muted-foreground">Client:</span>
+                          <span className="font-medium text-gray-700">{order.clientName}</span>
+                        </div>
+                      )}
 
-                    {/* Agent Commission Rate */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground">Agent Commission:</span>
-                      <span className="font-medium text-green-600">{order.agentCommissionRate || 0}%</span>
-                    </div>
-
-                    {/* Consultant Level Commission */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground">Level Bonus:</span>
-                      <span className="font-medium text-purple-600">
-                        +{getConsultantLevelCommission(order.consultantLevel || "red")}%
-                      </span>
-                    </div>
-
-                    {/* Total Commission */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground">Total Commission:</span>
-                      <span className="font-medium text-orange-600">
-                        {(order.agentCommissionRate || 0) +
-                          getConsultantLevelCommission(order.consultantLevel || "red")}
-                        %
-                      </span>
+                      {/* Consultant Level */}
+                      {order.consultantLevel && (
+                        <div className="flex items-center gap-2">
+                          <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-muted-foreground">Level:</span>
+                          <Badge className={getConsultantLevelColor(order.consultantLevel)}>
+                            {order.consultantLevel.charAt(0).toUpperCase() + order.consultantLevel.slice(1)}
+                          </Badge>
+                        </div>
+                      )}
                     </div>
                   </div>
-                </div>
+                )}
               </CardHeader>
               <CardContent className="p-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -477,16 +379,7 @@ export default function PastOrdersPage() {
                                   {item.customThickness && <div>Thickness: {item.customThickness} mm</div>}
                                 </div>
                               )}
-                              {hasCommission && (
-                                <div className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                                  <span>Commission Applied ✓</span>
-                                  {item.commissionInfo && (
-                                    <span className="text-muted-foreground">
-                                      (+{item.commissionInfo.totalCommission}%)
-                                    </span>
-                                  )}
-                                </div>
-                              )}
+                              {hasCommission && <div className="text-xs text-green-600 mt-1">Commission Applied ✓</div>}
                             </div>
                             <div className="text-right">
                               {hasCommission ? (
