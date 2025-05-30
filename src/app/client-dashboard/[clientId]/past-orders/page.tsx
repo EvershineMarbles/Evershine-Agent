@@ -37,7 +37,7 @@ interface Order {
   paymentStatus: string
   createdAt: string
   shippingAddress?: ShippingAddress
-  // Updated to match backend structure
+  // Direct properties from backend
   agentName?: string
   clientName?: string
   consultantLevel?: string
@@ -86,6 +86,8 @@ export default function PastOrdersPage() {
       }
 
       const apiUrl = getApiUrl()
+      console.log("PAST ORDERS - Fetching orders with token:", token.substring(0, 15) + "...")
+
       const response = await fetch(`${apiUrl}/api/clients/${clientId}/orders`, {
         method: "GET",
         headers: {
@@ -103,15 +105,18 @@ export default function PastOrdersPage() {
       }
 
       const data = await response.json()
-      console.log("Orders API Response:", data) // Debug log
+      console.log("PAST ORDERS - Full API response:", data)
 
       if (data && Array.isArray(data.data)) {
+        console.log("PAST ORDERS - Orders data:", data.data)
         setOrders(data.data)
         setFilteredOrders(data.data)
       } else if (Array.isArray(data)) {
+        console.log("PAST ORDERS - Orders data (direct array):", data)
         setOrders(data)
         setFilteredOrders(data)
       } else {
+        console.warn("PAST ORDERS - Unexpected response format:", data)
         setOrders([])
         setFilteredOrders([])
       }
@@ -322,8 +327,8 @@ export default function PastOrdersPage() {
                   </div>
                 </div>
 
-                {/* Agent and Consultant Level Information - Updated */}
-                {(order.agentName || order.consultantLevel) && (
+                {/* Agent and Consultant Information */}
+                {(order.agentName || order.clientName || order.consultantLevel) && (
                   <div className="mt-3 pt-3 border-t border-muted-foreground/20">
                     <div className="flex flex-wrap gap-4 text-sm">
                       {/* Agent Name */}
@@ -340,7 +345,7 @@ export default function PastOrdersPage() {
                         <div className="flex items-center gap-2">
                           <User className="h-4 w-4 text-muted-foreground" />
                           <span className="text-muted-foreground">Client:</span>
-                          <span className="font-medium text-gray-700">{order.clientName}</span>
+                          <span className="font-medium text-gray-600">{order.clientName}</span>
                         </div>
                       )}
 
