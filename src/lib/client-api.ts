@@ -35,6 +35,17 @@ export const clientAPI = {
       }
     } catch (error: any) {
       console.error("Error checking client:", error)
+
+      // If the endpoint doesn't exist (404), we'll handle this gracefully
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        console.log("Check-existing-client endpoint not found, will determine during registration")
+        return {
+          success: true,
+          exists: false, // Assume new client, let registration handle duplicates
+          message: "Client check endpoint not available",
+        }
+      }
+
       const errorMessage =
         axios.isAxiosError(error) && error.response?.data?.message
           ? error.response.data.message

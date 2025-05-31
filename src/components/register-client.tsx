@@ -157,7 +157,7 @@ export default function RegisterClient() {
       const phoneNumber = formData.mobile.startsWith("+") ? formData.mobile : `+91${formData.mobile}`
       setFormattedPhone(phoneNumber)
 
-      // FIRST: Check if client already exists
+      // FIRST: Try to check if client already exists
       console.log("Checking if client exists for mobile:", formData.mobile)
       const clientCheckResponse = await clientAPI.checkExistingClient(formData.mobile)
       console.log("Client check response:", clientCheckResponse)
@@ -180,16 +180,16 @@ export default function RegisterClient() {
           description: `Welcome back, ${clientCheckResponse.clientName}!`,
         })
       } else {
-        // New client
+        // New client OR check failed - we'll determine this later
         setExistingClient({
           exists: false,
         })
 
-        console.log("New client - will proceed with registration")
+        console.log("Treating as new client - will verify during registration")
 
         toast({
-          title: "New Client",
-          description: "This mobile number will be registered as a new client",
+          title: "Proceeding with Verification",
+          description: "We'll verify your account status after OTP confirmation",
         })
       }
 
@@ -427,17 +427,35 @@ export default function RegisterClient() {
       // Check if it's a duplicate client error
       if (
         errorMessage.toLowerCase().includes("phone number already exists") ||
-        errorMessage.toLowerCase().includes("client already exists")
+        errorMessage.toLowerCase().includes("client already exists") ||
+        errorMessage.toLowerCase().includes("already exists")
       ) {
         toast({
           title: "Client Already Exists",
-          description: "A client with this phone number already exists. Please use the client access flow instead.",
+          description: "This phone number is already registered. Let me redirect you to access the existing account.",
           variant: "destructive",
         })
 
-        // Reset to initial step to start over
-        setStep("initial")
-        setExistingClient(null)
+        // Set as existing client and redirect to OTP for access
+        setExistingClient({
+          exists: true,
+          clientId: undefined, // We don't have the ID, but we know it exists
+          clientName: formData.name, // Use the name they provided
+        })
+
+        // Go back to OTP step for existing client access
+        setStep("otp")
+
+        // Send new OTP for existing client access
+        try {
+          await clientAPI.sendOTP(formData.mobile)
+          toast({
+            title: "OTP Sent",
+            description: "Please verify your identity to access your existing account",
+          })
+        } catch (otpError) {
+          console.error("Error sending OTP for existing client:", otpError)
+        }
       } else {
         toast({
           title: "Error",
@@ -569,9 +587,9 @@ export default function RegisterClient() {
                 ) : (
                   <div className="space-y-2">
                     <div className="p-3 bg-blue-50 rounded-md border border-blue-200">
-                      <span className="text-blue-700 font-medium">📝 New Client Registration</span>
+                      <span className="text-blue-700 font-medium">📱 Account Verification</span>
                     </div>
-                    <p className="text-sm text-gray-600">Enter OTP to continue registration</p>
+                    <p className="text-sm text-gray-600">Enter OTP to continue</p>
                   </div>
                 )}
               </CardDescription>
