@@ -1,7 +1,14 @@
+"use client"
+
 import { Suspense } from "react"
 import RegisterClient from "@/components/register-client"
+import { useRouter } from "next/navigation"
 
 function RegisterClientContent() {
+  const router = useRouter()
+
+  // This component now just renders the RegisterClient component
+  // All the logic for checking existing clients is in the RegisterClient component
   return <RegisterClient />
 }
 
