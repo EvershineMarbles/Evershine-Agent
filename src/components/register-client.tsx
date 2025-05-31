@@ -153,13 +153,24 @@ export default function RegisterClient() {
     }
 
     try {
+      // Format phone number first
+      const phoneNumber = formData.mobile.startsWith("+") ? formData.mobile : `+91${formData.mobile}`
+      setFormattedPhone(phoneNumber)
+
       // FIRST: Check if client already exists
+      console.log("Checking if client exists for mobile:", formData.mobile)
       const clientCheckResponse = await clientAPI.checkExistingClient(formData.mobile)
+      console.log("Client check response:", clientCheckResponse)
 
       if (clientCheckResponse.success && clientCheckResponse.exists) {
-        // Client exists - store the info and proceed with OTP for existing client
+        // Client exists - store the info
         setExistingClient({
           exists: true,
+          clientId: clientCheckResponse.clientId,
+          clientName: clientCheckResponse.clientName,
+        })
+
+        console.log("Existing client found:", {
           clientId: clientCheckResponse.clientId,
           clientName: clientCheckResponse.clientName,
         })
@@ -173,6 +184,8 @@ export default function RegisterClient() {
         setExistingClient({
           exists: false,
         })
+
+        console.log("New client - will proceed with registration")
 
         toast({
           title: "New Client",
@@ -188,8 +201,6 @@ export default function RegisterClient() {
           title: "OTP Sent",
           description: "A verification code has been sent to your mobile number",
         })
-        // Store the formatted phone number for verification
-        setFormattedPhone(otpResponse.formattedPhone || `+91${formData.mobile}`)
         // Move to OTP verification step
         setStep("otp")
       } else {
@@ -228,6 +239,9 @@ export default function RegisterClient() {
     }
 
     try {
+      console.log("Verifying OTP for:", formattedPhone)
+      console.log("Existing client state:", existingClient)
+
       // Call the OTP verify API
       const response = await clientAPI.verifyOTP(formattedPhone, otpValue)
 
@@ -237,8 +251,10 @@ export default function RegisterClient() {
           description: "Your phone number has been verified successfully",
         })
 
-        // Check if this is an existing client
+        // Check if this is an existing client based on our earlier check
         if (existingClient?.exists && existingClient.clientId) {
+          console.log("Processing existing client:", existingClient)
+
           // EXISTING CLIENT - Get impersonation token and redirect to dashboard
           const agentToken = localStorage.getItem("agentToken")
 
@@ -282,6 +298,7 @@ export default function RegisterClient() {
             })
           }
         } else {
+          console.log("Processing new client - proceeding to details step")
           // NEW CLIENT - Proceed to details step for registration
           setStep("details")
         }
@@ -308,6 +325,17 @@ export default function RegisterClient() {
     setIsLoading(true)
 
     try {
+      // Double-check that this is actually a new client
+      if (existingClient?.exists) {
+        toast({
+          title: "Error",
+          description: "This client already exists. Please use the client access flow instead.",
+          variant: "destructive",
+        })
+        setIsLoading(false)
+        return
+      }
+
       // Check if agent is authenticated
       if (!isAgentAuthenticated()) {
         toast({
@@ -331,6 +359,12 @@ export default function RegisterClient() {
         router.push("/agent-login")
         return
       }
+
+      console.log("Creating new client with data:", {
+        name: formData.name,
+        mobile: formData.mobile,
+        email: formData.email,
+      })
 
       // Create new client
       const response = await clientAPI.registerClient(
@@ -389,11 +423,28 @@ export default function RegisterClient() {
     } catch (error: any) {
       console.error("Error creating client:", error)
       const errorMessage = error instanceof Error ? error.message : "An error occurred while creating the client"
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
+
+      // Check if it's a duplicate client error
+      if (
+        errorMessage.toLowerCase().includes("phone number already exists") ||
+        errorMessage.toLowerCase().includes("client already exists")
+      ) {
+        toast({
+          title: "Client Already Exists",
+          description: "A client with this phone number already exists. Please use the client access flow instead.",
+          variant: "destructive",
+        })
+
+        // Reset to initial step to start over
+        setStep("initial")
+        setExistingClient(null)
+      } else {
+        toast({
+          title: "Error",
+          description: errorMessage,
+          variant: "destructive",
+        })
+      }
     } finally {
       setIsLoading(false)
     }
