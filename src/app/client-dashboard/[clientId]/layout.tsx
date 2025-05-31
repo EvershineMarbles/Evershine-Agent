@@ -47,18 +47,26 @@ export default function ClientDashboardLayout({
         const email = localStorage.getItem("agentEmail")
         setAgentEmail(email)
 
-        // Extract name from email (similar to code 2)
+        // Extract name from email
         if (email) {
           const name = email.split("@")[0]
           // Capitalize first letter and format name
           const formattedName = name.charAt(0).toUpperCase() + name.slice(1)
           setAgentName(formattedName)
         }
+
+        // Check if we have an impersonation token for this client
+        const impersonatedClientId = localStorage.getItem("impersonatedClientId")
+        if (impersonatedClientId !== clientId) {
+          // If we're trying to access a different client than the one we're impersonating,
+          // we need to get a new impersonation token
+          console.log("Client ID mismatch, need new impersonation token")
+        }
       } catch (e) {
         console.error("Error loading data from localStorage:", e)
       }
     }
-  }, [])
+  }, [clientId])
 
   const handleLogout = () => {
     // Clear tokens and redirect to login

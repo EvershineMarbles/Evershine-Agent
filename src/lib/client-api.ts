@@ -31,7 +31,7 @@ export const clientAPI = {
         message: response.data.message,
         formattedPhone,
       }
-    } catch (error: Error | unknown) {
+    } catch (error) {
       console.error("Error sending OTP:", error)
       const errorMessage =
         axios.isAxiosError(error) && error.response?.data?.message
@@ -60,7 +60,7 @@ export const clientAPI = {
         message: response.data.message,
         data: response.data.data,
       }
-    } catch (error: Error | unknown) {
+    } catch (error) {
       console.error("Error verifying OTP:", error)
       const errorMessage =
         axios.isAxiosError(error) && error.response?.data?.message
@@ -91,7 +91,7 @@ export const clientAPI = {
         message: response.data.message || "Client registered successfully",
         data: response.data.data,
       }
-    } catch (error: Error | unknown) {
+    } catch (error) {
       console.error("Error registering client:", error)
       const errorMessage =
         axios.isAxiosError(error) && error.response?.data?.message
@@ -122,7 +122,7 @@ export const clientAPI = {
         message: response.data.message || "Client details updated successfully",
         data: response.data.data,
       }
-    } catch (error: Error | unknown) {
+    } catch (error) {
       console.error("Error updating client details:", error)
       const errorMessage =
         axios.isAxiosError(error) && error.response?.data?.message
@@ -133,6 +133,103 @@ export const clientAPI = {
 
       return {
         success: false,
+        message: errorMessage,
+      }
+    }
+  },
+
+  // Check if client exists by mobile number (using new backend endpoint)
+  checkExistingClient: async (mobile: string) => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/check-existing-client`, {
+        mobile,
+      })
+
+      return {
+        success: response.data.success,
+        exists: response.data.exists,
+        message: response.data.message,
+        clientName: response.data.clientName,
+        clientId: response.data.clientId,
+      }
+    } catch (error) {
+      console.error("Error checking existing client:", error)
+      const errorMessage =
+        axios.isAxiosError(error) && error.response?.data?.message
+          ? error.response.data.message
+          : error instanceof Error
+            ? error.message
+            : "Failed to check client"
+
+      return {
+        success: false,
+        exists: false,
+        message: errorMessage,
+      }
+    }
+  },
+
+  // Agent impersonation of client
+  agentImpersonateClient: async (clientId: string, agentToken: string) => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/agent/impersonate/${clientId}`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${agentToken}`,
+            "Content-Type": "application/json",
+          },
+        },
+      )
+
+      return {
+        success: response.data.success,
+        impersonationToken: response.data.impersonationToken,
+        clientDetails: response.data.clientDetails,
+        message: response.data.message || "Successfully impersonated client",
+      }
+    } catch (error) {
+      console.error("Error impersonating client:", error)
+      const errorMessage =
+        axios.isAxiosError(error) && error.response?.data?.message
+          ? error.response.data.message
+          : error instanceof Error
+            ? error.message
+            : "Failed to impersonate client"
+
+      return {
+        success: false,
+        message: errorMessage,
+      }
+    }
+  },
+
+  // Check if client exists by mobile number
+  checkClientExists: async (mobile: string) => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/api/check-client`, {
+        mobile,
+      })
+
+      return {
+        success: response.data.success,
+        clientExists: response.data.clientExists,
+        client: response.data.client,
+        message: response.data.message,
+      }
+    } catch (error) {
+      console.error("Error checking client:", error)
+      const errorMessage =
+        axios.isAxiosError(error) && error.response?.data?.message
+          ? error.response.data.message
+          : error instanceof Error
+            ? error.message
+            : "Failed to check client"
+
+      return {
+        success: false,
+        clientExists: false,
         message: errorMessage,
       }
     }

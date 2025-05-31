@@ -2,8 +2,8 @@
 
 import type React from "react"
 
-import { useState, useRef } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useRef, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -19,10 +19,14 @@ import axios from "axios"
 export default function RegisterClient() {
   const router = useRouter()
   const { toast } = useToast()
+  const searchParams = useSearchParams()
+  const mobileFromParams = searchParams.get("mobile")
+  const isVerified = searchParams.get("verified") === "true"
+
   const [step, setStep] = useState<"initial" | "otp" | "details">("initial")
   const [formData, setFormData] = useState({
     name: "",
-    mobile: "",
+    mobile: mobileFromParams || "",
     email: "",
     address: "",
     city: "",
@@ -32,9 +36,9 @@ export default function RegisterClient() {
     gstNumber: "",
     projectType: "",
     dateOfBirth: "",
-    anniversaryDate: "", // Add anniversary date
-    architectDetails: "", // Add architect details
-    consultantLevel: "red", // Update default to "red" instead of "standard"
+    anniversaryDate: "",
+    architectDetails: "",
+    consultantLevel: "red",
     agreeToTerms: false,
   })
   const [isLoading, setIsLoading] = useState(false)
@@ -42,6 +46,24 @@ export default function RegisterClient() {
   // OTP state and refs
   const [otp, setOtp] = useState(["", "", "", "", "", ""])
   const otpInputs = useRef<(HTMLInputElement | null)[]>([null, null, null, null, null, null])
+
+  // Additional state for API interactions
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [apiError, setApiError] = useState("")
+  const [formattedPhone, setFormattedPhone] = useState("")
+
+  // Effect to handle pre-filled mobile number from OTP verification
+  useEffect(() => {
+    if (mobileFromParams && isVerified) {
+      setFormData((prev) => ({
+        ...prev,
+        mobile: mobileFromParams,
+      }))
+
+      // If mobile is verified, skip to details step
+      setStep("details")
+    }
+  }, [mobileFromParams, isVerified])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -96,12 +118,7 @@ export default function RegisterClient() {
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
-  // Add these new state variables
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [apiError, setApiError] = useState("")
-  const [formattedPhone, setFormattedPhone] = useState("")
-
-  // Update the handleSubmitInitial function to call the OTP send API
+  // Submit initial form with mobile number
   const handleSubmitInitial = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
@@ -163,7 +180,7 @@ export default function RegisterClient() {
     }
   }
 
-  // Update the handleVerifyOTP function to call the OTP verify API
+  // Verify OTP
   const handleVerifyOTP = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
@@ -208,6 +225,34 @@ export default function RegisterClient() {
             description: "You have been logged in successfully",
           })
 
+          // Get impersonation token for agent
+          try {
+            const agentToken = localStorage.getItem("agentToken")
+            if (agentToken) {
+              const impersonateResponse = await axios.post(
+                `https://evershinebackend-2.onrender.com/api/agent/impersonate/${response.data.data.clientId}`,
+                {},
+                {
+                  headers: {
+                    Authorization: `Bearer ${agentToken}`,
+                  },
+                },
+              )
+
+              if (impersonateResponse.data.success) {
+                localStorage.setItem("clientImpersonationToken", impersonateResponse.data.data.impersonationToken)
+
+                toast({
+                  title: "Access Granted",
+                  description: "You now have access to this client's dashboard",
+                })
+              }
+            }
+          } catch (impersonateError) {
+            console.error("Error getting impersonation token:", impersonateError)
+            // Continue anyway, as we have the client token
+          }
+
           // Redirect to client dashboard
           setTimeout(() => {
             router.push(`/client-dashboard/${response.data.data.clientId}`)
@@ -230,7 +275,7 @@ export default function RegisterClient() {
     }
   }
 
-  // Updated handleSubmitDetails function with client dashboard redirect
+  // Submit client details form
   const handleSubmitDetails = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
@@ -350,6 +395,34 @@ export default function RegisterClient() {
     }
   }
 
+  // Resend OTP function
+  const handleResendOTP = async () => {
+    try {
+      setIsSubmitting(true)
+      const response = await axios.post("https://evershinebackend-2.onrender.com/api/otp/send", {
+        phoneNumber: formattedPhone,
+      })
+
+      if (response.data.success) {
+        toast({
+          title: "OTP Resent",
+          description: "A new verification code has been sent to your mobile number",
+        })
+      } else {
+        throw new Error(response.data.message || "Failed to resend OTP")
+      }
+    } catch (error: any) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to resend OTP"
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   return (
     <div className="flex flex-col items-center justify-center">
       <div className="w-full max-w-xl">
@@ -465,30 +538,7 @@ export default function RegisterClient() {
                     <Button
                       variant="link"
                       className="p-0 h-auto text-blue"
-                      onClick={async () => {
-                        try {
-                          setIsSubmitting(true)
-                          const response = await axios.post("https://evershinebackend-2.onrender.com/api/otp/send", {
-                            phoneNumber: formattedPhone,
-                          })
-
-                          if (response.data.success) {
-                            toast({
-                              title: "OTP Resent",
-                              description: "A new verification code has been sent to your mobile number",
-                            })
-                          }
-                        } catch (error: any) {
-                          const errorMessage = error instanceof Error ? error.message : "Failed to resend OTP"
-                          toast({
-                            title: "Error",
-                            description: errorMessage,
-                            variant: "destructive",
-                          })
-                        } finally {
-                          setIsSubmitting(false)
-                        }
-                      }}
+                      onClick={handleResendOTP}
                       disabled={isSubmitting}
                     >
                       {isSubmitting ? "Sending..." : "Resend"}
@@ -651,7 +701,7 @@ export default function RegisterClient() {
                       placeholder="Enter architect details"
                       value={formData.architectDetails}
                       onChange={handleChange}
-                      className="h-12 pl-10 rounded-md"
+                      className="h-12 rounded-md"
                     />
                   </div>
                 </div>
@@ -765,11 +815,13 @@ export default function RegisterClient() {
               </form>
             </CardContent>
 
-            <CardFooter className="flex justify-center">
-              <Button variant="link" onClick={() => setStep("otp")} className="text-blue">
-                Back to OTP verification
-              </Button>
-            </CardFooter>
+            {!isVerified && (
+              <CardFooter className="flex justify-center">
+                <Button variant="link" onClick={() => setStep("otp")} className="text-blue">
+                  Back to OTP verification
+                </Button>
+              </CardFooter>
+            )}
           </Card>
         )}
       </div>
