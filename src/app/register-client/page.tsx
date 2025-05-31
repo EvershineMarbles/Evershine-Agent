@@ -1,53 +1,25 @@
-"use client"
-
-import type React from "react"
-import { useState, useEffect } from "react"
-import { useSearchParams } from "next/navigation"
+import { Suspense } from "react"
 import RegisterClient from "@/components/register-client"
 
-const RegisterClientPage = () => {
-  const [formData, setFormData] = useState({
-    mobile: "",
-    // other form fields
-  })
+function RegisterClientContent() {
+  return <RegisterClient />
+}
 
-  // Add this near the top of your component, after any useState declarations
-  const searchParams = useSearchParams()
-  const mobileFromParams = searchParams.get("mobile")
-  const isVerified = searchParams.get("verified") === "true"
-
-  useEffect(() => {
-    if (mobileFromParams && isVerified) {
-      // Pre-fill the mobile number in your form
-      // This depends on how your form state is managed
-      setFormData((prev) => ({
-        ...prev,
-        mobile: mobileFromParams,
-      }))
-
-      // Optionally disable the mobile field since it's already verified
-      // This depends on your form implementation
-    }
-  }, [mobileFromParams, isVerified])
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    })
-  }
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    // Handle form submission logic here
-    console.log(formData)
-  }
-
+function RegisterClientLoading() {
   return (
-    <div>
-      <RegisterClient />
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+        <p className="mt-4 text-gray-600">Loading registration form...</p>
+      </div>
     </div>
   )
 }
 
-export default RegisterClientPage
+export default function RegisterClientPage() {
+  return (
+    <Suspense fallback={<RegisterClientLoading />}>
+      <RegisterClientContent />
+    </Suspense>
+  )
+}

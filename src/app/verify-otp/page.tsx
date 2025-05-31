@@ -10,6 +10,18 @@ import { useToast } from "@/components/ui/use-toast"
 import { Loader2, ArrowLeft } from "lucide-react"
 import { clientAPI } from "@/lib/client-api"
 import Image from "next/image"
+import { Suspense } from "react"
+
+function VerifyOTPLoading() {
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+        <p className="mt-4 text-gray-600">Loading OTP verification...</p>
+      </div>
+    </div>
+  )
+}
 
 export default function VerifyOTPPage() {
   const [otp, setOtp] = useState("")
@@ -154,78 +166,80 @@ export default function VerifyOTPPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-      {/* Logo */}
-      <div className="absolute top-6 left-1/2 transform -translate-x-1/2">
-        <Image src="/logo.png" alt="Evershine Logo" width={180} height={60} className="h-12 w-auto" />
+    <Suspense fallback={<VerifyOTPLoading />}>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        {/* Logo */}
+        <div className="absolute top-6 left-1/2 transform -translate-x-1/2">
+          <Image src="/logo.png" alt="Evershine Logo" width={180} height={60} className="h-12 w-auto" />
+        </div>
+
+        <Card className="w-full max-w-md shadow-lg">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl font-bold text-[#194a95]">Verify OTP</CardTitle>
+            <CardDescription>
+              Enter the 6-digit code sent to +91{mobile}
+              {type === "existing" && clientName && (
+                <div className="mt-2 p-2 bg-green-50 rounded-md">
+                  <span className="text-green-700 font-medium">Accessing: {clientName}</span>
+                </div>
+              )}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="otp">OTP Code</Label>
+              <Input
+                id="otp"
+                type="text"
+                placeholder="Enter 6-digit OTP"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                maxLength={6}
+                className="text-center text-lg tracking-widest"
+              />
+            </div>
+
+            <Button
+              onClick={verifyOTP}
+              className="w-full bg-[#194a95] hover:bg-[#0d3a7d]"
+              disabled={isLoading || otp.length !== 6}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Verifying...
+                </>
+              ) : type === "existing" ? (
+                "Access Dashboard"
+              ) : (
+                "Verify & Continue"
+              )}
+            </Button>
+
+            <div className="text-center space-y-2">
+              {countdown > 0 ? (
+                <p className="text-sm text-gray-600">Resend OTP in {countdown} seconds</p>
+              ) : (
+                <Button variant="link" onClick={resendOTP} disabled={resendLoading} className="text-[#194a95]">
+                  {resendLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    "Resend OTP"
+                  )}
+                </Button>
+              )}
+            </div>
+
+            <Button variant="outline" onClick={() => router.back()} className="w-full">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </Button>
+          </CardContent>
+        </Card>
       </div>
-
-      <Card className="w-full max-w-md shadow-lg">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold text-[#194a95]">Verify OTP</CardTitle>
-          <CardDescription>
-            Enter the 6-digit code sent to +91{mobile}
-            {type === "existing" && clientName && (
-              <div className="mt-2 p-2 bg-green-50 rounded-md">
-                <span className="text-green-700 font-medium">Accessing: {clientName}</span>
-              </div>
-            )}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="otp">OTP Code</Label>
-            <Input
-              id="otp"
-              type="text"
-              placeholder="Enter 6-digit OTP"
-              value={otp}
-              onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              maxLength={6}
-              className="text-center text-lg tracking-widest"
-            />
-          </div>
-
-          <Button
-            onClick={verifyOTP}
-            className="w-full bg-[#194a95] hover:bg-[#0d3a7d]"
-            disabled={isLoading || otp.length !== 6}
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Verifying...
-              </>
-            ) : type === "existing" ? (
-              "Access Dashboard"
-            ) : (
-              "Verify & Continue"
-            )}
-          </Button>
-
-          <div className="text-center space-y-2">
-            {countdown > 0 ? (
-              <p className="text-sm text-gray-600">Resend OTP in {countdown} seconds</p>
-            ) : (
-              <Button variant="link" onClick={resendOTP} disabled={resendLoading} className="text-[#194a95]">
-                {resendLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Sending...
-                  </>
-                ) : (
-                  "Resend OTP"
-                )}
-              </Button>
-            )}
-          </div>
-
-          <Button variant="outline" onClick={() => router.back()} className="w-full">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
+    </Suspense>
   )
 }
