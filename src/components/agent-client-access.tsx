@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { useToast } from "@/components/ui/use-toast"
-import { Loader2, User, ArrowRight, Phone } from "lucide-react"
+import { Loader2, User, ArrowRight, Phone, UserPlus, Search } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { clientAPI } from "@/lib/client-api"
 import Image from "next/image"
@@ -55,7 +55,6 @@ export default function AgentClientAccess() {
 
     setIsLoading(true)
     try {
-      // Use the API endpoint through our client API helper
       const response = await clientAPI.checkExistingClient(mobile)
 
       if (response.success) {
@@ -66,6 +65,7 @@ export default function AgentClientAccess() {
             clientName: response.clientName,
             mobile: mobile,
           })
+          setShowNewClientOption(false)
 
           toast({
             title: "Client Found",
@@ -73,6 +73,7 @@ export default function AgentClientAccess() {
           })
         } else {
           // Client doesn't exist
+          setExistingClient(null)
           setShowNewClientOption(true)
           toast({
             title: "New Client",
@@ -103,13 +104,13 @@ export default function AgentClientAccess() {
 
     setOtpSending(true)
     try {
-      // Send OTP for verification
       const response = await clientAPI.sendOTP(mobile)
 
       if (response.success) {
-        // Store client info temporarily and redirect to OTP verification
-        sessionStorage.setItem("pendingClientAccess", JSON.stringify(existingClient))
-        router.push(`/verify-otp?mobile=${mobile}&type=existing`)
+        // Redirect to OTP verification with client details
+        router.push(
+          `/verify-otp?mobile=${mobile}&type=existing&clientId=${existingClient.clientId}&clientName=${encodeURIComponent(existingClient.clientName)}`,
+        )
 
         toast({
           title: "OTP Sent",
@@ -174,6 +175,7 @@ export default function AgentClientAccess() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
+      {/* Logo */}
       <div className="w-full max-w-md mb-6">
         <div className="flex justify-center mb-4">
           <Image src="/logo.png" alt="Evershine Logo" width={180} height={60} className="h-12 w-auto" />
@@ -182,7 +184,10 @@ export default function AgentClientAccess() {
 
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold text-[#194a95]">Client Access</CardTitle>
+          <CardTitle className="text-2xl font-bold text-[#194a95] flex items-center justify-center gap-2">
+            <Search className="h-6 w-6" />
+            Client Access
+          </CardTitle>
           <CardDescription>Enter client's mobile number to access or create their account</CardDescription>
         </CardHeader>
 
@@ -217,7 +222,10 @@ export default function AgentClientAccess() {
                     Checking...
                   </>
                 ) : (
-                  "Continue"
+                  <>
+                    <Search className="mr-2 h-4 w-4" />
+                    Search Client
+                  </>
                 )}
               </Button>
             </div>
@@ -227,14 +235,18 @@ export default function AgentClientAccess() {
             <div className="space-y-4">
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                 <div className="flex items-center space-x-3">
-                  <User className="h-8 w-8 text-green-600" />
-                  <div>
-                    <h3 className="font-semibold text-green-800">{existingClient.clientName}</h3>
-                    <div className="flex items-center text-sm text-green-600">
+                  <div className="bg-green-100 p-2 rounded-full">
+                    <User className="h-6 w-6 text-green-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-green-800 text-lg">{existingClient.clientName}</h3>
+                    <div className="flex items-center text-sm text-green-600 mt-1">
                       <Phone className="h-3 w-3 mr-1" />
                       +91 {existingClient.mobile}
                     </div>
-                    <p className="text-xs text-green-600 mt-1">This client already exists in the system</p>
+                    <p className="text-xs text-green-600 mt-1 bg-green-100 px-2 py-1 rounded-md inline-block">
+                      ✓ Existing Client
+                    </p>
                   </div>
                 </div>
               </div>
@@ -242,7 +254,7 @@ export default function AgentClientAccess() {
               <div className="space-y-3">
                 <Button
                   onClick={sendOTPForExistingClient}
-                  className="w-full bg-green-600 hover:bg-green-700"
+                  className="w-full bg-green-600 hover:bg-green-700 text-white"
                   disabled={otpSending}
                 >
                   {otpSending ? (
@@ -268,9 +280,16 @@ export default function AgentClientAccess() {
           {showNewClientOption && (
             <div className="space-y-4">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
-                <h3 className="font-semibold text-blue-800 mb-2">New Client</h3>
+                <div className="flex justify-center mb-2">
+                  <div className="bg-blue-100 p-2 rounded-full">
+                    <UserPlus className="h-6 w-6 text-blue-600" />
+                  </div>
+                </div>
+                <h3 className="font-semibold text-blue-800 mb-2">New Client Registration</h3>
                 <p className="text-sm text-blue-600">No client found with mobile number +91 {mobile}</p>
-                <p className="text-xs text-blue-600 mt-1">You can register this client as a new client</p>
+                <p className="text-xs text-blue-600 mt-1 bg-blue-100 px-2 py-1 rounded-md inline-block">
+                  Ready to register new client
+                </p>
               </div>
 
               <div className="space-y-3">
@@ -286,8 +305,8 @@ export default function AgentClientAccess() {
                     </>
                   ) : (
                     <>
+                      <UserPlus className="mr-2 h-4 w-4" />
                       Send OTP to Register New Client
-                      <ArrowRight className="ml-2 h-4 w-4" />
                     </>
                   )}
                 </Button>
@@ -302,7 +321,7 @@ export default function AgentClientAccess() {
 
         <CardFooter className="flex justify-center pt-0">
           <p className="text-xs text-gray-500 text-center">
-            Any agent can access any client's dashboard after OTP verification
+            🔒 Any agent can access any client's dashboard after OTP verification
           </p>
         </CardFooter>
       </Card>

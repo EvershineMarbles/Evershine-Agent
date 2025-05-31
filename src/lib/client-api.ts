@@ -138,7 +138,9 @@ export const clientAPI = {
     }
   },
 
-  // Check if client exists by mobile number (using new backend endpoint)
+  // ========== NEW FUNCTIONS FOR CROSS-AGENT CLIENT ACCESS ==========
+
+  // Check if client exists by mobile number (NEW BACKEND ENDPOINT)
   checkExistingClient: async (mobile: string) => {
     try {
       const response = await axios.post(`${API_BASE_URL}/check-existing-client`, {
@@ -169,7 +171,7 @@ export const clientAPI = {
     }
   },
 
-  // Agent impersonation of client
+  // Agent impersonation of client (NEW BACKEND ENDPOINT)
   agentImpersonateClient: async (clientId: string, agentToken: string) => {
     try {
       const response = await axios.post(
@@ -205,7 +207,7 @@ export const clientAPI = {
     }
   },
 
-  // Check if client exists by mobile number
+  // Check if client exists by mobile number (LEGACY FUNCTION - for backward compatibility)
   checkClientExists: async (mobile: string) => {
     try {
       const response = await axios.post(`${API_BASE_URL}/api/check-client`, {
