@@ -262,6 +262,15 @@ export default function CartPage() {
       }
 
       const apiUrl = getApiUrl()
+
+      // Create a temporary order reference for follow-up
+      const tempOrderData = {
+        clientId: clientId,
+        totalAmount: cartData?.totalAmount || 0,
+        items: cartData?.items || [],
+        createdAt: new Date(),
+      }
+
       const response = await fetch(`${apiUrl}/api/client/followup-preferences`, {
         method: "POST",
         headers: {
@@ -270,6 +279,7 @@ export default function CartPage() {
         },
         body: JSON.stringify({
           followUpReminder: followUpReminder.enabled ? followUpReminder : { enabled: false },
+          tempOrderData: followUpReminder.enabled ? tempOrderData : null, // Pass order data for actual creation
         }),
       })
 
@@ -284,7 +294,9 @@ export default function CartPage() {
         setSavedFollowUpId(data.data?.id || null)
         toast({
           title: "Follow-up Saved",
-          description: "Your follow-up preferences have been saved successfully",
+          description: followUpReminder.enabled
+            ? "Follow-up reminder created and will be applied to your next order"
+            : "Follow-up preferences saved successfully",
         })
 
         // Reset the saved state after 3 seconds
