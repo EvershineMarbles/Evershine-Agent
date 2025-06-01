@@ -1627,7 +1627,7 @@ export default function CartPage() {
   )
 }
 
-// Debounce utility function
+// Debounce uility function
 function debounce<T extends (...args: any[]) => any>(func: T, wait: number): T {
   let timeout: NodeJS.Timeout
   return ((...args: any[]) => {
