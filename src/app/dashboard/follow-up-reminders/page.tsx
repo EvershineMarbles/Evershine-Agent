@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { CalendarIcon, MessageSquare, Plus, Loader2, CheckCircle, User, IndianRupee, Package } from "lucide-react"
+import { CalendarIcon, MessageSquare, Plus, Loader2, CheckCircle, User, IndianRupee, Package, Send } from "lucide-react"
 import { format, differenceInDays } from "date-fns"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -38,6 +38,11 @@ interface Order {
     comment: string
     period: string
     customDays?: number
+    messageDetails?: {
+      messageSent: boolean
+      sentAt?: string
+      deliveryStatus: string
+    }
   }
 }
 
@@ -51,6 +56,7 @@ export default function AgentOrdersPage() {
   const [customDate, setCustomDate] = useState<Date | undefined>(undefined)
   const [comment, setComment] = useState("")
   const [creating, setCreating] = useState(false)
+  const [sendingReminder, setSendingReminder] = useState<string | null>(null)
 
   const fetchOrders = async () => {
     try {
@@ -169,6 +175,85 @@ export default function AgentOrdersPage() {
     }
   }
 
+  const sendWhatsAppReminder = async (followUpId: string) => {
+    try {
+      setSendingReminder(followUpId)
+      const token = localStorage.getItem("token") || localStorage.getItem("agentToken")
+
+      const response = await fetch(
+        `https://evershinebackend-2.onrender.com/api/agent/followup/${followUpId}/send-whatsapp`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        },
+      )
+
+      if (response.ok) {
+        const data = await response.json()
+        toast({
+          title: "Success",
+          description: "WhatsApp reminder sent successfully with invoice PDF!",
+        })
+
+        // Refresh orders to update the message status
+        await fetchOrders()
+      } else {
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Failed to send WhatsApp reminder")
+      }
+    } catch (error: any) {
+      console.error("Error sending WhatsApp reminder:", error)
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send WhatsApp reminder",
+        variant: "destructive",
+      })
+    } finally {
+      setSendingReminder(null)
+    }
+  }
+
+  const markFollowUpComplete = async (followUpId: string) => {
+    try {
+      const token = localStorage.getItem("token") || localStorage.getItem("agentToken")
+
+      const response = await fetch(`https://evershinebackend-2.onrender.com/api/agent/followup/${followUpId}/status`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          status: "completed",
+          completionNotes: "Marked as complete by agent",
+        }),
+      })
+
+      if (response.ok) {
+        toast({
+          title: "Success",
+          description: "Follow-up marked as complete",
+        })
+
+        // Refresh orders
+        await fetchOrders()
+      } else {
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Failed to mark follow-up as complete")
+      }
+    } catch (error: any) {
+      console.error("Error marking follow-up complete:", error)
+      toast({
+        title: "Error",
+        description: error.message || "Failed to mark follow-up as complete",
+        variant: "destructive",
+      })
+    }
+  }
+
   useEffect(() => {
     fetchOrders()
   }, [])
@@ -269,7 +354,7 @@ export default function AgentOrdersPage() {
                   {/* Right side - Dates and Follow-up Status */}
                   <div className="text-left lg:text-right space-y-2">
                     <div className="flex items-center gap-2 lg:justify-end">
-                      <Calendar className="h-4 w-4 text-gray-500" />
+                      <CalendarIcon className="h-4 w-4 text-gray-500" />
                       <span className="text-sm text-gray-600">
                         Order Date: {format(new Date(order.createdAt), "dd MMM yyyy")}
                       </span>
@@ -285,6 +370,15 @@ export default function AgentOrdersPage() {
                         <div className="flex lg:justify-end">
                           {getFollowUpStatusBadge(order.followUpReminder.status)}
                         </div>
+                        {order.followUpReminder.messageDetails?.messageSent && (
+                          <div className="flex items-center gap-2 lg:justify-end">
+                            <Send className="h-4 w-4 text-green-500" />
+                            <span className="text-sm text-green-600">
+                              WhatsApp sent:{" "}
+                              {format(new Date(order.followUpReminder.messageDetails.sentAt!), "dd MMM yyyy")}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -317,12 +411,42 @@ export default function AgentOrdersPage() {
                         <p className="mt-1 text-sm text-gray-900">{order.followUpReminder.comment || "No comment"}</p>
                       </div>
                     </div>
+                    {order.followUpReminder.messageDetails?.messageSent && (
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                        <div className="flex items-center gap-2">
+                          <Send className="h-4 w-4 text-green-600" />
+                          <span className="text-sm font-medium text-green-800">WhatsApp Reminder Sent</span>
+                        </div>
+                        <p className="text-sm text-green-700 mt-1">
+                          Invoice PDF sent on{" "}
+                          {format(new Date(order.followUpReminder.messageDetails.sentAt!), "dd MMM yyyy 'at' HH:mm")}
+                        </p>
+                        <p className="text-sm text-green-600">
+                          Status: {order.followUpReminder.messageDetails.deliveryStatus}
+                        </p>
+                      </div>
+                    )}
                     <div className="flex gap-3 pt-2">
-                      <Button size="sm" variant="outline" className="flex items-center gap-2">
-                        <MessageSquare className="h-4 w-4" />
-                        Send Reminder
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex items-center gap-2"
+                        onClick={() => sendWhatsAppReminder(order.followUpReminder!._id)}
+                        disabled={sendingReminder === order.followUpReminder!._id}
+                      >
+                        {sendingReminder === order.followUpReminder!._id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <MessageSquare className="h-4 w-4" />
+                        )}
+                        Send WhatsApp Reminder
                       </Button>
-                      <Button size="sm" className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        className="flex items-center gap-2"
+                        onClick={() => markFollowUpComplete(order.followUpReminder!._id)}
+                        disabled={order.followUpReminder.status === "completed"}
+                      >
                         <CheckCircle className="h-4 w-4" />
                         Mark Complete
                       </Button>
@@ -347,7 +471,8 @@ export default function AgentOrdersPage() {
                           <DialogTitle>Create Follow-up Reminder</DialogTitle>
                           <DialogDescription>
                             Set up a follow-up reminder for <strong>{selectedOrder?.clientName}</strong> - Order #
-                            {selectedOrder?.orderId}
+                            {selectedOrder?.orderId}. The system will automatically send a WhatsApp message with invoice
+                            PDF after the specified period.
                           </DialogDescription>
                         </DialogHeader>
                         <div className="grid gap-4 py-4">
