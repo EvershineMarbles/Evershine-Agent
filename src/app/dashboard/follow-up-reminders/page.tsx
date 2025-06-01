@@ -861,7 +861,7 @@ export default function FollowUpRemindersPage() {
         )}
       </div>
 
-      {/* Send Message Dialog */}
+      {/* Send Message Dialg */}
       <Dialog open={isMessageDialogOpen} onOpenChange={setIsMessageDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
