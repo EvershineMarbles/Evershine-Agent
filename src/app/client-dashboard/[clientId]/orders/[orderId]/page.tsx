@@ -39,6 +39,15 @@ interface ShippingAddress {
   country?: string
 }
 
+interface AdditionalCharges {
+  loadingFee: number
+  woodPackaging: number
+  insurance: number
+  transportAdvance: number
+  gstRate: number
+  gstAmount: number
+}
+
 interface Order {
   orderId: string
   items: OrderItem[]
@@ -47,6 +56,7 @@ interface Order {
   paymentStatus: string
   createdAt: string
   shippingAddress?: ShippingAddress
+  additionalCharges?: AdditionalCharges
 }
 
 export default function OrderDetailsPage() {
@@ -534,32 +544,191 @@ export default function OrderDetailsPage() {
               </Table>
             </div>
 
+            {/* Additional Charges Section */}
+            {order.additionalCharges && (
+              <>
+                <Separator className="my-4" />
+                <h3 className="font-medium text-base mb-3">Additional Charges</h3>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">Charge Type</TableHead>
+                        <TableHead className="text-xs">Description</TableHead>
+                        <TableHead className="text-right text-xs">Amount</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {order.additionalCharges.loadingFee > 0 && (
+                        <TableRow>
+                          <TableCell className="font-medium text-sm">Loading Fee</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">Material loading charges</TableCell>
+                          <TableCell className="text-right text-sm">
+                            ₹
+                            {order.additionalCharges.loadingFee.toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {order.additionalCharges.woodPackaging > 0 && (
+                        <TableRow>
+                          <TableCell className="font-medium text-sm">Wood Packaging</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {order.additionalCharges.woodPackaging === 1500 && "Basic packaging"}
+                            {order.additionalCharges.woodPackaging === 2500 && "Standard packaging"}
+                            {order.additionalCharges.woodPackaging === 3500 && "Premium packaging"}
+                            {order.additionalCharges.woodPackaging === 4500 && "Deluxe packaging"}
+                            {![1500, 2500, 3500, 4500].includes(order.additionalCharges.woodPackaging) &&
+                              "Custom packaging"}
+                          </TableCell>
+                          <TableCell className="text-right text-sm">
+                            ₹
+                            {order.additionalCharges.woodPackaging.toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {order.additionalCharges.insurance > 0 && (
+                        <TableRow>
+                          <TableCell className="font-medium text-sm">Insurance</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            ₹345 per lakh of billing amount
+                          </TableCell>
+                          <TableCell className="text-right text-sm">
+                            ₹
+                            {order.additionalCharges.insurance.toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {order.additionalCharges.transportAdvance > 0 && (
+                        <TableRow>
+                          <TableCell className="font-medium text-sm">Transport Advance</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            Transportation advance payment
+                          </TableCell>
+                          <TableCell className="text-right text-sm">
+                            ₹
+                            {order.additionalCharges.transportAdvance.toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
+            )}
+
+            {/* Updated Total Calculation */}
             <div className="mt-4 flex flex-col items-end">
-              <div className="w-full md:w-1/3 space-y-2 text-sm">
+              <div className="w-full md:w-1/2 space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span>Subtotal:</span>
+                  <span>Items Subtotal:</span>
                   <span>
                     ₹
-                    {calculateAdjustedTotal(order).toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
+                    {order.items
+                      .reduce((total, item) => {
+                        const displayPrice = item.updatedPrice || item.price
+                        return total + displayPrice * item.quantity
+                      }, 0)
+                      .toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span>Shipping:</span>
-                  <span>₹0.00</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Tax:</span>
-                  <span>Included</span>
-                </div>
+
+                {order.additionalCharges && (
+                  <>
+                    {order.additionalCharges.loadingFee > 0 && (
+                      <div className="flex justify-between">
+                        <span>Loading Fee:</span>
+                        <span>
+                          ₹
+                          {order.additionalCharges.loadingFee.toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </span>
+                      </div>
+                    )}
+                    {order.additionalCharges.woodPackaging > 0 && (
+                      <div className="flex justify-between">
+                        <span>Wood Packaging:</span>
+                        <span>
+                          ₹
+                          {order.additionalCharges.woodPackaging.toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </span>
+                      </div>
+                    )}
+                    {order.additionalCharges.insurance > 0 && (
+                      <div className="flex justify-between">
+                        <span>Insurance:</span>
+                        <span>
+                          ₹
+                          {order.additionalCharges.insurance.toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </span>
+                      </div>
+                    )}
+                    {order.additionalCharges.transportAdvance > 0 && (
+                      <div className="flex justify-between">
+                        <span>Transport Advance:</span>
+                        <span>
+                          ₹
+                          {order.additionalCharges.transportAdvance.toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </span>
+                      </div>
+                    )}
+                    <Separator className="my-2" />
+                    <div className="flex justify-between">
+                      <span>Subtotal before GST:</span>
+                      <span>
+                        ₹
+                        {(order.totalAmount - (order.additionalCharges.gstAmount || 0)).toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </span>
+                    </div>
+                    {order.additionalCharges.gstAmount > 0 && (
+                      <div className="flex justify-between">
+                        <span>GST ({order.additionalCharges.gstRate}%):</span>
+                        <span>
+                          ₹
+                          {order.additionalCharges.gstAmount.toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </span>
+                      </div>
+                    )}
+                  </>
+                )}
+
                 <Separator className="my-2" />
-                <div className="flex justify-between font-bold">
-                  <span>Total:</span>
-                  <span>
+                <div className="flex justify-between font-bold text-lg">
+                  <span>Total Amount:</span>
+                  <span className="text-primary">
                     ₹
-                    {calculateAdjustedTotal(order).toLocaleString(undefined, {
+                    {order.totalAmount.toLocaleString(undefined, {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}

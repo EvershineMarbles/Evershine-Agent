@@ -52,7 +52,6 @@ interface CartData {
 }
 
 const WOOD_PACKAGING_OPTIONS = [
-  { value: 0, label: "None", description: "No wood packaging" },
   { value: 1500, label: "Basic", description: "Basic protection" },
   { value: 2500, label: "Standard", description: "Standard protection" },
   { value: 3500, label: "Premium", description: "Premium protection" },
@@ -81,7 +80,7 @@ export default function CartPage() {
   // Local state for additional charges
   const [localCharges, setLocalCharges] = useState<AdditionalCharges>({
     loadingFee: 1000,
-    woodPackaging: 0,
+    woodPackaging: 1500, // Changed from 0 to 1500 (Basic)
     insurance: 0,
     transportAdvance: 15000,
     gstRate: 18,
@@ -133,6 +132,9 @@ export default function CartPage() {
     return Math.ceil(amountInLakhs * 345)
   }, [])
 
+  const [isEditingInsurance, setIsEditingInsurance] = useState(false)
+  const [customInsurance, setCustomInsurance] = useState<number>(0)
+
   // Calculate totals in real-time
   const calculateTotals = useCallback(
     (items: CartItem[], charges: AdditionalCharges) => {
@@ -141,7 +143,8 @@ export default function CartPage() {
         return total + displayPrice * item.quantity
       }, 0)
 
-      const insurance = calculateInsurance(itemsTotal)
+      // Use custom insurance if set, otherwise auto-calculate
+      const insurance = charges.insurance > 0 ? charges.insurance : calculateInsurance(itemsTotal)
       const subtotalBeforeGST =
         itemsTotal + charges.loadingFee + charges.woodPackaging + insurance + charges.transportAdvance
       const gstAmount = Math.round((subtotalBeforeGST * charges.gstRate) / 100)
@@ -277,7 +280,7 @@ export default function CartPage() {
         // Set cart data with additional charges if available
         const charges = data.data.additionalCharges || {
           loadingFee: 1000,
-          woodPackaging: 0,
+          woodPackaging: 1500, // Changed from 0 to 1500 (Basic)
           insurance: 0,
           transportAdvance: 15000,
           gstRate: 18,
@@ -1016,12 +1019,62 @@ export default function CartPage() {
                     <Shield className="h-4 w-4 text-muted-foreground" />
                     <Label className="text-sm font-medium">Insurance</Label>
                   </div>
-                  <div className="bg-muted/50 rounded-lg p-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">₹345 per lakh of billing amount</span>
-                      <span className="font-medium">₹{cartData.additionalCharges.insurance.toLocaleString()}</span>
+                  {isEditingInsurance ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">₹</span>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={customInsurance}
+                          onChange={(e) => setCustomInsurance(Number(e.target.value) || 0)}
+                          className="w-32"
+                          placeholder="Enter amount"
+                        />
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            updateCharges({ insurance: customInsurance })
+                            setIsEditingInsurance(false)
+                          }}
+                          className="h-8"
+                        >
+                          Save
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setIsEditingInsurance(false)
+                            setCustomInsurance(cartData?.additionalCharges.insurance || 0)
+                          }}
+                          className="h-8"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="bg-muted/50 rounded-lg p-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">₹345 per lakh of billing amount</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">₹{cartData.additionalCharges.insurance.toLocaleString()}</span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setIsEditingInsurance(true)
+                              setCustomInsurance(cartData.additionalCharges.insurance)
+                            }}
+                            className="h-6 text-xs px-2 text-primary hover:text-primary/80"
+                          >
+                            Edit
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Transport Advance */}
