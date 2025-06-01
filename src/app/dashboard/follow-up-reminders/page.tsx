@@ -136,9 +136,13 @@ export default function FollowUpRemindersPage() {
       }
 
       const data = await response.json()
-      console.log("API Response:", data)
+      console.log("Full API Response:", JSON.stringify(data, null, 2))
+      console.log("Data array:", data.data)
+      console.log("Data length:", data.data?.length)
+      console.log("Data type:", typeof data.data)
 
       if (data.success) {
+        console.log("Setting followUps to:", data.data)
         setFollowUps(data.data || [])
         setFilteredFollowUps(data.data || [])
         toast({
@@ -146,6 +150,7 @@ export default function FollowUpRemindersPage() {
           description: `Loaded ${data.data?.length || 0} follow-up reminders`,
         })
       } else {
+        console.log("API returned success: false, message:", data.message)
         throw new Error(data.message || "Failed to fetch follow-ups")
       }
     } catch (error: any) {
