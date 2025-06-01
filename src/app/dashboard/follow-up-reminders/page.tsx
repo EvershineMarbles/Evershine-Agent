@@ -102,6 +102,12 @@ export default function AgentOrdersPage() {
     }
   }
 
+  const calculateDaysFromDate = (selectedDate: Date) => {
+    const today = new Date()
+    const diffDays = differenceInDays(selectedDate, today)
+    return Math.max(1, diffDays + 1) // Ensure at least 1 day, +1 to include today as 1 day
+  }
+
   const createFollowUp = async () => {
     if (!selectedOrder || !followUpPeriod) {
       toast({
@@ -112,10 +118,10 @@ export default function AgentOrdersPage() {
       return
     }
 
-    if (followUpPeriod === "custom" && (!customDate || differenceInDays(customDate, new Date()) < 1)) {
+    if (followUpPeriod === "custom" && !customDate) {
       toast({
         title: "Error",
-        description: "Please select a valid future date",
+        description: "Please select a custom date",
         variant: "destructive",
       })
       return
@@ -486,19 +492,19 @@ export default function AgentOrdersPage() {
                                 <SelectItem value="7days">7 days</SelectItem>
                                 <SelectItem value="10days">10 days</SelectItem>
                                 <SelectItem value="1month">1 month</SelectItem>
-                                <SelectItem value="custom">Custom</SelectItem>
+                                <SelectItem value="custom">Custom Date</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
                           {followUpPeriod === "custom" && (
-                            <div className="grid gap-2">
-                              <Label>Custom Follow-up Date</Label>
+                            <div className="grid gap-3">
+                              <Label>Select Follow-up Date</Label>
                               <Popover>
                                 <PopoverTrigger asChild>
                                   <Button
                                     variant="outline"
                                     className={cn(
-                                      "w-full justify-start text-left font-normal",
+                                      "w-full justify-start text-left font-normal h-10",
                                       !customDate && "text-muted-foreground",
                                     )}
                                   >
@@ -507,29 +513,50 @@ export default function AgentOrdersPage() {
                                   </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0" align="start">
-                                  <Calendar
-                                    mode="single"
-                                    selected={customDate}
-                                    onSelect={(date) => {
-                                      setCustomDate(date)
-                                      if (date) {
-                                        const days = differenceInDays(date, new Date())
-                                        setCustomDays(days.toString())
-                                      }
-                                    }}
-                                    disabled={(date) => date < new Date()}
-                                    initialFocus
-                                  />
+                                  <div className="p-3">
+                                    <Calendar
+                                      mode="single"
+                                      selected={customDate}
+                                      onSelect={(date) => {
+                                        if (date) {
+                                          setCustomDate(date)
+                                          const days = calculateDaysFromDate(date)
+                                          setCustomDays(days.toString())
+                                        }
+                                      }}
+                                      disabled={(date) => {
+                                        // Allow today and future dates only
+                                        const today = new Date()
+                                        today.setHours(0, 0, 0, 0)
+                                        const checkDate = new Date(date)
+                                        checkDate.setHours(0, 0, 0, 0)
+                                        return checkDate < today
+                                      }}
+                                      initialFocus
+                                      className="rounded-md border"
+                                    />
+                                  </div>
                                 </PopoverContent>
                               </Popover>
                               {customDate && (
-                                <p className="text-sm text-gray-600">
-                                  Follow-up in {differenceInDays(customDate, new Date())} days (
-                                  {format(customDate, "dd MMM yyyy")})
-                                </p>
-                              )}
-                              {customDate && differenceInDays(customDate, new Date()) < 1 && (
-                                <p className="text-sm text-red-600">Please select a future date</p>
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-1">
+                                  <p className="text-sm font-medium text-blue-900">
+                                    📅 Follow-up Date: {format(customDate, "EEEE, MMMM do, yyyy")}
+                                  </p>
+                                  <p className="text-sm text-blue-700">
+                                    {(() => {
+                                      const today = new Date()
+                                      const diffDays = differenceInDays(customDate, today)
+                                      if (diffDays === 0) {
+                                        return "⚡ Follow-up will be sent today"
+                                      } else if (diffDays === 1) {
+                                        return "📬 Follow-up will be sent tomorrow"
+                                      } else {
+                                        return `📬 Follow-up will be sent in ${diffDays} days`
+                                      }
+                                    })()}
+                                  </p>
+                                </div>
                               )}
                             </div>
                           )}
@@ -541,6 +568,7 @@ export default function AgentOrdersPage() {
                               value={comment}
                               onChange={(e) => setComment(e.target.value)}
                               maxLength={500}
+                              className="min-h-[80px]"
                             />
                           </div>
                         </div>
