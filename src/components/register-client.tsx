@@ -1,20 +1,20 @@
 "use client"
 
 import type React from "react"
-
-import { useState, useRef } from "react"
+import { useState, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Phone, User, Mail, MapPin, Building, Calendar, Loader2 } from "lucide-react"
+import { ArrowLeft, Phone, User, Mail, MapPin, Building, Calendar, Loader2, AlertCircle } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/components/ui/use-toast"
 import { isAgentAuthenticated } from "@/lib/auth-utils"
 import axios from "axios"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function RegisterClient() {
   const router = useRouter()
@@ -32,12 +32,20 @@ export default function RegisterClient() {
     gstNumber: "",
     projectType: "",
     dateOfBirth: "",
-    anniversaryDate: "", // Add anniversary date
-    architectDetails: "", // Add architect details
-    consultantLevel: "red", // Update default to "red" instead of "standard"
+    anniversaryDate: "",
+    architectDetails: "",
+    consultantLevel: "red",
     agreeToTerms: false,
   })
   const [isLoading, setIsLoading] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [apiError, setApiError] = useState("")
+  const [formattedPhone, setFormattedPhone] = useState("")
+
+  // New state variables for client existence check
+  const [clientExists, setClientExists] = useState(false)
+  const [existingClientData, setExistingClientData] = useState<any>(null)
+  const [checkingClient, setCheckingClient] = useState(false)
 
   // OTP state and refs
   const [otp, setOtp] = useState(["", "", "", "", "", ""])
@@ -96,12 +104,33 @@ export default function RegisterClient() {
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
-  // Add these new state variables
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [apiError, setApiError] = useState("")
-  const [formattedPhone, setFormattedPhone] = useState("")
+  // New function to check if client exists
+  const checkClientExists = useCallback(async (phoneNumber: string) => {
+    try {
+      setCheckingClient(true)
+      setApiError("")
 
-  // Update the handleSubmitInitial function to call the OTP send API
+      // Format phone number to E.164 format if it doesn't already start with +
+      const formattedNumber = phoneNumber.startsWith("+") ? phoneNumber : `+91${phoneNumber}`
+
+      const response = await axios.post("https://evershinebackend-2.onrender.com/api/client/check-exists", {
+        phoneNumber: formattedNumber,
+      })
+
+      if (response.data.success) {
+        return response.data.data
+      } else {
+        throw new Error(response.data.message || "Failed to check client existence")
+      }
+    } catch (error: any) {
+      console.error("Error checking client existence:", error)
+      return { exists: false }
+    } finally {
+      setCheckingClient(false)
+    }
+  }, [])
+
+  // Update the handleSubmitInitial function to check client existence before sending OTP
   const handleSubmitInitial = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
@@ -130,7 +159,19 @@ export default function RegisterClient() {
 
     try {
       // Format phone number to E.164 format if it doesn't already start with +
-      const phoneNumber = formData.mobile.startsWith("+") ? formData.mobile : `+91${formData.mobile}` // Assuming India country code, adjust as needed
+      const phoneNumber = formData.mobile.startsWith("+") ? formData.mobile : `+91${formData.mobile}`
+
+      // First check if client exists
+      const clientCheckResult = await checkClientExists(formData.mobile)
+      setClientExists(clientCheckResult.exists || false)
+      setExistingClientData(clientCheckResult)
+
+      if (clientCheckResult.exists) {
+        toast({
+          title: "Client Found",
+          description: `Found existing client: ${clientCheckResult.clientName}`,
+        })
+      }
 
       // Call the OTP send API
       const response = await axios.post("https://evershinebackend-2.onrender.com/api/otp/send", {
@@ -163,7 +204,7 @@ export default function RegisterClient() {
     }
   }
 
-  // Update the handleVerifyOTP function to call the OTP verify API
+  // Update the handleVerifyOTP function to handle existing clients
   const handleVerifyOTP = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
@@ -194,24 +235,60 @@ export default function RegisterClient() {
           description: "Your phone number has been verified successfully",
         })
 
-        // Check if user is new or existing
-        if (response.data.data.isNewUser) {
-          // New user, proceed to details step
-          setStep("details")
-        } else {
+        // Check if user is new or existing based on the enhanced OTP response
+        if (response.data.data.isNewUser === false) {
           // Existing user, store token and redirect to dashboard
           localStorage.setItem("clientToken", response.data.data.token)
           localStorage.setItem("clientId", response.data.data.clientId)
 
-          toast({
-            title: "Welcome Back",
-            description: "You have been logged in successfully",
-          })
+          // Generate impersonation token for the existing client
+          try {
+            const token = localStorage.getItem("agentToken")
+            if (!token) {
+              throw new Error("Agent token not found")
+            }
 
-          // Redirect to client dashboard
-          setTimeout(() => {
+            const impersonateResponse = await fetch(
+              `https://evershinebackend-2.onrender.com/api/agent/impersonate/${response.data.data.clientId}`,
+              {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  "Content-Type": "application/json",
+                },
+              },
+            )
+
+            if (!impersonateResponse.ok) {
+              throw new Error("Failed to generate impersonation token")
+            }
+
+            const impersonateData = await impersonateResponse.json()
+
+            if (impersonateData.success && impersonateData.data?.impersonationToken) {
+              // Store the impersonation token
+              localStorage.setItem("clientImpersonationToken", impersonateData.data.impersonationToken)
+
+              toast({
+                title: "Welcome Back",
+                description: `Redirecting to ${response.data.data.clientName}'s dashboard`,
+              })
+
+              // Redirect to client dashboard
+              setTimeout(() => {
+                router.push(`/client-dashboard/${response.data.data.clientId}`)
+              }, 1500)
+            } else {
+              throw new Error("Invalid impersonation token response")
+            }
+          } catch (impersonateError) {
+            console.error("Error generating impersonation token:", impersonateError)
+            // If impersonation fails, still try to redirect to client dashboard
             router.push(`/client-dashboard/${response.data.data.clientId}`)
-          }, 1500)
+          }
+        } else {
+          // New user, proceed to details step
+          setStep("details")
         }
       } else {
         throw new Error(response.data.message || "Failed to verify OTP")
@@ -230,7 +307,7 @@ export default function RegisterClient() {
     }
   }
 
-  // Updated handleSubmitDetails function with client dashboard redirect
+  // The rest of the component remains the same
   const handleSubmitDetails = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
@@ -407,12 +484,12 @@ export default function RegisterClient() {
                 <Button
                   type="submit"
                   className="w-full h-12 mt-6 bg-blue hover:bg-blue/90 text-white rounded-md text-base"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || checkingClient}
                 >
-                  {isSubmitting ? (
+                  {isSubmitting || checkingClient ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Sending OTP...
+                      {checkingClient ? "Checking client..." : "Sending OTP..."}
                     </>
                   ) : (
                     "Send OTP"
@@ -432,6 +509,17 @@ export default function RegisterClient() {
             </CardHeader>
 
             <CardContent className="pt-6">
+              {clientExists && existingClientData && (
+                <Alert className="mb-4 bg-blue-50 border-blue-200">
+                  <AlertCircle className="h-4 w-4 text-blue-500" />
+                  <AlertDescription className="text-blue-700">
+                    Existing client found: <span className="font-semibold">{existingClientData.clientName}</span>
+                    <br />
+                    After verification, you'll be redirected to their dashboard.
+                  </AlertDescription>
+                </Alert>
+              )}
+
               <form onSubmit={handleVerifyOTP} className="space-y-4">
                 <div className="text-center mb-6">
                   <p className="text-muted-foreground">
