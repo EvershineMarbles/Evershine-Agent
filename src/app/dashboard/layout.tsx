@@ -35,8 +35,8 @@ export default function DashboardLayout({
       try {
         console.log("🚀 Making API call to fetch agent details...")
         
-        // Call your existing endpoint
-        const response = await fetch("/api/agent/commission-rate", {
+        // ✅ FIXED: Removed /api prefix
+        const response = await fetch("/agent/commission-rate", {
           method: "GET",
           headers: {
             "Authorization": `Bearer ${token}`,
