@@ -4,7 +4,7 @@ import type React from "react"
 import { useEffect, useState, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import axios, { AxiosError } from "axios"
-import { ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Heart, X } from "lucide-react"
+import { ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Heart, X, ShoppingCart } from "lucide-react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -498,13 +498,32 @@ export default function ProductDetail() {
 
   return (
     <div className="min-h-screen bg-white p-6">
-      <button
-        onClick={() => router.back()}
-        className="mb-6 hover:bg-gray-100 p-2 rounded-full transition-colors"
-        aria-label="Go back"
-      >
-        <ArrowLeft className="h-6 w-6" />
-      </button>
+      <div className="flex items-center justify-between mb-6">
+        <button
+          onClick={() => router.back()}
+          className="hover:bg-gray-100 p-2 rounded-full transition-colors"
+          aria-label="Go back"
+        >
+          <ArrowLeft className="h-6 w-6" />
+        </button>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => router.push(`/client-dashboard/${clientId}/wishlist`)}
+            className="hover:bg-gray-100 p-2 rounded-full transition-colors relative"
+            aria-label="View wishlist"
+          >
+            <Heart className="h-6 w-6" />
+          </button>
+          <button
+            onClick={() => router.push(`/client-dashboard/${clientId}/cart`)}
+            className="hover:bg-gray-100 p-2 rounded-full transition-colors relative"
+            aria-label="View cart"
+          >
+            <ShoppingCart className="h-6 w-6" />
+          </button>
+        </div>
+      </div>
 
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col md:flex-row md:gap-12">
@@ -577,30 +596,6 @@ export default function ProductDetail() {
               </div>
             )}
 
-            {/* Product Visualizer Button */}
-            <div className="mt-4">
-              <Button
-                onClick={() => {
-                  if (!showVisualizer) {
-                    setShowVisualizer(true)
-                    // Scroll to visualizer section after a short delay to ensure it's rendered
-                    setTimeout(() => {
-                      visualizerRef.current?.scrollIntoView({
-                        behavior: "smooth",
-                        block: "end",
-                        inline: "nearest",
-                      })
-                    }, 200)
-                  } else {
-                    setShowVisualizer(false)
-                  }
-                }}
-                className="w-full bg-[#194a95] hover:bg-[#0f3a7a] py-3 text-white rounded-xl"
-              >
-                {showVisualizer ? "Hide Product Visualizer" : "Show Product Visualizer"}
-              </Button>
-            </div>
-
             <div className="mt-4 space-y-4">
               <div>
                 <Label htmlFor="customQuantity">Quantity (sqft)</Label>
@@ -642,6 +637,15 @@ export default function ProductDetail() {
                   className="w-full"
                 />
               </div>
+
+              <Button
+                onClick={toggleWishlist}
+                disabled={wishlistLoading}
+                className="w-full px-8 py-3 rounded-md flex items-center justify-center gap-2 bg-[#194a95] hover:bg-[#0f3a7a] text-white"
+              >
+                <Heart className={`w-4 h-4 ${inWishlist ? "fill-current" : ""}`} />
+                {wishlistLoading ? "Processing..." : inWishlist ? "In Wishlist" : "Add to Wishlist"}
+              </Button>
             </div>
           </div>
 
@@ -738,12 +742,24 @@ export default function ProductDetail() {
 
             <div className="flex flex-wrap gap-4 mb-8">
               <Button
-                onClick={toggleWishlist}
-                disabled={wishlistLoading}
-                className="px-8 py-3 rounded-md flex items-center gap-2 bg-[#194a95] hover:bg-[#0f3a7a] text-white"
+                onClick={() => {
+                  if (!showVisualizer) {
+                    setShowVisualizer(true)
+                    // Scroll to visualizer section after a short delay to ensure it's rendered
+                    setTimeout(() => {
+                      visualizerRef.current?.scrollIntoView({
+                        behavior: "smooth",
+                        block: "end",
+                        inline: "nearest",
+                      })
+                    }, 200)
+                  } else {
+                    setShowVisualizer(false)
+                  }
+                }}
+                className="w-full bg-[#194a95] hover:bg-[#0f3a7a] py-3 text-white rounded-xl"
               >
-                <Heart className={`w-4 h-4 ${inWishlist ? "fill-current" : ""}`} />
-                {wishlistLoading ? "Processing..." : inWishlist ? "In Wishlist" : "Add to Wishlist"}
+                {showVisualizer ? "Hide Product Visualizer" : "Show Product Visualizer"}
               </Button>
             </div>
           </div>
