@@ -223,11 +223,29 @@ export default function RegisterClient() {
     }
 
     try {
+      console.log("🔍 STARTING OTP VERIFICATION")
+      console.log("📱 Phone Number:", formattedPhone)
+      console.log("🔢 OTP Value:", otpValue)
+
       // Call the OTP verify API
       const response = await axios.post("https://evershinebackend-2.onrender.com/api/otp/verify", {
         phoneNumber: formattedPhone,
         otp: otpValue,
       })
+
+      console.log("🌐 FULL API RESPONSE:", response)
+      console.log("📦 Response Data:", response.data)
+      console.log("✅ Response Success:", response.data.success)
+
+      if (response.data && response.data.data) {
+        console.log("📋 Response Data Object:", response.data.data)
+        console.log("🆔 isNewUser Field:", response.data.data.isNewUser)
+        console.log("🔍 isNewUser Type:", typeof response.data.data.isNewUser)
+        console.log("🎯 isNewUser === false:", response.data.data.isNewUser === false)
+        console.log("🎯 isNewUser === true:", response.data.data.isNewUser === true)
+        console.log("🎯 isNewUser == false:", response.data.data.isNewUser == false)
+        console.log("🎯 !isNewUser:", !response.data.data.isNewUser)
+      }
 
       if (response.data.success) {
         toast({
@@ -236,18 +254,36 @@ export default function RegisterClient() {
         })
 
         // Check if user is new or existing based on the enhanced OTP response
-        if (response.data.data.isNewUser === false) {
+        const isNewUser = response.data.data.isNewUser
+        console.log("🔄 CHECKING USER TYPE...")
+        console.log("📊 isNewUser variable:", isNewUser)
+        console.log("📊 isNewUser type:", typeof isNewUser)
+
+        if (isNewUser === false) {
+          console.log("🎉 EXISTING CLIENT DETECTED!")
+          console.log("👤 Client ID:", response.data.data.clientId)
+          console.log("👤 Client Name:", response.data.data.clientName)
+          console.log("🔑 Token:", response.data.data.token)
+
           // Existing user, store token and redirect to dashboard
           localStorage.setItem("clientToken", response.data.data.token)
           localStorage.setItem("clientId", response.data.data.clientId)
 
+          toast({
+            title: "Welcome Back",
+            description: `Redirecting to ${response.data.data.clientName}'s dashboard`,
+          })
+
           // Generate impersonation token for the existing client
           try {
             const token = localStorage.getItem("agentToken")
+            console.log("🔐 Agent Token:", token ? "Found" : "Not Found")
+
             if (!token) {
               throw new Error("Agent token not found")
             }
 
+            console.log("🔄 Generating impersonation token...")
             const impersonateResponse = await fetch(
               `https://evershinebackend-2.onrender.com/api/agent/impersonate/${response.data.data.clientId}`,
               {
@@ -259,42 +295,50 @@ export default function RegisterClient() {
               },
             )
 
+            console.log("🌐 Impersonation Response Status:", impersonateResponse.status)
+
             if (!impersonateResponse.ok) {
               throw new Error("Failed to generate impersonation token")
             }
 
             const impersonateData = await impersonateResponse.json()
+            console.log("🔑 Impersonation Data:", impersonateData)
 
             if (impersonateData.success && impersonateData.data?.impersonationToken) {
               // Store the impersonation token
               localStorage.setItem("clientImpersonationToken", impersonateData.data.impersonationToken)
+              console.log("✅ Impersonation token stored successfully")
 
-              toast({
-                title: "Welcome Back",
-                description: `Redirecting to ${response.data.data.clientName}'s dashboard`,
-              })
-
-              // Redirect to client dashboard
-              setTimeout(() => {
-                router.push(`/client-dashboard/${response.data.data.clientId}`)
-              }, 1500)
+              // Redirect to client dashboard immediately
+              console.log("🚀 REDIRECTING TO DASHBOARD:", `/client-dashboard/${response.data.data.clientId}`)
+              router.push(`/client-dashboard/${response.data.data.clientId}`)
+              return // Important: return here to prevent further execution
             } else {
               throw new Error("Invalid impersonation token response")
             }
           } catch (impersonateError) {
-            console.error("Error generating impersonation token:", impersonateError)
+            console.error("❌ Error generating impersonation token:", impersonateError)
             // If impersonation fails, still try to redirect to client dashboard
+            console.log("🚀 FALLBACK REDIRECT TO DASHBOARD:", `/client-dashboard/${response.data.data.clientId}`)
             router.push(`/client-dashboard/${response.data.data.clientId}`)
+            return // Important: return here to prevent further execution
           }
-        } else {
+        } else if (isNewUser === true) {
+          console.log("🆕 NEW CLIENT DETECTED - SHOWING REGISTRATION FORM")
           // New user, proceed to details step
+          setStep("details")
+        } else {
+          console.log("⚠️ UNEXPECTED isNewUser VALUE:", isNewUser)
+          console.log("⚠️ Defaulting to registration form")
+          // Fallback to registration form
           setStep("details")
         }
       } else {
+        console.log("❌ API Response not successful:", response.data)
         throw new Error(response.data.message || "Failed to verify OTP")
       }
     } catch (error: any) {
-      console.error("Error verifying OTP:", error)
+      console.error("❌ ERROR in OTP verification:", error)
       const errorMessage = error instanceof Error ? error.message : "Failed to verify OTP"
       setApiError(errorMessage)
       toast({
