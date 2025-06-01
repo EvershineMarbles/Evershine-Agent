@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Calendar, MessageSquare, Plus, Loader2, CheckCircle } from "lucide-react"
+import { Calendar, MessageSquare, Plus, Loader2, CheckCircle, User, IndianRupee, Package } from "lucide-react"
 import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
@@ -170,85 +170,115 @@ export default function AgentOrdersPage() {
   }, [])
 
   const getStatusBadge = (status: string) => {
-    const statusColors = {
-      pending: "bg-yellow-100 text-yellow-800",
-      processing: "bg-blue-100 text-blue-800",
-      shipped: "bg-purple-100 text-purple-800",
-      delivered: "bg-green-100 text-green-800",
-      cancelled: "bg-red-100 text-red-800",
+    const statusConfig = {
+      pending: { color: "bg-yellow-100 text-yellow-800 border-yellow-200", label: "Pending" },
+      processing: { color: "bg-blue-100 text-blue-800 border-blue-200", label: "Processing" },
+      shipped: { color: "bg-purple-100 text-purple-800 border-purple-200", label: "Shipped" },
+      delivered: { color: "bg-green-100 text-green-800 border-green-200", label: "Delivered" },
+      cancelled: { color: "bg-red-100 text-red-800 border-red-200", label: "Cancelled" },
     }
 
-    return (
-      <Badge className={statusColors[status as keyof typeof statusColors] || "bg-gray-100 text-gray-800"}>
-        {status}
-      </Badge>
-    )
+    const config = statusConfig[status as keyof typeof statusConfig] || {
+      color: "bg-gray-100 text-gray-800 border-gray-200",
+      label: status,
+    }
+
+    return <Badge className={`${config.color} border font-medium`}>{config.label}</Badge>
   }
 
   const getFollowUpStatusBadge = (status: string) => {
-    const statusColors = {
-      pending: "bg-blue-100 text-blue-800",
-      completed: "bg-green-100 text-green-800",
-      cancelled: "bg-gray-100 text-gray-800",
-      overdue: "bg-red-100 text-red-800",
+    const statusConfig = {
+      pending: { color: "bg-blue-100 text-blue-800 border-blue-200", label: "Pending" },
+      completed: { color: "bg-green-100 text-green-800 border-green-200", label: "Completed" },
+      cancelled: { color: "bg-gray-100 text-gray-800 border-gray-200", label: "Cancelled" },
+      overdue: { color: "bg-red-100 text-red-800 border-red-200", label: "Overdue" },
     }
 
-    return (
-      <Badge className={statusColors[status as keyof typeof statusColors] || "bg-gray-100 text-gray-800"}>
-        {status}
-      </Badge>
-    )
+    const config = statusConfig[status as keyof typeof statusConfig] || {
+      color: "bg-gray-100 text-gray-800 border-gray-200",
+      label: status,
+    }
+
+    return <Badge className={`${config.color} border font-medium`}>{config.label}</Badge>
   }
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin" />
-        <span className="ml-2">Loading orders...</span>
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2 text-lg">Loading orders...</span>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto px-4 py-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">All Client Orders</h1>
-        <p className="text-muted-foreground">Manage follow-up reminders for all your client orders</p>
+    <div className="container mx-auto px-4 py-6 max-w-6xl">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">All Client Orders</h1>
+        <p className="text-gray-600 mt-2">Manage follow-up reminders for all your client orders</p>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-6">
         {orders.length === 0 ? (
-          <div className="text-center py-12">
-            <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">No orders found</h3>
-            <p className="text-muted-foreground">No orders from your clients yet.</p>
+          <div className="text-center py-16 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+            <Package className="h-16 w-16 mx-auto text-gray-400 mb-4" />
+            <h3 className="text-xl font-medium text-gray-900 mb-2">No orders found</h3>
+            <p className="text-gray-500">No orders from your clients yet.</p>
           </div>
         ) : (
           orders.map((order) => (
-            <Card key={order._id}>
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="font-medium">Order #{order.orderId}</h3>
-                    <p className="text-sm text-muted-foreground">Client: {order.clientName}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Amount: ₹{order.totalAmount?.toLocaleString() || "0"}
-                    </p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-sm">Status:</span>
-                      {getStatusBadge(order.status)}
+            <Card key={order._id} className="border-l-4 border-l-blue-500 shadow-sm hover:shadow-md transition-shadow">
+              <CardHeader className="pb-4">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                  {/* Left side - Client and Order Info */}
+                  <div className="space-y-3">
+                    {/* Client Name - Most Prominent */}
+                    <div className="flex items-center gap-3">
+                      <div className="bg-blue-100 p-2 rounded-full">
+                        <User className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <h2 className="text-2xl font-bold text-gray-900">{order.clientName}</h2>
+                        <p className="text-sm text-gray-500">Client</p>
+                      </div>
+                    </div>
+
+                    {/* Order Details */}
+                    <div className="flex flex-wrap items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <Package className="h-4 w-4 text-gray-500" />
+                        <span className="font-medium text-gray-900">#{order.orderId}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <IndianRupee className="h-4 w-4 text-gray-500" />
+                        <span className="font-semibold text-lg text-gray-900">
+                          ₹{order.totalAmount?.toLocaleString() || "0"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-500">Status:</span>
+                        {getStatusBadge(order.status)}
+                      </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm text-muted-foreground">
-                      Order Date: {format(new Date(order.createdAt), "dd MMM yyyy")}
-                    </p>
+
+                  {/* Right side - Dates and Follow-up Status */}
+                  <div className="text-left lg:text-right space-y-2">
+                    <div className="flex items-center gap-2 lg:justify-end">
+                      <Calendar className="h-4 w-4 text-gray-500" />
+                      <span className="text-sm text-gray-600">
+                        Order Date: {format(new Date(order.createdAt), "dd MMM yyyy")}
+                      </span>
+                    </div>
                     {order.followUpReminder && (
-                      <div className="mt-2">
-                        <p className="text-sm text-muted-foreground">
-                          Follow-up: {format(new Date(order.followUpReminder.followUpDate), "dd MMM yyyy")}
-                        </p>
-                        <div className="flex justify-end mt-1">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 lg:justify-end">
+                          <MessageSquare className="h-4 w-4 text-gray-500" />
+                          <span className="text-sm text-gray-600">
+                            Follow-up: {format(new Date(order.followUpReminder.followUpDate), "dd MMM yyyy")}
+                          </span>
+                        </div>
+                        <div className="flex lg:justify-end">
                           {getFollowUpStatusBadge(order.followUpReminder.status)}
                         </div>
                       </div>
@@ -256,53 +286,64 @@ export default function AgentOrdersPage() {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
+
+              <CardContent className="pt-0">
                 {order.followUpReminder ? (
-                  <div className="space-y-2">
-                    <p className="text-sm">
-                      <strong>Follow-up Status:</strong> {order.followUpReminder.status}
-                    </p>
-                    <p className="text-sm">
-                      <strong>Period:</strong>{" "}
-                      {order.followUpReminder.period === "custom"
-                        ? `${order.followUpReminder.customDays} days`
-                        : order.followUpReminder.period === "7days"
-                          ? "7 days"
-                          : order.followUpReminder.period === "10days"
-                            ? "10 days"
-                            : "1 month"}
-                    </p>
-                    {order.followUpReminder.comment && (
-                      <p className="text-sm">
-                        <strong>Comment:</strong> {order.followUpReminder.comment}
-                      </p>
-                    )}
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline">
-                        <MessageSquare className="h-4 w-4 mr-1" />
+                  <div className="bg-blue-50 rounded-lg p-4 space-y-3">
+                    <h4 className="font-semibold text-gray-900 mb-3">Follow-up Details</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <span className="text-sm font-medium text-gray-700">Status:</span>
+                        <p className="mt-1">{getFollowUpStatusBadge(order.followUpReminder.status)}</p>
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium text-gray-700">Period:</span>
+                        <p className="mt-1 text-sm text-gray-900">
+                          {order.followUpReminder.period === "custom"
+                            ? `${order.followUpReminder.customDays} days`
+                            : order.followUpReminder.period === "7days"
+                              ? "7 days"
+                              : order.followUpReminder.period === "10days"
+                                ? "10 days"
+                                : "1 month"}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium text-gray-700">Comment:</span>
+                        <p className="mt-1 text-sm text-gray-900">{order.followUpReminder.comment || "No comment"}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-3 pt-2">
+                      <Button size="sm" variant="outline" className="flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4" />
                         Send Reminder
                       </Button>
-                      <Button size="sm">
-                        <CheckCircle className="h-4 w-4 mr-1" />
+                      <Button size="sm" className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4" />
                         Mark Complete
                       </Button>
                     </div>
                   </div>
                 ) : (
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-2">No follow-up reminder set</p>
+                  <div className="bg-gray-50 rounded-lg p-4 text-center">
+                    <p className="text-gray-600 mb-3">No follow-up reminder set for this order</p>
                     <Dialog>
                       <DialogTrigger asChild>
-                        <Button size="sm" variant="outline" onClick={() => setSelectedOrder(order)}>
-                          <Plus className="h-4 w-4 mr-1" />
-                          Create Follow-up
+                        <Button
+                          variant="default"
+                          className="flex items-center gap-2"
+                          onClick={() => setSelectedOrder(order)}
+                        >
+                          <Plus className="h-4 w-4" />
+                          Create Follow-up Reminder
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="sm:max-w-[425px]">
+                      <DialogContent className="sm:max-w-[500px]">
                         <DialogHeader>
                           <DialogTitle>Create Follow-up Reminder</DialogTitle>
                           <DialogDescription>
-                            Set up a follow-up reminder for Order #{selectedOrder?.orderId}
+                            Set up a follow-up reminder for <strong>{selectedOrder?.clientName}</strong> - Order #
+                            {selectedOrder?.orderId}
                           </DialogDescription>
                         </DialogHeader>
                         <div className="grid gap-4 py-4">
