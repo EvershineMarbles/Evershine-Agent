@@ -6,7 +6,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { LogOut } from "lucide-react"
+import { LogOut } from 'lucide-react'
 import { AdvisorSidebar } from "@/components/advisor-sidebar"
 import { isAgentAuthenticated, clearAllTokens } from "@/lib/auth-utils"
 
@@ -16,8 +16,8 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const router = useRouter()
-  const [agentEmail, setAgentEmail] = useState<string | null>(null)
   const [agentName, setAgentName] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     // Check if agent is logged in
@@ -26,16 +26,49 @@ export default function DashboardLayout({
       return
     }
 
-    // Fetch agent email from localStorage
-    const email = localStorage.getItem("agentEmail")
-    setAgentEmail(email)
-
-    // Extract name from email (for demo purposes)
-    if (email) {
-      const name = email.split("@")[0]
-      // Capitalize first letter and format name
-      const formattedName = name.charAt(0).toUpperCase() + name.slice(1)
-      setAgentName(formattedName)
+    // Get agent token for API call
+    const token = localStorage.getItem("agentToken")
+    
+    // Fetch agent details from backend
+    const fetchAgentDetails = async () => {
+      try {
+        // Call your existing endpoint
+        const response = await fetch("/api/agent/commission-rate", {
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+          }
+        })
+        
+        if (response.ok) {
+          const data = await response.json()
+          
+          // Check if we got a successful response with agent name
+          if (data.success && data.data && data.data.name) {
+            // Use the real name from database
+            setAgentName(data.data.name)
+            console.log("✅ Agent name fetched:", data.data.name)
+          } else {
+            setAgentName("Agent")
+          }
+        } else {
+          console.error("Failed to fetch agent details:", response.status)
+          setAgentName("Agent")
+        }
+      } catch (error) {
+        console.error("Error fetching agent details:", error)
+        setAgentName("Agent")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    
+    // Call the fetch function if we have a token
+    if (token) {
+      fetchAgentDetails()
+    } else {
+      setAgentName("Agent")
+      setIsLoading(false)
     }
   }, [router])
 
@@ -59,7 +92,9 @@ export default function DashboardLayout({
               <h1 className="text-xl font-semibold">Consultant Dashboard</h1>
             </div>
             <div className="flex items-center gap-4">
-              <span className="text-sm md:text-base">Welcome, {agentName || agentEmail}</span>
+              <span className="text-sm md:text-base">
+                Welcome, {isLoading ? "..." : agentName}
+              </span>
               <Button
                 variant="ghost"
                 size="sm"
