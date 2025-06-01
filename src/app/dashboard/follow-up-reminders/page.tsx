@@ -1,8 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Calendar, MessageSquare, Plus, Loader2, CheckCircle, User, IndianRupee, Package } from "lucide-react"
-import { format } from "date-fns"
+import { CalendarIcon, MessageSquare, Plus, Loader2, CheckCircle, User, IndianRupee, Package } from "lucide-react"
+import { format, differenceInDays } from "date-fns"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -19,7 +22,6 @@ import {
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Input } from "@/components/ui/input"
 
 interface Order {
   _id: string
@@ -46,6 +48,7 @@ export default function AgentOrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [followUpPeriod, setFollowUpPeriod] = useState("")
   const [customDays, setCustomDays] = useState("")
+  const [customDate, setCustomDate] = useState<Date | undefined>(undefined)
   const [comment, setComment] = useState("")
   const [creating, setCreating] = useState(false)
 
@@ -103,10 +106,10 @@ export default function AgentOrdersPage() {
       return
     }
 
-    if (followUpPeriod === "custom" && (!customDays || Number.parseInt(customDays) < 1)) {
+    if (followUpPeriod === "custom" && (!customDate || differenceInDays(customDate, new Date()) < 1)) {
       toast({
         title: "Error",
-        description: "Please enter valid custom days (1-365)",
+        description: "Please select a valid future date",
         variant: "destructive",
       })
       return
@@ -148,6 +151,7 @@ export default function AgentOrdersPage() {
         setSelectedOrder(null)
         setFollowUpPeriod("")
         setCustomDays("")
+        setCustomDate(undefined)
         setComment("")
       } else {
         const errorData = await response.json()
@@ -363,16 +367,45 @@ export default function AgentOrdersPage() {
                           </div>
                           {followUpPeriod === "custom" && (
                             <div className="grid gap-2">
-                              <Label htmlFor="customDays">Custom Days</Label>
-                              <Input
-                                id="customDays"
-                                type="number"
-                                placeholder="Enter number of days (1-365)"
-                                value={customDays}
-                                onChange={(e) => setCustomDays(e.target.value)}
-                                min="1"
-                                max="365"
-                              />
+                              <Label>Custom Follow-up Date</Label>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    className={cn(
+                                      "w-full justify-start text-left font-normal",
+                                      !customDate && "text-muted-foreground",
+                                    )}
+                                  >
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {customDate ? format(customDate, "PPP") : "Pick a date"}
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                  <Calendar
+                                    mode="single"
+                                    selected={customDate}
+                                    onSelect={(date) => {
+                                      setCustomDate(date)
+                                      if (date) {
+                                        const days = differenceInDays(date, new Date())
+                                        setCustomDays(days.toString())
+                                      }
+                                    }}
+                                    disabled={(date) => date < new Date()}
+                                    initialFocus
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                              {customDate && (
+                                <p className="text-sm text-gray-600">
+                                  Follow-up in {differenceInDays(customDate, new Date())} days (
+                                  {format(customDate, "dd MMM yyyy")})
+                                </p>
+                              )}
+                              {customDate && differenceInDays(customDate, new Date()) < 1 && (
+                                <p className="text-sm text-red-600">Please select a future date</p>
+                              )}
                             </div>
                           )}
                           <div className="grid gap-2">
