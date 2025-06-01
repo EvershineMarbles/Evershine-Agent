@@ -1,22 +1,17 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import {
   Calendar,
   Clock,
-  Filter,
-  MessageSquare,
-  Phone,
   Search,
   CheckCircle,
   XCircle,
   AlertCircle,
   ChevronDown,
-  ChevronUp,
-  Send,
+  MessageSquare,
+  Phone,
   RefreshCw,
-  Loader2,
 } from "lucide-react"
 import { format, isAfter, isBefore, addDays } from "date-fns"
 import { Button } from "@/components/ui/button"
@@ -24,19 +19,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Textarea } from "@/components/ui/textarea"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { useToast } from "@/components/ui/use-toast"
-import { Skeleton } from "@/components/ui/skeleton"
 
 interface FollowUpReminder {
   _id: string
@@ -72,39 +55,144 @@ interface FollowUpReminder {
     messageId?: string
     deliveryStatus?: string
   }
-  reminderAttempts?: number
-  lastReminderAt?: string
 }
 
-interface FollowUpStatistics {
-  byStatus: Array<{
-    _id: string
-    count: number
-  }>
-  overdue: number
-  upcoming: number
-}
+// Sample data for demonstration
+const SAMPLE_FOLLOWUPS: FollowUpReminder[] = [
+  {
+    _id: "1",
+    orderId: {
+      _id: "order1",
+      orderId: "ORD-001",
+      totalAmount: 25000,
+      status: "delivered",
+      createdAt: "2023-05-15T10:30:00Z",
+    },
+    clientId: {
+      _id: "client1",
+      name: "Rajesh Kumar",
+      mobile: "+91 98765 43210",
+      email: "rajesh@example.com",
+    },
+    agentId: "agent1",
+    enabled: true,
+    period: "7days",
+    comment: "Follow up about the marble quality and installation feedback",
+    status: "pending",
+    followUpDate: new Date().toISOString(), // Today
+    createdAt: "2023-05-15T10:30:00Z",
+    updatedAt: "2023-05-15T10:30:00Z",
+  },
+  {
+    _id: "2",
+    orderId: {
+      _id: "order2",
+      orderId: "ORD-002",
+      totalAmount: 45000,
+      status: "processing",
+      createdAt: "2023-05-10T14:20:00Z",
+    },
+    clientId: {
+      _id: "client2",
+      name: "Priya Sharma",
+      mobile: "+91 87654 32109",
+      email: "priya@example.com",
+    },
+    agentId: "agent1",
+    enabled: true,
+    period: "10days",
+    comment: "Check if they need additional granite pieces for the kitchen countertop",
+    status: "pending",
+    followUpDate: new Date(new Date().setDate(new Date().getDate() - 2)).toISOString(), // 2 days ago (overdue)
+    createdAt: "2023-05-10T14:20:00Z",
+    updatedAt: "2023-05-10T14:20:00Z",
+  },
+  {
+    _id: "3",
+    orderId: {
+      _id: "order3",
+      orderId: "ORD-003",
+      totalAmount: 18000,
+      status: "delivered",
+      createdAt: "2023-04-28T09:15:00Z",
+    },
+    clientId: {
+      _id: "client3",
+      name: "Amit Patel",
+      mobile: "+91 76543 21098",
+      email: "amit@example.com",
+    },
+    agentId: "agent1",
+    enabled: true,
+    period: "1month",
+    comment: "Follow up for potential new order for office renovation",
+    status: "completed",
+    followUpDate: "2023-05-28T09:15:00Z",
+    createdAt: "2023-04-28T09:15:00Z",
+    updatedAt: "2023-05-28T10:00:00Z",
+    completedBy: "agent1",
+    completedAt: "2023-05-28T10:00:00Z",
+    completionNotes: "Client is satisfied with the product. Will place new order next month.",
+  },
+  {
+    _id: "4",
+    orderId: {
+      _id: "order4",
+      orderId: "ORD-004",
+      totalAmount: 32000,
+      status: "delivered",
+      createdAt: "2023-05-05T11:45:00Z",
+    },
+    clientId: {
+      _id: "client4",
+      name: "Sneha Reddy",
+      mobile: "+91 65432 10987",
+      email: "sneha@example.com",
+    },
+    agentId: "agent1",
+    enabled: true,
+    period: "custom",
+    customDays: 14,
+    comment: "Check if the marble flooring is holding up well",
+    status: "cancelled",
+    followUpDate: "2023-05-19T11:45:00Z",
+    createdAt: "2023-05-05T11:45:00Z",
+    updatedAt: "2023-05-18T16:30:00Z",
+    completionNotes: "Client moved to a different city. No follow-up needed.",
+  },
+  {
+    _id: "5",
+    orderId: {
+      _id: "order5",
+      orderId: "ORD-005",
+      totalAmount: 55000,
+      status: "processing",
+      createdAt: "2023-05-12T13:10:00Z",
+    },
+    clientId: {
+      _id: "client5",
+      name: "Vikram Singh",
+      mobile: "+91 54321 09876",
+      email: "vikram@example.com",
+    },
+    agentId: "agent1",
+    enabled: true,
+    period: "7days",
+    comment: "Follow up about delivery schedule and installation preferences",
+    status: "pending",
+    followUpDate: new Date(new Date().setDate(new Date().getDate() + 3)).toISOString(), // 3 days from now
+    createdAt: "2023-05-12T13:10:00Z",
+    updatedAt: "2023-05-12T13:10:00Z",
+  },
+]
 
 export default function FollowUpRemindersPage() {
-  const router = useRouter()
-  const { toast } = useToast()
-  const [mounted, setMounted] = useState(false)
   const [activeTab, setActiveTab] = useState("all")
-  const [followUps, setFollowUps] = useState<FollowUpReminder[]>([])
-  const [filteredFollowUps, setFilteredFollowUps] = useState<FollowUpReminder[]>([])
-  const [loading, setLoading] = useState(true)
+  const [followUps, setFollowUps] = useState<FollowUpReminder[]>(SAMPLE_FOLLOWUPS)
+  const [filteredFollowUps, setFilteredFollowUps] = useState<FollowUpReminder[]>(SAMPLE_FOLLOWUPS)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedDateRange, setSelectedDateRange] = useState("all")
-  const [statistics, setStatistics] = useState<FollowUpStatistics | null>(null)
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({})
-  const [selectedFollowUp, setSelectedFollowUp] = useState<FollowUpReminder | null>(null)
-  const [isMessageDialogOpen, setIsMessageDialogOpen] = useState(false)
-  const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false)
-  const [messageText, setMessageText] = useState("")
-  const [completionNotes, setCompletionNotes] = useState("")
-  const [newStatus, setNewStatus] = useState<string>("completed")
-  const [isSendingMessage, setIsSendingMessage] = useState(false)
-  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
   const [sortConfig, setSortConfig] = useState<{
     key: string
     direction: "ascending" | "descending"
@@ -113,119 +201,8 @@ export default function FollowUpRemindersPage() {
     direction: "ascending",
   })
 
-  // Handle client-side mounting
   useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  const getApiUrl = () => {
-    return process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
-  }
-
-  const getToken = () => {
-    if (!mounted) return null
-
-    try {
-      const token = localStorage.getItem("token")
-      if (!token) {
-        toast({
-          title: "Authentication required",
-          description: "Please log in to view follow-up reminders",
-          variant: "destructive",
-        })
-        router.push("/login")
-        return null
-      }
-      return token
-    } catch (e) {
-      toast({
-        title: "Error",
-        description: "Error accessing authentication. Please refresh the page.",
-        variant: "destructive",
-      })
-      return null
-    }
-  }
-
-  const fetchFollowUps = async () => {
-    if (!mounted) return
-
-    try {
-      setLoading(true)
-      const token = getToken()
-      if (!token) return
-
-      const apiUrl = getApiUrl()
-      const response = await fetch(`${apiUrl}/api/agent/followups`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch follow-ups")
-      }
-
-      const data = await response.json()
-      if (data.success) {
-        setFollowUps(data.data || [])
-        setFilteredFollowUps(data.data || [])
-      } else {
-        throw new Error(data.message || "Failed to fetch follow-ups")
-      }
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to load follow-up reminders",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const fetchStatistics = async () => {
-    if (!mounted) return
-
-    try {
-      const token = getToken()
-      if (!token) return
-
-      const apiUrl = getApiUrl()
-      const response = await fetch(`${apiUrl}/api/followups/statistics`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch statistics")
-      }
-
-      const data = await response.json()
-      if (data.success) {
-        setStatistics(data.data || null)
-      }
-    } catch (error: any) {
-      console.error("Error fetching statistics:", error)
-    }
-  }
-
-  useEffect(() => {
-    if (mounted) {
-      fetchFollowUps()
-      fetchStatistics()
-    }
-  }, [mounted])
-
-  useEffect(() => {
-    if (followUps.length > 0) {
-      applyFilters()
-    }
+    applyFilters()
   }, [activeTab, searchQuery, selectedDateRange, followUps, sortConfig])
 
   const applyFilters = () => {
@@ -333,122 +310,11 @@ export default function FollowUpRemindersPage() {
     setSortConfig({ key, direction })
   }
 
-  const getSortIcon = (key: string) => {
-    if (sortConfig.key !== key) {
-      return <ChevronDown className="h-4 w-4 opacity-50" />
-    }
-    return sortConfig.direction === "ascending" ? (
-      <ChevronUp className="h-4 w-4" />
-    ) : (
-      <ChevronDown className="h-4 w-4" />
-    )
-  }
-
   const toggleExpand = (id: string) => {
     setExpandedItems((prev) => ({
       ...prev,
       [id]: !prev[id],
     }))
-  }
-
-  const handleSendMessage = async () => {
-    if (!selectedFollowUp || !messageText.trim()) return
-
-    try {
-      setIsSendingMessage(true)
-      const token = getToken()
-      if (!token) return
-
-      const apiUrl = getApiUrl()
-      const response = await fetch(`${apiUrl}/api/followups/${selectedFollowUp._id}/message`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          message: messageText,
-          clientId: selectedFollowUp.clientId._id,
-          orderId: selectedFollowUp.orderId._id,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error("Failed to send message")
-      }
-
-      const data = await response.json()
-      if (data.success) {
-        toast({
-          title: "Message Sent",
-          description: "Follow-up message has been sent successfully",
-        })
-        setIsMessageDialogOpen(false)
-        setMessageText("")
-        // Refresh follow-ups to get updated status
-        fetchFollowUps()
-      } else {
-        throw new Error(data.message || "Failed to send message")
-      }
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to send message",
-        variant: "destructive",
-      })
-    } finally {
-      setIsSendingMessage(false)
-    }
-  }
-
-  const handleUpdateStatus = async () => {
-    if (!selectedFollowUp || !newStatus) return
-
-    try {
-      setIsUpdatingStatus(true)
-      const token = getToken()
-      if (!token) return
-
-      const apiUrl = getApiUrl()
-      const response = await fetch(`${apiUrl}/api/followups/${selectedFollowUp._id}/status`, {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          status: newStatus,
-          completionNotes: completionNotes,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error("Failed to update status")
-      }
-
-      const data = await response.json()
-      if (data.success) {
-        toast({
-          title: "Status Updated",
-          description: `Follow-up has been marked as ${newStatus}`,
-        })
-        setIsStatusDialogOpen(false)
-        setCompletionNotes("")
-        // Refresh follow-ups to get updated status
-        fetchFollowUps()
-        fetchStatistics()
-      } else {
-        throw new Error(data.message || "Failed to update status")
-      }
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update status",
-        variant: "destructive",
-      })
-    } finally {
-      setIsUpdatingStatus(false)
-    }
   }
 
   const getStatusBadge = (status: string, followUpDate: string) => {
@@ -495,75 +361,21 @@ export default function FollowUpRemindersPage() {
   }
 
   const getStatCount = (status: string) => {
-    if (!statistics) return 0
-    const found = statistics.byStatus.find((item) => item._id === status)
-    return found ? found.count : 0
-  }
-
-  const renderSkeletons = () => {
-    return Array(5)
-      .fill(0)
-      .map((_, index) => (
-        <Card key={index} className="mb-4">
-          <CardHeader className="pb-2">
-            <div className="flex justify-between">
-              <Skeleton className="h-6 w-32" />
-              <Skeleton className="h-6 w-24" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <Skeleton className="h-4 w-40" />
-                <Skeleton className="h-4 w-20" />
-              </div>
-              <div className="flex justify-between">
-                <Skeleton className="h-4 w-32" />
-                <Skeleton className="h-4 w-24" />
-              </div>
-              <Skeleton className="h-4 w-full" />
-            </div>
-          </CardContent>
-          <CardFooter>
-            <div className="flex justify-end w-full gap-2">
-              <Skeleton className="h-9 w-24" />
-              <Skeleton className="h-9 w-24" />
-            </div>
-          </CardFooter>
-        </Card>
-      ))
-  }
-
-  // Don't render anything until mounted (prevents SSR issues)
-  if (!mounted) {
-    return (
-      <div className="container mx-auto px-4 py-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
-          <div>
-            <Skeleton className="h-8 w-64 mb-2" />
-            <Skeleton className="h-4 w-96" />
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          {Array(4)
-            .fill(0)
-            .map((_, i) => (
-              <Card key={i}>
-                <CardContent className="pt-6">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <Skeleton className="h-4 w-24 mb-2" />
-                      <Skeleton className="h-8 w-16" />
-                    </div>
-                    <Skeleton className="h-12 w-12 rounded-full" />
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-        </div>
-        {renderSkeletons()}
-      </div>
-    )
+    if (status === "overdue") {
+      return followUps.filter((item) => item.status === "pending" && isBefore(new Date(item.followUpDate), new Date()))
+        .length
+    }
+    if (status === "upcoming") {
+      const today = new Date()
+      const nextWeek = addDays(today, 7)
+      return followUps.filter(
+        (item) =>
+          item.status === "pending" &&
+          isAfter(new Date(item.followUpDate), today) &&
+          isBefore(new Date(item.followUpDate), nextWeek),
+      ).length
+    }
+    return followUps.filter((item) => item.status === status).length
   }
 
   return (
@@ -574,14 +386,7 @@ export default function FollowUpRemindersPage() {
           <p className="text-muted-foreground">Manage and track all your client follow-up reminders</p>
         </div>
         <div className="mt-4 md:mt-0">
-          <Button
-            variant="outline"
-            className="flex items-center gap-2"
-            onClick={() => {
-              fetchFollowUps()
-              fetchStatistics()
-            }}
-          >
+          <Button variant="outline" className="flex items-center gap-2">
             <RefreshCw className="h-4 w-4" />
             Refresh
           </Button>
@@ -595,9 +400,7 @@ export default function FollowUpRemindersPage() {
             <div className="flex justify-between items-center">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Total Follow-ups</p>
-                <p className="text-2xl font-bold">
-                  {loading ? <Skeleton className="h-8 w-16 inline-block" /> : followUps.length}
-                </p>
+                <p className="text-2xl font-bold">{followUps.length}</p>
               </div>
               <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
                 <Calendar className="h-6 w-6 text-primary" />
@@ -611,9 +414,7 @@ export default function FollowUpRemindersPage() {
             <div className="flex justify-between items-center">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Pending</p>
-                <p className="text-2xl font-bold">
-                  {loading ? <Skeleton className="h-8 w-16 inline-block" /> : getStatCount("pending")}
-                </p>
+                <p className="text-2xl font-bold">{getStatCount("pending")}</p>
               </div>
               <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
                 <Clock className="h-6 w-6 text-blue-600" />
@@ -627,9 +428,7 @@ export default function FollowUpRemindersPage() {
             <div className="flex justify-between items-center">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Overdue</p>
-                <p className="text-2xl font-bold">
-                  {loading ? <Skeleton className="h-8 w-16 inline-block" /> : statistics?.overdue || 0}
-                </p>
+                <p className="text-2xl font-bold">{getStatCount("overdue")}</p>
               </div>
               <div className="h-12 w-12 rounded-full bg-red-100 flex items-center justify-center">
                 <AlertCircle className="h-6 w-6 text-red-600" />
@@ -643,9 +442,7 @@ export default function FollowUpRemindersPage() {
             <div className="flex justify-between items-center">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Completed</p>
-                <p className="text-2xl font-bold">
-                  {loading ? <Skeleton className="h-8 w-16 inline-block" /> : getStatCount("completed")}
-                </p>
+                <p className="text-2xl font-bold">{getStatCount("completed")}</p>
               </div>
               <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
                 <CheckCircle className="h-6 w-6 text-green-600" />
@@ -681,21 +478,6 @@ export default function FollowUpRemindersPage() {
               <SelectItem value="thisMonth">This Month</SelectItem>
             </SelectContent>
           </Select>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="flex items-center gap-2">
-                <Filter className="h-4 w-4" />
-                Sort
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleSort("followUpDate")}>By Follow-up Date</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleSort("clientName")}>By Client Name</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleSort("orderAmount")}>By Order Amount</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleSort("createdAt")}>By Creation Date</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
       </div>
 
@@ -712,9 +494,7 @@ export default function FollowUpRemindersPage() {
 
       {/* Follow-up List */}
       <div className="space-y-4">
-        {loading ? (
-          renderSkeletons()
-        ) : filteredFollowUps.length === 0 ? (
+        {filteredFollowUps.length === 0 ? (
           <div className="text-center py-12 bg-muted/20 rounded-lg">
             <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium mb-2">No follow-up reminders found</h3>
@@ -844,60 +624,23 @@ export default function FollowUpRemindersPage() {
                     )}
                   </div>
                 </CardContent>
-                <CardFooter className="flex flex-col sm:flex-row justify-between items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => toggleExpand(followUp._id)}
-                    className="w-full sm:w-auto"
-                  >
+                <CardFooter className="flex justify-between items-center">
+                  <Button variant="ghost" size="sm" onClick={() => toggleExpand(followUp._id)}>
                     {isExpanded ? "Show Less" : "Show More"}
                     <ChevronDown className={`ml-1 h-4 w-4 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
                   </Button>
-                  <div className="flex gap-2 w-full sm:w-auto">
+                  <div className="flex gap-2">
                     {followUp.status === "pending" && (
                       <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1 sm:flex-none"
-                          onClick={() => {
-                            setSelectedFollowUp(followUp)
-                            setIsMessageDialogOpen(true)
-                          }}
-                        >
+                        <Button variant="outline" size="sm">
                           <MessageSquare className="h-4 w-4 mr-1" />
                           Send Message
                         </Button>
-                        <Button
-                          variant="default"
-                          size="sm"
-                          className="flex-1 sm:flex-none"
-                          onClick={() => {
-                            setSelectedFollowUp(followUp)
-                            setNewStatus("completed")
-                            setIsStatusDialogOpen(true)
-                          }}
-                        >
+                        <Button variant="default" size="sm">
                           <CheckCircle className="h-4 w-4 mr-1" />
                           Mark Complete
                         </Button>
                       </>
-                    )}
-                    {followUp.status !== "pending" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 sm:flex-none"
-                        onClick={() => {
-                          setSelectedFollowUp(followUp)
-                          setNewStatus("pending")
-                          setIsStatusDialogOpen(true)
-                        }}
-                      >
-                        <RefreshCw className="h-4 w-4 mr-1" />
-                        Reopen
-                      </Button>
                     )}
                   </div>
                 </CardFooter>
@@ -906,147 +649,6 @@ export default function FollowUpRemindersPage() {
           })
         )}
       </div>
-
-      {/* Send Message Dialog */}
-      <Dialog open={isMessageDialogOpen} onOpenChange={setIsMessageDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Send Follow-up Message</DialogTitle>
-            <DialogDescription>
-              Send a WhatsApp message to <span className="font-medium">{selectedFollowUp?.clientId?.name}</span>{" "}
-              regarding order #{selectedFollowUp?.orderId?.orderId}.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Client Phone</p>
-              <p className="text-sm">{selectedFollowUp?.clientId?.mobile || "No phone number"}</p>
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="message" className="text-sm font-medium">
-                Message
-              </label>
-              <Textarea
-                id="message"
-                placeholder="Type your follow-up message here..."
-                value={messageText}
-                onChange={(e) => setMessageText(e.target.value)}
-                rows={5}
-              />
-              <p className="text-xs text-muted-foreground">
-                This message will be sent via WhatsApp to the client's registered number.
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsMessageDialogOpen(false)} disabled={isSendingMessage}>
-              Cancel
-            </Button>
-            <Button onClick={handleSendMessage} disabled={isSendingMessage || !messageText.trim()}>
-              {isSendingMessage ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Sending...
-                </>
-              ) : (
-                <>
-                  <Send className="mr-2 h-4 w-4" />
-                  Send Message
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Update Status Dialog */}
-      <Dialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              {newStatus === "completed"
-                ? "Mark Follow-up as Complete"
-                : newStatus === "cancelled"
-                  ? "Cancel Follow-up"
-                  : "Update Follow-up Status"}
-            </DialogTitle>
-            <DialogDescription>
-              {newStatus === "completed"
-                ? "Mark this follow-up as completed and add any notes about the outcome."
-                : newStatus === "cancelled"
-                  ? "Cancel this follow-up and provide a reason."
-                  : "Update the status of this follow-up reminder."}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Order</p>
-              <p className="text-sm">#{selectedFollowUp?.orderId?.orderId}</p>
-            </div>
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Client</p>
-              <p className="text-sm">{selectedFollowUp?.clientId?.name}</p>
-            </div>
-            {newStatus !== "pending" && (
-              <div className="space-y-2">
-                <label htmlFor="notes" className="text-sm font-medium">
-                  {newStatus === "completed" ? "Completion Notes" : "Reason"}
-                </label>
-                <Textarea
-                  id="notes"
-                  placeholder={
-                    newStatus === "completed"
-                      ? "Add notes about the follow-up outcome..."
-                      : "Provide a reason for cancellation..."
-                  }
-                  value={completionNotes}
-                  onChange={(e) => setCompletionNotes(e.target.value)}
-                  rows={3}
-                />
-              </div>
-            )}
-            {newStatus === "pending" && (
-              <div className="bg-yellow-50 p-3 rounded-md">
-                <p className="text-sm text-yellow-800">
-                  This will reopen the follow-up and set it back to pending status.
-                </p>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsStatusDialogOpen(false)} disabled={isUpdatingStatus}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleUpdateStatus}
-              disabled={isUpdatingStatus}
-              variant={newStatus === "completed" ? "default" : "secondary"}
-            >
-              {isUpdatingStatus ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Updating...
-                </>
-              ) : newStatus === "completed" ? (
-                <>
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                  Mark as Complete
-                </>
-              ) : newStatus === "cancelled" ? (
-                <>
-                  <XCircle className="mr-2 h-4 w-4" />
-                  Cancel Follow-up
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Reopen Follow-up
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
