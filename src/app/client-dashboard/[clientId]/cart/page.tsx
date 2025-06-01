@@ -1,21 +1,25 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowLeft, Trash2, Loader2, ShoppingBag } from "lucide-react"
+import { ArrowLeft, Trash2, Loader2, ShoppingBag, Calculator, Package, Shield, Truck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
 
 interface CartItem {
   _id: string
   name: string
   price: number
   basePrice?: number
-  updatedPrice?: number // Backend calculated price
+  updatedPrice?: number
   image: string[]
   postId: string
   category: string
@@ -31,18 +35,58 @@ interface CartItem {
   }
 }
 
+interface AdditionalCharges {
+  loadingFee: number
+  woodPackaging: number
+  insurance: number
+  transportAdvance: number
+  gstRate: number
+  gstAmount: number
+}
+
+interface CartData {
+  items: CartItem[]
+  additionalCharges: AdditionalCharges
+  subtotal: number
+  totalAmount: number
+}
+
+const WOOD_PACKAGING_OPTIONS = [
+  { value: 0, label: "None", description: "No wood packaging" },
+  { value: 1500, label: "Basic", description: "Basic protection" },
+  { value: 2500, label: "Standard", description: "Standard protection" },
+  { value: 3500, label: "Premium", description: "Premium protection" },
+  { value: 4500, label: "Deluxe", description: "Maximum protection" },
+]
+
+const GST_OPTIONS = [
+  { value: 18, label: "18%", description: "Standard items" },
+  { value: 12, label: "12%", description: "Block items" },
+]
+
 export default function CartPage() {
   const router = useRouter()
   const params = useParams()
   const clientId = params.clientId as string
   const { toast } = useToast()
 
-  const [cartItems, setCartItems] = useState<CartItem[]>([])
+  const [cartData, setCartData] = useState<CartData | null>(null)
   const [loading, setLoading] = useState(true)
   const [removing, setRemoving] = useState<Record<string, boolean>>({})
   const [updating, setUpdating] = useState<Record<string, boolean>>({})
   const [isCheckingOut, setIsCheckingOut] = useState(false)
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
+  const [updatingCharges, setUpdatingCharges] = useState(false)
+
+  // Local state for additional charges
+  const [localCharges, setLocalCharges] = useState<AdditionalCharges>({
+    loadingFee: 1000,
+    woodPackaging: 0,
+    insurance: 0,
+    transportAdvance: 15000,
+    gstRate: 18,
+    gstAmount: 0,
+  })
 
   const [editingCustomFields, setEditingCustomFields] = useState<
     Record<
@@ -83,9 +127,201 @@ export default function CartPage() {
     }
   }
 
+  // Calculate insurance based on amount
+  const calculateInsurance = useCallback((amount: number) => {
+    const amountInLakhs = amount / 100000
+    return Math.ceil(amountInLakhs * 345)
+  }, [])
+
+  // Calculate totals in real-time
+  const calculateTotals = useCallback(
+    (items: CartItem[], charges: AdditionalCharges) => {
+      const itemsTotal = items.reduce((total, item) => {
+        const displayPrice = item.updatedPrice || item.price
+        return total + displayPrice * item.quantity
+      }, 0)
+
+      const insurance = calculateInsurance(itemsTotal)
+      const subtotalBeforeGST =
+        itemsTotal + charges.loadingFee + charges.woodPackaging + insurance + charges.transportAdvance
+      const gstAmount = Math.round((subtotalBeforeGST * charges.gstRate) / 100)
+      const totalAmount = subtotalBeforeGST + gstAmount
+
+      return {
+        itemsTotal,
+        insurance,
+        subtotalBeforeGST,
+        gstAmount,
+        totalAmount,
+      }
+    },
+    [calculateInsurance],
+  )
+
+  // Debounced function to update charges on backend
+  const debouncedUpdateCharges = useCallback(
+    debounce(async (charges: AdditionalCharges) => {
+      try {
+        setUpdatingCharges(true)
+        const token = getToken()
+        if (!token) return
+
+        const apiUrl = getApiUrl()
+        const response = await fetch(`${apiUrl}/api/updateCartAdditionalCharges`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            loadingFee: charges.loadingFee,
+            woodPackaging: charges.woodPackaging,
+            transportAdvance: charges.transportAdvance,
+            gstRate: charges.gstRate,
+          }),
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success) {
+            // Update cart data with response
+            if (cartData) {
+              const calculations = calculateTotals(cartData.items, charges)
+              setCartData({
+                ...cartData,
+                additionalCharges: {
+                  ...charges,
+                  insurance: calculations.insurance,
+                  gstAmount: calculations.gstAmount,
+                },
+                subtotal: calculations.subtotalBeforeGST,
+                totalAmount: calculations.totalAmount,
+              })
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error updating charges:", error)
+        toast({
+          title: "Error",
+          description: "Failed to update additional charges",
+          variant: "destructive",
+        })
+      } finally {
+        setUpdatingCharges(false)
+      }
+    }, 1000),
+    [cartData, calculateTotals, toast],
+  )
+
+  // Update local charges and trigger backend update
+  const updateCharges = (newCharges: Partial<AdditionalCharges>) => {
+    const updatedCharges = { ...localCharges, ...newCharges }
+    setLocalCharges(updatedCharges)
+
+    if (cartData) {
+      const calculations = calculateTotals(cartData.items, updatedCharges)
+      const finalCharges = {
+        ...updatedCharges,
+        insurance: calculations.insurance,
+        gstAmount: calculations.gstAmount,
+      }
+
+      // Update local display immediately
+      setCartData({
+        ...cartData,
+        additionalCharges: finalCharges,
+        subtotal: calculations.subtotalBeforeGST,
+        totalAmount: calculations.totalAmount,
+      })
+
+      // Debounced backend update
+      debouncedUpdateCharges(finalCharges)
+    }
+  }
+
   useEffect(() => {
     fetchCart()
   }, [])
+
+  const fetchCart = async () => {
+    try {
+      setLoading(true)
+      const token = getToken()
+
+      if (!token) {
+        setLoading(false)
+        return
+      }
+
+      const apiUrl = getApiUrl()
+      const response = await fetch(`${apiUrl}/api/getUserCart`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch cart")
+      }
+
+      const data = await response.json()
+
+      if (data.data) {
+        const validItems = (data.data.items || []).filter(
+          (item: CartItem) => item.postId && typeof item.postId === "string",
+        )
+
+        // Set cart data with additional charges if available
+        const charges = data.data.additionalCharges || {
+          loadingFee: 1000,
+          woodPackaging: 0,
+          insurance: 0,
+          transportAdvance: 15000,
+          gstRate: 18,
+          gstAmount: 0,
+        }
+
+        setLocalCharges(charges)
+
+        const calculations = calculateTotals(validItems, charges)
+
+        setCartData({
+          items: validItems,
+          additionalCharges: {
+            ...charges,
+            insurance: calculations.insurance,
+            gstAmount: calculations.gstAmount,
+          },
+          subtotal: calculations.subtotalBeforeGST,
+          totalAmount: calculations.totalAmount,
+        })
+      } else {
+        setCartData({
+          items: [],
+          additionalCharges: localCharges,
+          subtotal: 0,
+          totalAmount: 0,
+        })
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to load your cart. Please try again.",
+        variant: "destructive",
+      })
+      setCartData({
+        items: [],
+        additionalCharges: localCharges,
+        subtotal: 0,
+        totalAmount: 0,
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleCustomFieldChange = (itemId: string, field: string, value: string | number) => {
     setEditingCustomFields((prev) => ({
@@ -96,19 +332,26 @@ export default function CartPage() {
       },
     }))
 
-    // Sync main quantity field when custom quantity changes
-    if (field === "customQuantity" && typeof value === "number" && value > 0) {
-      setCartItems((prev) =>
-        prev.map((item) => {
-          if (item.postId === itemId) {
-            return {
-              ...item,
-              quantity: value,
-            }
-          }
-          return item
-        }),
-      )
+    if (field === "customQuantity" && typeof value === "number" && value > 0 && cartData) {
+      const updatedItems = cartData.items.map((item) => {
+        if (item.postId === itemId) {
+          return { ...item, quantity: value }
+        }
+        return item
+      })
+
+      const calculations = calculateTotals(updatedItems, cartData.additionalCharges)
+      setCartData({
+        ...cartData,
+        items: updatedItems,
+        additionalCharges: {
+          ...cartData.additionalCharges,
+          insurance: calculations.insurance,
+          gstAmount: calculations.gstAmount,
+        },
+        subtotal: calculations.subtotalBeforeGST,
+        totalAmount: calculations.totalAmount,
+      })
     }
   }
 
@@ -138,22 +381,32 @@ export default function CartPage() {
 
       if (response.ok) {
         const data = await response.json()
-        if (data.success) {
-          setCartItems((prev) =>
-            prev.map((item) => {
-              if (item.postId === productId) {
-                return {
-                  ...item,
-                  customQuantity: customFields.customQuantity,
-                  customFinish: customFields.customFinish,
-                  customThickness: customFields.customThickness,
-                  // Sync the main quantity with custom quantity
-                  quantity: customFields.customQuantity || item.quantity,
-                }
+        if (data.success && cartData) {
+          const updatedItems = cartData.items.map((item) => {
+            if (item.postId === productId) {
+              return {
+                ...item,
+                customQuantity: customFields.customQuantity,
+                customFinish: customFields.customFinish,
+                customThickness: customFields.customThickness,
+                quantity: customFields.customQuantity || item.quantity,
               }
-              return item
-            }),
-          )
+            }
+            return item
+          })
+
+          const calculations = calculateTotals(updatedItems, cartData.additionalCharges)
+          setCartData({
+            ...cartData,
+            items: updatedItems,
+            additionalCharges: {
+              ...cartData.additionalCharges,
+              insurance: calculations.insurance,
+              gstAmount: calculations.gstAmount,
+            },
+            subtotal: calculations.subtotalBeforeGST,
+            totalAmount: calculations.totalAmount,
+          })
 
           setEditingCustomFields((prev) => {
             const newState = { ...prev }
@@ -176,56 +429,8 @@ export default function CartPage() {
     }
   }
 
-  const fetchCart = async () => {
-    try {
-      setLoading(true)
-      const token = getToken()
-
-      if (!token) {
-        setLoading(false)
-        return
-      }
-
-      const apiUrl = getApiUrl()
-
-      // Use client-specific cart endpoint
-      const response = await fetch(`${apiUrl}/api/getUserCart`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch cart")
-      }
-
-      const data = await response.json()
-
-      if (data.data) {
-        const validItems = (data.data.items || []).filter(
-          (item: CartItem) => item.postId && typeof item.postId === "string",
-        )
-
-        setCartItems(validItems)
-      } else {
-        setCartItems([])
-      }
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: "Failed to load your cart. Please try again.",
-        variant: "destructive",
-      })
-      setCartItems([])
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const updateQuantity = async (productId: string, newQuantity: number) => {
-    if (newQuantity < 1) return
+    if (newQuantity < 1 || !cartData) return
 
     try {
       setUpdating((prev) => ({ ...prev, [productId]: true }))
@@ -235,7 +440,7 @@ export default function CartPage() {
 
       const apiUrl = getApiUrl()
 
-      const currentItem = cartItems.find((item) => item.postId === productId)
+      const currentItem = cartData.items.find((item) => item.postId === productId)
       if (!currentItem) return
 
       await fetch(`${apiUrl}/api/deleteUserCartItem`, {
@@ -247,7 +452,6 @@ export default function CartPage() {
         body: JSON.stringify({ productId }),
       })
 
-      // Add back with new quantity - let backend calculate price
       await fetch(`${apiUrl}/api/addToCart`, {
         method: "POST",
         headers: {
@@ -260,9 +464,22 @@ export default function CartPage() {
         }),
       })
 
-      setCartItems((prev) =>
-        prev.map((item) => (item.postId === productId ? { ...item, quantity: newQuantity } : item)),
+      const updatedItems = cartData.items.map((item) =>
+        item.postId === productId ? { ...item, quantity: newQuantity } : item,
       )
+
+      const calculations = calculateTotals(updatedItems, cartData.additionalCharges)
+      setCartData({
+        ...cartData,
+        items: updatedItems,
+        additionalCharges: {
+          ...cartData.additionalCharges,
+          insurance: calculations.insurance,
+          gstAmount: calculations.gstAmount,
+        },
+        subtotal: calculations.subtotalBeforeGST,
+        totalAmount: calculations.totalAmount,
+      })
 
       toast({
         title: "Quantity Updated",
@@ -291,7 +508,7 @@ export default function CartPage() {
       setRemoving((prev) => ({ ...prev, [productId]: true }))
       const token = getToken()
 
-      if (!token) return
+      if (!token || !cartData) return
 
       const apiUrl = getApiUrl()
 
@@ -311,7 +528,21 @@ export default function CartPage() {
       const data = await response.json()
 
       if (data.success) {
-        setCartItems((prev) => prev.filter((item) => item.postId !== productId))
+        const updatedItems = cartData.items.filter((item) => item.postId !== productId)
+        const calculations = calculateTotals(updatedItems, cartData.additionalCharges)
+
+        setCartData({
+          ...cartData,
+          items: updatedItems,
+          additionalCharges: {
+            ...cartData.additionalCharges,
+            insurance: calculations.insurance,
+            gstAmount: calculations.gstAmount,
+          },
+          subtotal: calculations.subtotalBeforeGST,
+          totalAmount: calculations.totalAmount,
+        })
+
         toast({
           title: "Item removed",
           description: "Item has been removed from your cart",
@@ -330,20 +561,12 @@ export default function CartPage() {
     }
   }
 
-  // Calculate total using backend prices
-  const calculateTotal = () => {
-    return cartItems.reduce((total, item) => {
-      const displayPrice = item.updatedPrice || item.price
-      return total + displayPrice * item.quantity
-    }, 0)
-  }
-
   const handleCheckout = async () => {
     try {
       setIsCheckingOut(true)
       setCheckoutError(null)
 
-      if (cartItems.length === 0) {
+      if (!cartData || cartData.items.length === 0) {
         throw new Error("Your cart is empty")
       }
 
@@ -383,7 +606,12 @@ export default function CartPage() {
       const data = await response.json()
 
       if (data.success) {
-        setCartItems([])
+        setCartData({
+          items: [],
+          additionalCharges: localCharges,
+          subtotal: 0,
+          totalAmount: 0,
+        })
         toast({
           title: "Order Placed",
           description: "Your order has been placed successfully!",
@@ -419,14 +647,19 @@ export default function CartPage() {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({}), // Declared payload as an empty object
+        body: JSON.stringify({}),
       })
 
       if (!response.ok) {
         throw new Error("Failed to clear cart")
       }
 
-      setCartItems([])
+      setCartData({
+        items: [],
+        additionalCharges: localCharges,
+        subtotal: 0,
+        totalAmount: 0,
+      })
       toast({
         title: "Cart Cleared",
         description: "All items have been removed from your cart",
@@ -451,6 +684,14 @@ export default function CartPage() {
     )
   }
 
+  if (!cartData) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[80vh]">
+        <p className="text-muted-foreground">Failed to load cart data</p>
+      </div>
+    )
+  }
+
   return (
     <div className="container mx-auto px-3 py-4">
       <div className="flex items-center justify-between mb-4">
@@ -461,7 +702,7 @@ export default function CartPage() {
           <h1 className="text-xl md:text-2xl font-bold">Your Cart</h1>
         </div>
 
-        {cartItems.length > 0 && (
+        {cartData.items.length > 0 && (
           <Button variant="outline" onClick={clearCart} className="text-red-500 border-red-200 hover:bg-red-50 text-xs">
             <Trash2 className="h-3 w-3 mr-1" />
             Clear Cart
@@ -475,7 +716,7 @@ export default function CartPage() {
         </Alert>
       )}
 
-      {cartItems.length === 0 ? (
+      {cartData.items.length === 0 ? (
         <div className="text-center py-12 bg-muted/20 rounded-lg shadow-sm">
           <ShoppingBag className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
           <p className="text-xl font-medium mb-3">Your cart is empty</p>
@@ -491,13 +732,14 @@ export default function CartPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 space-y-4">
+            {/* Cart Items */}
             <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
               <div className="p-3 bg-muted/20 border-b">
-                <h2 className="font-medium">Cart Items ({cartItems.length})</h2>
+                <h2 className="font-medium">Cart Items ({cartData.items.length})</h2>
               </div>
               <div className="divide-y">
-                {cartItems.map((item) => {
+                {cartData.items.map((item) => {
                   const displayPrice = item.updatedPrice || item.price
                   const hasCommission = item.updatedPrice && item.updatedPrice !== item.price
                   const originalPrice = item.basePrice || item.price
@@ -510,9 +752,7 @@ export default function CartPage() {
 
                   return (
                     <div key={item.postId} className="p-3">
-                      {/* Main Product Row - Tablet Layout */}
                       <div className="flex items-center gap-3">
-                        {/* Product Image */}
                         <Link href={`/client-dashboard/${clientId}/product/${item.postId}`} className="flex-shrink-0">
                           <div className="relative h-16 w-16 rounded-lg overflow-hidden border border-gray-200 hover:border-primary/30 transition-all duration-200 hover:shadow-sm cursor-pointer group">
                             <Image
@@ -528,7 +768,6 @@ export default function CartPage() {
                           </div>
                         </Link>
 
-                        {/* Product Details */}
                         <div className="flex-grow min-w-0">
                           <Link href={`/client-dashboard/${clientId}/product/${item.postId}`} className="block group">
                             <h3 className="font-medium text-sm text-gray-900 group-hover:text-primary transition-colors duration-200 cursor-pointer line-clamp-1">
@@ -537,7 +776,6 @@ export default function CartPage() {
                           </Link>
                           <p className="text-xs text-gray-500 mt-0.5">{item.category}</p>
 
-                          {/* Price Display */}
                           <div className="mt-1">
                             {hasCommission ? (
                               <div className="space-y-0.5">
@@ -559,7 +797,6 @@ export default function CartPage() {
                           </div>
                         </div>
 
-                        {/* Quantity and Actions - Right Side */}
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <div className="flex items-center gap-1">
                             <label className="text-xs font-medium text-gray-700 whitespace-nowrap">Qty:</label>
@@ -590,7 +827,6 @@ export default function CartPage() {
                         </div>
                       </div>
 
-                      {/* Custom Specifications - Ultra Compact */}
                       {(item.customQuantity || item.customFinish || item.customThickness || isEditing) && (
                         <div className="mt-2 bg-gray-50 rounded-md p-2 border border-gray-200">
                           <div className="flex items-center justify-between mb-2">
@@ -717,39 +953,184 @@ export default function CartPage() {
                 })}
               </div>
             </div>
-          </div>
 
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg border shadow-sm overflow-hidden sticky top-4">
-              <div className="p-3 bg-muted/20 border-b">
-                <h2 className="font-medium">Order Summary</h2>
-              </div>
-              <div className="p-3">
+            {/* Additional Charges Section */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Calculator className="h-5 w-5" />
+                  Additional Charges
+                  {updatingCharges && <Loader2 className="h-4 w-4 animate-spin" />}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Loading Fee */}
                 <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-sm text-muted-foreground">Subtotal</span>
-                    <span className="text-sm font-medium">₹{calculateTotal().toLocaleString()}</span>
+                  <div className="flex items-center gap-2">
+                    <Truck className="h-4 w-4 text-muted-foreground" />
+                    <Label className="text-sm font-medium">Loading Fee</Label>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-muted-foreground">Shipping</span>
-                    <span className="text-sm">Calculated at checkout</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">₹</span>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={localCharges.loadingFee}
+                      onChange={(e) => updateCharges({ loadingFee: Number(e.target.value) || 0 })}
+                      className="w-32"
+                      placeholder="1000"
+                    />
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-muted-foreground">Tax</span>
-                    <span className="text-sm">Calculated at checkout</span>
+                </div>
+
+                {/* Wood Packaging */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Package className="h-4 w-4 text-muted-foreground" />
+                    <Label className="text-sm font-medium">Wood Packaging</Label>
                   </div>
-                  <div className="border-t pt-2 mt-2">
-                    <div className="flex justify-between font-semibold">
-                      <span>Total</span>
-                      <span className="text-primary">₹{calculateTotal().toLocaleString()}</span>
+                  <RadioGroup
+                    value={localCharges.woodPackaging.toString()}
+                    onValueChange={(value) => updateCharges({ woodPackaging: Number(value) })}
+                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
+                  >
+                    {WOOD_PACKAGING_OPTIONS.map((option) => (
+                      <div
+                        key={option.value}
+                        className="flex items-center space-x-2 border rounded-lg p-3 hover:bg-muted/50"
+                      >
+                        <RadioGroupItem value={option.value.toString()} id={`wood-${option.value}`} />
+                        <Label htmlFor={`wood-${option.value}`} className="flex-1 cursor-pointer">
+                          <div className="font-medium">{option.label}</div>
+                          <div className="text-sm text-muted-foreground">{option.description}</div>
+                          <div className="text-sm font-medium text-primary">₹{option.value.toLocaleString()}</div>
+                        </Label>
+                      </div>
+                    ))}
+                  </RadioGroup>
+                </div>
+
+                {/* Insurance */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Shield className="h-4 w-4 text-muted-foreground" />
+                    <Label className="text-sm font-medium">Insurance</Label>
+                  </div>
+                  <div className="bg-muted/50 rounded-lg p-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">₹345 per lakh of billing amount</span>
+                      <span className="font-medium">₹{cartData.additionalCharges.insurance.toLocaleString()}</span>
                     </div>
                   </div>
+                </div>
+
+                {/* Transport Advance */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Truck className="h-4 w-4 text-muted-foreground" />
+                    <Label className="text-sm font-medium">Transport Advance</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">₹</span>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={localCharges.transportAdvance}
+                      onChange={(e) => updateCharges({ transportAdvance: Number(e.target.value) || 0 })}
+                      className="w-32"
+                      placeholder="15000"
+                    />
+                  </div>
+                </div>
+
+                {/* GST Rate */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">GST Rate</Label>
+                  <RadioGroup
+                    value={localCharges.gstRate.toString()}
+                    onValueChange={(value) => updateCharges({ gstRate: Number(value) })}
+                    className="flex gap-4"
+                  >
+                    {GST_OPTIONS.map((option) => (
+                      <div
+                        key={option.value}
+                        className="flex items-center space-x-2 border rounded-lg p-3 hover:bg-muted/50"
+                      >
+                        <RadioGroupItem value={option.value.toString()} id={`gst-${option.value}`} />
+                        <Label htmlFor={`gst-${option.value}`} className="cursor-pointer">
+                          <div className="font-medium">{option.label}</div>
+                          <div className="text-sm text-muted-foreground">{option.description}</div>
+                        </Label>
+                      </div>
+                    ))}
+                  </RadioGroup>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Order Summary */}
+          <div className="lg:col-span-1">
+            <Card className="sticky top-4">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Order Summary</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Items Subtotal</span>
+                    <span>
+                      ₹
+                      {(
+                        cartData.subtotal -
+                        cartData.additionalCharges.loadingFee -
+                        cartData.additionalCharges.woodPackaging -
+                        cartData.additionalCharges.insurance -
+                        cartData.additionalCharges.transportAdvance
+                      ).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Loading Fee</span>
+                    <span>₹{cartData.additionalCharges.loadingFee.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Wood Packaging</span>
+                    <span>₹{cartData.additionalCharges.woodPackaging.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Insurance</span>
+                    <span>₹{cartData.additionalCharges.insurance.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Transport Advance</span>
+                    <span>₹{cartData.additionalCharges.transportAdvance.toLocaleString()}</span>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Subtotal before GST</span>
+                  <span className="font-medium">₹{cartData.subtotal.toLocaleString()}</span>
+                </div>
+
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">GST ({cartData.additionalCharges.gstRate}%)</span>
+                  <span>₹{cartData.additionalCharges.gstAmount.toLocaleString()}</span>
+                </div>
+
+                <Separator />
+
+                <div className="flex justify-between font-semibold text-lg">
+                  <span>Total Amount</span>
+                  <span className="text-primary">₹{cartData.totalAmount.toLocaleString()}</span>
                 </div>
 
                 <Button
                   onClick={handleCheckout}
                   className="w-full mt-4 bg-primary hover:bg-primary/90 py-2 h-auto text-sm"
-                  disabled={isCheckingOut || cartItems.length === 0}
+                  disabled={isCheckingOut || cartData.items.length === 0}
                 >
                   {isCheckingOut ? (
                     <>
@@ -769,11 +1150,20 @@ export default function CartPage() {
                     Continue Shopping
                   </Link>
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       )}
     </div>
   )
+}
+
+// Debounce utility function
+function debounce<T extends (...args: any[]) => any>(func: T, wait: number): T {
+  let timeout: NodeJS.Timeout
+  return ((...args: any[]) => {
+    clearTimeout(timeout)
+    timeout = setTimeout(() => func(...args), wait)
+  }) as T
 }
