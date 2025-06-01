@@ -6,7 +6,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { LogOut } from 'lucide-react'
+import { LogOut } from "lucide-react"
 import { AdvisorSidebar } from "@/components/advisor-sidebar"
 import { isAgentAuthenticated, clearAllTokens } from "@/lib/auth-utils"
 
@@ -16,8 +16,8 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const router = useRouter()
+  const [agentEmail, setAgentEmail] = useState<string | null>(null)
   const [agentName, setAgentName] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     // Check if agent is logged in
@@ -26,60 +26,16 @@ export default function DashboardLayout({
       return
     }
 
-    // Get agent token for API call
-    const token = localStorage.getItem("agentToken")
-    console.log("🔍 Agent token found:", token ? "Yes" : "No")
-    
-    // Fetch agent details from backend
-    const fetchAgentDetails = async () => {
-      try {
-        console.log("🚀 Making API call to fetch agent details...")
-        
-        // ✅ FIXED: Removed /api prefix
-        const response = await fetch("/agent/commission-rate", {
-          method: "GET",
-          headers: {
-            "Authorization": `Bearer ${token}`,
-            "Content-Type": "application/json"
-          }
-        })
-        
-        console.log("📡 API Response status:", response.status)
-        
-        if (response.ok) {
-          const data = await response.json()
-          console.log("📦 Full API Response:", data)
-          
-          // Check if we got a successful response with agent name
-          if (data.success && data.data && data.data.name) {
-            // Use the real name from database
-            setAgentName(data.data.name)
-            console.log("✅ Agent name set to:", data.data.name)
-          } else {
-            console.log("⚠️ No name found in response, setting to 'Agent'")
-            setAgentName("Agent")
-          }
-        } else {
-          const errorText = await response.text()
-          console.error("❌ API call failed:", response.status, errorText)
-          setAgentName("Agent")
-        }
-      } catch (error) {
-        console.error("❌ Error fetching agent details:", error)
-        setAgentName("Agent")
-      } finally {
-        setIsLoading(false)
-        console.log("🏁 Loading finished")
-      }
-    }
-    
-    // Call the fetch function if we have a token
-    if (token) {
-      fetchAgentDetails()
-    } else {
-      console.log("❌ No token found, setting name to 'Agent'")
-      setAgentName("Agent")
-      setIsLoading(false)
+    // Fetch agent email from localStorage
+    const email = localStorage.getItem("agentEmail")
+    setAgentEmail(email)
+
+    // Extract name from email (for demo purposes)
+    if (email) {
+      const name = email.split("@")[0]
+      // Capitalize first letter and format name
+      const formattedName = name.charAt(0).toUpperCase() + name.slice(1)
+      setAgentName(formattedName)
     }
   }, [router])
 
@@ -87,8 +43,6 @@ export default function DashboardLayout({
     clearAllTokens()
     router.push("/agent-login")
   }
-
-  console.log("🎨 Rendering with agentName:", agentName, "isLoading:", isLoading)
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -105,9 +59,7 @@ export default function DashboardLayout({
               <h1 className="text-xl font-semibold">Consultant Dashboard</h1>
             </div>
             <div className="flex items-center gap-4">
-              <span className="text-sm md:text-base">
-                Welcome, {isLoading ? "Loading..." : (agentName || "Agent")}
-              </span>
+              <span className="text-sm md:text-base">Welcome, {agentName || agentEmail}</span>
               <Button
                 variant="ghost"
                 size="sm"
