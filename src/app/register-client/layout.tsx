@@ -92,7 +92,9 @@ export default function DashboardLayout({
               <h1 className="text-xl font-semibold">Consultant Dashboard</h1>
             </div>
             <div className="flex items-center gap-4">
-         
+              <span className="text-sm md:text-base">
+                Welcome, {isLoading ? "..." : agentName}
+              </span>
               <Button
                 variant="ghost"
                 size="sm"
