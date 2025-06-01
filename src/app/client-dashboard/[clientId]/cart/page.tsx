@@ -841,6 +841,29 @@ export default function CartPage() {
                           </div>
                         </div>
 
+                        {/* Add Specifications Button - only show if no custom specs exist */}
+                        {!item.customQuantity && !item.customFinish && !item.customThickness && !isEditing && (
+                          <div className="mt-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                setEditingCustomFields((prev) => ({
+                                  ...prev,
+                                  [item.postId]: {
+                                    customQuantity: undefined,
+                                    customFinish: undefined,
+                                    customThickness: undefined,
+                                  },
+                                }))
+                              }
+                              className="h-7 text-xs px-3 text-primary border-primary/30 hover:bg-primary/10"
+                            >
+                              + Add Specifications
+                            </Button>
+                          </div>
+                        )}
+
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <div className="flex items-center gap-1">
                             <label className="text-xs font-medium text-gray-700 whitespace-nowrap">Qty:</label>
@@ -1195,7 +1218,7 @@ export default function CartPage() {
                         key={option.value}
                         className="flex items-center space-x-2 border rounded-lg p-3 hover:bg-muted/50"
                       >
-                        <RadioGroupItem value={option.value.toString()} id={`gst-${option.value}`} />
+                        <RadioGroupItem value={option.value} id={`gst-${option.value}`} />
                         <Label htmlFor={`gst-${option.value}`} className="cursor-pointer">
                           <div className="font-medium">{option.label}</div>
                           <div className="text-sm text-muted-foreground">{option.description}</div>

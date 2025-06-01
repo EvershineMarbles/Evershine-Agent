@@ -68,6 +68,9 @@ export default function ProductDetail() {
   const [imageLoadError, setImageLoadError] = useState<boolean[]>([])
   const [wishlistLoading, setWishlistLoading] = useState(false)
   const [inWishlist, setInWishlist] = useState(false)
+  // Add these new state variables after the existing ones
+  const [wishlistCount, setWishlistCount] = useState(0)
+  const [cartCount, setCartCount] = useState(0)
   const clientId = params.clientId as string
   const [showFullDescription, setShowFullDescription] = useState(false)
   const [galleryOpen, setGalleryOpen] = useState(false)
@@ -145,6 +148,42 @@ export default function ProductDetail() {
     return Math.round(adjustedPrice * 100) / 100
   }
 
+  // Function to get wishlist count
+  const getWishlistCount = () => {
+    try {
+      const savedWishlist = localStorage.getItem("wishlist")
+      if (savedWishlist) {
+        const wishlistItems = JSON.parse(savedWishlist)
+        return Array.isArray(wishlistItems) ? wishlistItems.length : 0
+      }
+      return 0
+    } catch (error) {
+      console.error("Error getting wishlist count:", error)
+      return 0
+    }
+  }
+
+  // Function to get cart count
+  const getCartCount = () => {
+    try {
+      const savedCart = localStorage.getItem("cart")
+      if (savedCart) {
+        const cartItems = JSON.parse(savedCart)
+        return Array.isArray(cartItems) ? cartItems.length : 0
+      }
+      return 0
+    } catch (error) {
+      console.error("Error getting cart count:", error)
+      return 0
+    }
+  }
+
+  // Function to update counts
+  const updateCounts = () => {
+    setWishlistCount(getWishlistCount())
+    setCartCount(getCartCount())
+  }
+
   useEffect(() => {
     const fetchProduct = async () => {
       try {
@@ -197,6 +236,23 @@ export default function ProductDetail() {
 
     fetchProduct()
   }, [params.id])
+
+  // Initialize counts on component mount
+  useEffect(() => {
+    updateCounts()
+  }, [])
+
+  // Listen for storage changes to update counts
+  useEffect(() => {
+    const handleStorageChange = () => {
+      updateCounts()
+    }
+
+    window.addEventListener("storage", handleStorageChange)
+    return () => {
+      window.removeEventListener("storage", handleStorageChange)
+    }
+  }, [])
 
   // Check if product is in wishlist - prioritize server response over localStorage
   const checkWishlistStatus = async (productId: string) => {
@@ -356,6 +412,7 @@ export default function ProductDetail() {
           }
 
           setInWishlist(false)
+          updateCounts() // Add this line
 
           toast({
             title: "Removed from wishlist",
@@ -415,6 +472,7 @@ export default function ProductDetail() {
         }
 
         setInWishlist(true)
+        updateCounts() // Add this line
 
         // Update localStorage
         const savedWishlist = localStorage.getItem("wishlist")
@@ -514,6 +572,11 @@ export default function ProductDetail() {
             aria-label="View wishlist"
           >
             <Heart className="h-6 w-6" />
+            {wishlistCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium">
+                {wishlistCount > 99 ? "99+" : wishlistCount}
+              </span>
+            )}
           </button>
           <button
             onClick={() => router.push(`/client-dashboard/${clientId}/cart`)}
@@ -521,6 +584,11 @@ export default function ProductDetail() {
             aria-label="View cart"
           >
             <ShoppingCart className="h-6 w-6" />
+            {cartCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium">
+                {cartCount > 99 ? "99+" : cartCount}
+              </span>
+            )}
           </button>
         </div>
       </div>

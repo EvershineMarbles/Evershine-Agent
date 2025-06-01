@@ -561,6 +561,28 @@ export default function WishlistPage() {
                           <span className="font-semibold text-sm text-primary">₹{displayPrice.toLocaleString()}</span>
                         )}
                       </div>
+                      {/* Add Specifications Button - only show if no custom specs exist */}
+                      {!item.customQuantity && !item.customFinish && !item.customThickness && !isEditing && (
+                        <div className="mt-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              setEditingCustomFields((prev) => ({
+                                ...prev,
+                                [itemId]: {
+                                  customQuantity: undefined,
+                                  customFinish: undefined,
+                                  customThickness: undefined,
+                                },
+                              }))
+                            }
+                            className="h-7 text-xs px-3 text-primary border-primary/30 hover:bg-primary/10"
+                          >
+                            + Add Specifications
+                          </Button>
+                        </div>
+                      )}
                     </div>
 
                     {/* Quantity and Actions - Right Side */}
