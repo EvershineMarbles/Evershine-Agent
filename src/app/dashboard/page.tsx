@@ -101,7 +101,7 @@ export default function Dashboard() {
 
         <Card
           className="border rounded-lg overflow-hidden cursor-pointer transition-all hover:shadow-md hover:border-[#194a95]"
-          onClick={() => router.push("/dashboard/reminders")}
+          onClick={() => router.push("/dashboard/follow-up-reminders")}
         >
           <CardContent className="p-6 text-center">
             <div className="flex flex-col items-center gap-2">

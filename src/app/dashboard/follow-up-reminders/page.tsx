@@ -87,7 +87,12 @@ export default function FollowUpRemindersPage() {
       const token = getToken()
 
       if (!token) {
-        console.log("No token found, using sample data")
+        console.log("No token found")
+        toast({
+          title: "Authentication required",
+          description: "Please log in to view follow-up reminders",
+          variant: "destructive",
+        })
         setFollowUps([])
         setFilteredFollowUps([])
         setLoading(false)
@@ -95,22 +100,51 @@ export default function FollowUpRemindersPage() {
       }
 
       const apiUrl = getApiUrl()
-      const response = await fetch(`${apiUrl}/api/agent/followups`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch follow-ups")
+      // Try different possible endpoints
+      const endpoints = [`${apiUrl}/api/agent/followups`, `${apiUrl}/api/followups`, `${apiUrl}/api/client/followups`]
+
+      let response = null
+      let lastError = null
+
+      for (const endpoint of endpoints) {
+        try {
+          console.log(`Trying endpoint: ${endpoint}`)
+          response = await fetch(endpoint, {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          })
+
+          if (response.ok) {
+            console.log(`Success with endpoint: ${endpoint}`)
+            break
+          } else {
+            console.log(`Failed with endpoint: ${endpoint}, status: ${response.status}`)
+            lastError = `${endpoint} returned ${response.status}`
+          }
+        } catch (error) {
+          console.log(`Error with endpoint: ${endpoint}`, error)
+          lastError = error
+        }
+      }
+
+      if (!response || !response.ok) {
+        throw new Error(lastError || "All endpoints failed")
       }
 
       const data = await response.json()
+      console.log("API Response:", data)
+
       if (data.success) {
         setFollowUps(data.data || [])
         setFilteredFollowUps(data.data || [])
+        toast({
+          title: "Success",
+          description: `Loaded ${data.data?.length || 0} follow-up reminders`,
+        })
       } else {
         throw new Error(data.message || "Failed to fetch follow-ups")
       }
@@ -118,7 +152,7 @@ export default function FollowUpRemindersPage() {
       console.error("Error fetching follow-ups:", error)
       toast({
         title: "Error",
-        description: "Failed to load follow-up reminders. Showing empty list.",
+        description: `Failed to load follow-up reminders: ${error.message}`,
         variant: "destructive",
       })
       setFollowUps([])
@@ -128,7 +162,43 @@ export default function FollowUpRemindersPage() {
     }
   }
 
+  // Test API connectivity
+  const testApiConnection = async () => {
+    try {
+      const apiUrl = getApiUrl()
+      const response = await fetch(`${apiUrl}/api/test`, {
+        method: "GET",
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        console.log("API Test successful:", data)
+        toast({
+          title: "API Connection",
+          description: "Backend connection successful",
+        })
+      } else {
+        console.log("API Test failed:", response.status)
+        toast({
+          title: "API Connection",
+          description: `Backend connection failed: ${response.status}`,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("API Test error:", error)
+      toast({
+        title: "API Connection",
+        description: "Cannot connect to backend",
+        variant: "destructive",
+      })
+    }
+  }
+
   useEffect(() => {
+    // Test API connection first
+    testApiConnection()
+    // Then fetch follow-ups
     fetchFollowUps()
   }, [])
 
@@ -251,12 +321,28 @@ export default function FollowUpRemindersPage() {
           <h1 className="text-2xl font-bold">Follow-up Reminders</h1>
           <p className="text-muted-foreground">Manage and track all your client follow-up reminders</p>
         </div>
-        <div className="mt-4 md:mt-0">
+        <div className="mt-4 md:mt-0 flex gap-2">
+          <Button variant="outline" size="sm" onClick={testApiConnection}>
+            Test API
+          </Button>
           <Button variant="outline" className="flex items-center gap-2" onClick={fetchFollowUps}>
             <RefreshCw className="h-4 w-4" />
             Refresh
           </Button>
         </div>
+      </div>
+
+      {/* Debug Info */}
+      <div className="mb-4 p-3 bg-muted/20 rounded-lg text-sm">
+        <p>
+          <strong>API URL:</strong> {getApiUrl()}
+        </p>
+        <p>
+          <strong>Token:</strong> {getToken() ? "✓ Found" : "✗ Missing"}
+        </p>
+        <p>
+          <strong>Follow-ups loaded:</strong> {followUps.length}
+        </p>
       </div>
 
       {/* Filters and Search */}
@@ -291,8 +377,8 @@ export default function FollowUpRemindersPage() {
       {/* Tabs - Only All and Pending */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
         <TabsList className="grid grid-cols-2 md:w-fit">
-          <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="pending">Pending</TabsTrigger>
+          <TabsTrigger value="all">All ({followUps.length})</TabsTrigger>
+          <TabsTrigger value="pending">Pending ({followUps.filter((f) => f.status === "pending").length})</TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -308,9 +394,11 @@ export default function FollowUpRemindersPage() {
             <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium mb-2">No follow-up reminders found</h3>
             <p className="text-muted-foreground max-w-md mx-auto">
-              {activeTab === "pending"
-                ? "No pending follow-up reminders match your filters."
-                : "No follow-up reminders match your search criteria."}
+              {followUps.length === 0
+                ? "No follow-up reminders have been created yet."
+                : activeTab === "pending"
+                  ? "No pending follow-up reminders match your filters."
+                  : "No follow-up reminders match your search criteria."}
             </p>
           </div>
         ) : (
