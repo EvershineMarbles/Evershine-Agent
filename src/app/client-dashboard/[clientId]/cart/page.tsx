@@ -222,7 +222,7 @@ export default function CartPage() {
     [calculateInsurance],
   )
 
-  // NEW: Save follow-up reminder function
+  // NEW: Save follow-up reminder function - UPDATED to use the new direct endpoint
   const saveFollowUpReminder = async () => {
     try {
       setIsSavingFollowUp(true)
@@ -263,15 +263,8 @@ export default function CartPage() {
 
       const apiUrl = getApiUrl()
 
-      // Create a temporary order reference for follow-up
-      const tempOrderData = {
-        clientId: clientId,
-        totalAmount: cartData?.totalAmount || 0,
-        items: cartData?.items || [],
-        createdAt: new Date(),
-      }
-
-      const response = await fetch(`${apiUrl}/api/client/followup-preferences`, {
+      // Use the new direct endpoint for cart follow-ups
+      const response = await fetch(`${apiUrl}/api/client/cart-followup`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -279,24 +272,26 @@ export default function CartPage() {
         },
         body: JSON.stringify({
           followUpReminder: followUpReminder.enabled ? followUpReminder : { enabled: false },
-          tempOrderData: followUpReminder.enabled ? tempOrderData : null, // Pass order data for actual creation
         }),
       })
 
+      console.log("Follow-up API response status:", response.status)
+
       if (!response.ok) {
-        throw new Error("Failed to save follow-up preferences")
+        const errorText = await response.text()
+        console.error("Follow-up API error:", errorText)
+        throw new Error(`Failed to save follow-up: ${response.status} ${errorText}`)
       }
 
       const data = await response.json()
+      console.log("Follow-up API response data:", data)
 
       if (data.success) {
         setFollowUpSaved(true)
         setSavedFollowUpId(data.data?.id || null)
         toast({
-          title: "Follow-up Saved",
-          description: followUpReminder.enabled
-            ? "Follow-up reminder created and will be applied to your next order"
-            : "Follow-up preferences saved successfully",
+          title: "Follow-up Created",
+          description: "Your follow-up reminder has been created successfully",
         })
 
         // Reset the saved state after 3 seconds
@@ -304,7 +299,7 @@ export default function CartPage() {
           setFollowUpSaved(false)
         }, 3000)
       } else {
-        throw new Error(data.message || "Failed to save follow-up preferences")
+        throw new Error(data.message || "Failed to create follow-up reminder")
       }
     } catch (error: any) {
       console.error("Error saving follow-up:", error)
@@ -1472,34 +1467,32 @@ export default function CartPage() {
                       <p className="text-xs text-muted-foreground">{followUpReminder.comment.length}/500 characters</p>
                     </div>
 
-                    {/* NEW: Save Button */}
-                    {hasFollowUpChanged() && (
-                      <div className="flex items-center gap-2 pt-2 border-t border-muted">
-                        <Button onClick={saveFollowUpReminder} disabled={isSavingFollowUp} size="sm" className="h-8">
-                          {isSavingFollowUp ? (
-                            <>
-                              <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                              Saving...
-                            </>
-                          ) : followUpSaved ? (
-                            <>
-                              <Check className="h-3 w-3 mr-1" />
-                              Saved
-                            </>
-                          ) : (
-                            <>
-                              <Save className="h-3 w-3 mr-1" />
-                              Save Follow-up Settings
-                            </>
-                          )}
-                        </Button>
-                        {followUpSaved && (
-                          <span className="text-xs text-green-600 font-medium">
-                            Follow-up preferences saved successfully!
-                          </span>
+                    {/* NEW: Save Button - UPDATED with better feedback */}
+                    <div className="flex items-center gap-2 pt-2 border-t border-muted">
+                      <Button onClick={saveFollowUpReminder} disabled={isSavingFollowUp} size="sm" className="h-8">
+                        {isSavingFollowUp ? (
+                          <>
+                            <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                            Creating...
+                          </>
+                        ) : followUpSaved ? (
+                          <>
+                            <Check className="h-3 w-3 mr-1" />
+                            Created
+                          </>
+                        ) : (
+                          <>
+                            <Save className="h-3 w-3 mr-1" />
+                            Create Follow-up Now
+                          </>
                         )}
-                      </div>
-                    )}
+                      </Button>
+                      {followUpSaved && (
+                        <span className="text-xs text-green-600 font-medium">
+                          Follow-up reminder created successfully!
+                        </span>
+                      )}
+                    </div>
 
                     {/* Reminder Preview */}
                     <div className="bg-muted/50 rounded-lg p-3">
@@ -1627,7 +1620,7 @@ export default function CartPage() {
   )
 }
 
-// Debounce uility function
+// Debounce utility function
 function debounce<T extends (...args: any[]) => any>(func: T, wait: number): T {
   let timeout: NodeJS.Timeout
   return ((...args: any[]) => {
