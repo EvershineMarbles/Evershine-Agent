@@ -2,8 +2,8 @@
 
 import type React from "react"
 
-import { useState, useRef, useEffect } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useState, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -14,19 +14,15 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/components/ui/use-toast"
 import { isAgentAuthenticated } from "@/lib/auth-utils"
-import { clientAPI } from "@/lib/client-api"
+import axios from "axios"
 
 export default function RegisterClient() {
   const router = useRouter()
   const { toast } = useToast()
-  const searchParams = useSearchParams()
-  const mobileFromParams = searchParams.get("mobile")
-  const isVerified = searchParams.get("verified") === "true"
-
   const [step, setStep] = useState<"initial" | "otp" | "details">("initial")
   const [formData, setFormData] = useState({
     name: "",
-    mobile: mobileFromParams || "",
+    mobile: "",
     email: "",
     address: "",
     city: "",
@@ -36,9 +32,9 @@ export default function RegisterClient() {
     gstNumber: "",
     projectType: "",
     dateOfBirth: "",
-    anniversaryDate: "",
-    architectDetails: "",
-    consultantLevel: "red",
+    anniversaryDate: "", // Add anniversary date
+    architectDetails: "", // Add architect details
+    consultantLevel: "red", // Update default to "red" instead of "standard"
     agreeToTerms: false,
   })
   const [isLoading, setIsLoading] = useState(false)
@@ -46,31 +42,6 @@ export default function RegisterClient() {
   // OTP state and refs
   const [otp, setOtp] = useState(["", "", "", "", "", ""])
   const otpInputs = useRef<(HTMLInputElement | null)[]>([null, null, null, null, null, null])
-
-  // Additional state for API interactions
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [apiError, setApiError] = useState("")
-  const [formattedPhone, setFormattedPhone] = useState("")
-
-  // Client existence check state
-  const [existingClient, setExistingClient] = useState<{
-    exists: boolean
-    clientId?: string
-    clientName?: string
-  } | null>(null)
-
-  // Effect to handle pre-filled mobile number from OTP verification
-  useEffect(() => {
-    if (mobileFromParams && isVerified) {
-      setFormData((prev) => ({
-        ...prev,
-        mobile: mobileFromParams,
-      }))
-
-      // If mobile is verified, skip to details step
-      setStep("details")
-    }
-  }, [mobileFromParams, isVerified])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -125,7 +96,12 @@ export default function RegisterClient() {
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
-  // Submit initial form with mobile number - CHECK CLIENT FIRST
+  // Add these new state variables
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [apiError, setApiError] = useState("")
+  const [formattedPhone, setFormattedPhone] = useState("")
+
+  // Update the handleSubmitInitial function to call the OTP send API
   const handleSubmitInitial = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
@@ -153,62 +129,29 @@ export default function RegisterClient() {
     }
 
     try {
-      // Format phone number first
-      const phoneNumber = formData.mobile.startsWith("+") ? formData.mobile : `+91${formData.mobile}`
-      setFormattedPhone(phoneNumber)
+      // Format phone number to E.164 format if it doesn't already start with +
+      const phoneNumber = formData.mobile.startsWith("+") ? formData.mobile : `+91${formData.mobile}` // Assuming India country code, adjust as needed
 
-      // FIRST: Try to check if client already exists
-      console.log("Checking if client exists for mobile:", formData.mobile)
-      const clientCheckResponse = await clientAPI.checkExistingClient(formData.mobile)
-      console.log("Client check response:", clientCheckResponse)
+      // Call the OTP send API
+      const response = await axios.post("https://evershinebackend-2.onrender.com/api/otp/send", {
+        phoneNumber,
+      })
 
-      if (clientCheckResponse.success && clientCheckResponse.exists) {
-        // Client exists - store the info
-        setExistingClient({
-          exists: true,
-          clientId: clientCheckResponse.clientId,
-          clientName: clientCheckResponse.clientName,
-        })
-
-        console.log("Existing client found:", {
-          clientId: clientCheckResponse.clientId,
-          clientName: clientCheckResponse.clientName,
-        })
-
-        toast({
-          title: "Existing Client Found",
-          description: `Welcome back, ${clientCheckResponse.clientName}!`,
-        })
-      } else {
-        // New client OR check failed - we'll determine this later
-        setExistingClient({
-          exists: false,
-        })
-
-        console.log("Treating as new client - will verify during registration")
-
-        toast({
-          title: "Proceeding with Verification",
-          description: "We'll verify your account status after OTP confirmation",
-        })
-      }
-
-      // Send OTP regardless of client existence
-      const otpResponse = await clientAPI.sendOTP(formData.mobile)
-
-      if (otpResponse.success) {
+      if (response.data.success) {
         toast({
           title: "OTP Sent",
           description: "A verification code has been sent to your mobile number",
         })
+        // Store the formatted phone number for verification
+        setFormattedPhone(phoneNumber)
         // Move to OTP verification step
         setStep("otp")
       } else {
-        throw new Error(otpResponse.message || "Failed to send OTP")
+        throw new Error(response.data.message || "Failed to send OTP")
       }
     } catch (error: any) {
-      console.error("Error in initial submit:", error)
-      const errorResponse = error instanceof Error ? error.message : "Failed to process request"
+      console.error("Error sending OTP:", error)
+      const errorResponse = error instanceof Error ? error.message : "Failed to send OTP"
       setApiError(errorResponse)
       toast({
         title: "Error",
@@ -220,7 +163,7 @@ export default function RegisterClient() {
     }
   }
 
-  // Verify OTP - HANDLE EXISTING CLIENT DIFFERENTLY
+  // Update the handleVerifyOTP function to call the OTP verify API
   const handleVerifyOTP = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
@@ -239,71 +182,39 @@ export default function RegisterClient() {
     }
 
     try {
-      console.log("Verifying OTP for:", formattedPhone)
-      console.log("Existing client state:", existingClient)
-
       // Call the OTP verify API
-      const response = await clientAPI.verifyOTP(formattedPhone, otpValue)
+      const response = await axios.post("https://evershinebackend-2.onrender.com/api/otp/verify", {
+        phoneNumber: formattedPhone,
+        otp: otpValue,
+      })
 
-      if (response.success) {
+      if (response.data.success) {
         toast({
           title: "OTP Verified",
           description: "Your phone number has been verified successfully",
         })
 
-        // Check if this is an existing client based on our earlier check
-        if (existingClient?.exists && existingClient.clientId) {
-          console.log("Processing existing client:", existingClient)
-
-          // EXISTING CLIENT - Get impersonation token and redirect to dashboard
-          const agentToken = localStorage.getItem("agentToken")
-
-          if (!agentToken) {
-            toast({
-              title: "Authentication Error",
-              description: "Agent token not found. Please log in again.",
-              variant: "destructive",
-            })
-            router.push("/agent-login")
-            return
-          }
-
-          try {
-            // Get impersonation token for existing client
-            const impersonateResponse = await clientAPI.agentImpersonateClient(existingClient.clientId, agentToken)
-
-            if (impersonateResponse.success) {
-              // Store impersonation token
-              localStorage.setItem("clientImpersonationToken", impersonateResponse.impersonationToken)
-              localStorage.setItem("clientId", existingClient.clientId)
-
-              toast({
-                title: "Access Granted",
-                description: `You now have access to ${existingClient.clientName}'s dashboard`,
-              })
-
-              // Redirect to client dashboard
-              setTimeout(() => {
-                router.push(`/client-dashboard/${existingClient.clientId}`)
-              }, 1500)
-            } else {
-              throw new Error("Failed to get impersonation token")
-            }
-          } catch (impersonateError) {
-            console.error("Error getting impersonation token:", impersonateError)
-            toast({
-              title: "Error",
-              description: "Failed to access client dashboard. Please try again.",
-              variant: "destructive",
-            })
-          }
-        } else {
-          console.log("Processing new client - proceeding to details step")
-          // NEW CLIENT - Proceed to details step for registration
+        // Check if user is new or existing
+        if (response.data.data.isNewUser) {
+          // New user, proceed to details step
           setStep("details")
+        } else {
+          // Existing user, store token and redirect to dashboard
+          localStorage.setItem("clientToken", response.data.data.token)
+          localStorage.setItem("clientId", response.data.data.clientId)
+
+          toast({
+            title: "Welcome Back",
+            description: "You have been logged in successfully",
+          })
+
+          // Redirect to client dashboard
+          setTimeout(() => {
+            router.push(`/client-dashboard/${response.data.data.clientId}`)
+          }, 1500)
         }
       } else {
-        throw new Error(response.message || "Failed to verify OTP")
+        throw new Error(response.data.message || "Failed to verify OTP")
       }
     } catch (error: any) {
       console.error("Error verifying OTP:", error)
@@ -319,23 +230,12 @@ export default function RegisterClient() {
     }
   }
 
-  // Submit client details form (only for NEW clients)
+  // Updated handleSubmitDetails function with client dashboard redirect
   const handleSubmitDetails = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
 
     try {
-      // Double-check that this is actually a new client
-      if (existingClient?.exists) {
-        toast({
-          title: "Error",
-          description: "This client already exists. Please use the client access flow instead.",
-          variant: "destructive",
-        })
-        setIsLoading(false)
-        return
-      }
-
       // Check if agent is authenticated
       if (!isAgentAuthenticated()) {
         toast({
@@ -360,15 +260,14 @@ export default function RegisterClient() {
         return
       }
 
-      console.log("Creating new client with data:", {
-        name: formData.name,
-        mobile: formData.mobile,
-        email: formData.email,
-      })
-
-      // Create new client
-      const response = await clientAPI.registerClient(
-        {
+      // Make the API request with fetch instead of axios
+      const response = await fetch("https://evershinebackend-2.onrender.com/api/create-client", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
           name: formData.name,
           mobile: formData.mobile,
           email: formData.email || undefined,
@@ -380,122 +279,79 @@ export default function RegisterClient() {
           dateOfBirth: formData.dateOfBirth || undefined,
           anniversaryDate: formData.anniversaryDate || undefined,
           architectDetails: formData.architectDetails || undefined,
-          consultantLevel: formData.consultantLevel || undefined,
-        },
-        token,
-      )
+          consultantLevel: formData.consultantLevel || undefined, // This will now be "red", "yellow", or "purple"
+        }),
+      })
 
-      if (response.success) {
-        // Get the client ID from the response
-        const clientId = response.data?.client?.clientId
+      // Check if the response is ok
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || `Error: ${response.status} ${response.statusText}`)
+      }
 
-        if (!clientId) {
-          throw new Error("Client ID not found in response")
+      const data = await response.json()
+      console.log("Create client response:", data)
+
+      // Get the client ID from the response
+      const clientId = data.data?.client?.clientId
+
+      if (!clientId) {
+        throw new Error("Client ID not found in response")
+      }
+
+      toast({
+        title: "Success",
+        description: "Client registered successfully!",
+      })
+
+      // Generate impersonation token for the new client
+      try {
+        const impersonateResponse = await fetch(
+          `https://evershinebackend-2.onrender.com/api/agent/impersonate/${clientId}`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          },
+        )
+
+        if (!impersonateResponse.ok) {
+          throw new Error("Failed to generate impersonation token")
         }
 
-        toast({
-          title: "Success",
-          description: "Client registered successfully!",
-        })
+        const impersonateData = await impersonateResponse.json()
 
-        // Generate impersonation token for the new client
-        try {
-          const impersonateResponse = await clientAPI.agentImpersonateClient(clientId, token)
+        if (impersonateData.success && impersonateData.data?.impersonationToken) {
+          // Store the impersonation token
+          localStorage.setItem("clientImpersonationToken", impersonateData.data.impersonationToken)
 
-          if (impersonateResponse.success) {
-            // Store the impersonation token
-            localStorage.setItem("clientImpersonationToken", impersonateResponse.impersonationToken)
-            localStorage.setItem("clientId", clientId)
-
-            // Redirect to client dashboard
-            router.push(`/client-dashboard/${clientId}`)
-          } else {
-            throw new Error("Invalid impersonation token response")
-          }
-        } catch (impersonateError) {
-          console.error("Error generating impersonation token:", impersonateError)
-          // If impersonation fails, still redirect to client dashboard
+          // Redirect to client dashboard
           router.push(`/client-dashboard/${clientId}`)
+        } else {
+          throw new Error("Invalid impersonation token response")
         }
-      } else {
-        throw new Error(response.message || "Failed to register client")
+      } catch (impersonateError) {
+        console.error("Error generating impersonation token:", impersonateError)
+        // If impersonation fails, still redirect to client dashboard
+        router.push(`/client-dashboard/${clientId}`)
       }
     } catch (error: any) {
       console.error("Error creating client:", error)
       const errorMessage = error instanceof Error ? error.message : "An error occurred while creating the client"
-
-      // Check if it's a duplicate client error
-      if (
-        errorMessage.toLowerCase().includes("phone number already exists") ||
-        errorMessage.toLowerCase().includes("client already exists") ||
-        errorMessage.toLowerCase().includes("already exists")
-      ) {
-        toast({
-          title: "Client Already Exists",
-          description: "This phone number is already registered. Let me redirect you to access the existing account.",
-          variant: "destructive",
-        })
-
-        // Set as existing client and redirect to OTP for access
-        setExistingClient({
-          exists: true,
-          clientId: undefined, // We don't have the ID, but we know it exists
-          clientName: formData.name, // Use the name they provided
-        })
-
-        // Go back to OTP step for existing client access
-        setStep("otp")
-
-        // Send new OTP for existing client access
-        try {
-          await clientAPI.sendOTP(formData.mobile)
-          toast({
-            title: "OTP Sent",
-            description: "Please verify your identity to access your existing account",
-          })
-        } catch (otpError) {
-          console.error("Error sending OTP for existing client:", otpError)
-        }
-      } else {
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-        })
-      }
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // Resend OTP function
-  const handleResendOTP = async () => {
-    try {
-      setIsSubmitting(true)
-      const response = await clientAPI.sendOTP(formData.mobile)
-
-      if (response.success) {
-        toast({
-          title: "OTP Resent",
-          description: "A new verification code has been sent to your mobile number",
-        })
-      } else {
-        throw new Error(response.message || "Failed to resend OTP")
-      }
-    } catch (error: any) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to resend OTP"
       toast({
         title: "Error",
         description: errorMessage,
         variant: "destructive",
       })
     } finally {
-      setIsSubmitting(false)
+      setIsLoading(false)
     }
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
+    <div className="flex flex-col items-center justify-center">
       <div className="w-full max-w-xl">
         <div className="mb-4">
           <button onClick={() => router.push("/dashboard")} className="p-2 rounded-full hover:bg-gray-100">
@@ -506,10 +362,8 @@ export default function RegisterClient() {
         {step === "initial" && (
           <Card className="shadow-sm border">
             <CardHeader className="space-y-1 border-b pb-4">
-              <CardTitle className="text-2xl text-center text-[#194a95]">Client Access</CardTitle>
-              <CardDescription className="text-center">
-                Enter client information to access existing account or create new one
-              </CardDescription>
+              <CardTitle className="text-2xl text-center text-blue">Register New Client</CardTitle>
+              <CardDescription className="text-center">Enter basic client information</CardDescription>
             </CardHeader>
 
             <CardContent className="pt-6">
@@ -552,16 +406,16 @@ export default function RegisterClient() {
 
                 <Button
                   type="submit"
-                  className="w-full h-12 mt-6 bg-[#194a95] hover:bg-[#0d3a7d] text-white rounded-md text-base"
+                  className="w-full h-12 mt-6 bg-blue hover:bg-blue/90 text-white rounded-md text-base"
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Checking & Sending OTP...
+                      Sending OTP...
                     </>
                   ) : (
-                    "Check Client & Send OTP"
+                    "Send OTP"
                   )}
                 </Button>
                 {apiError && <div className="mt-4 p-3 bg-red-50 text-red-600 rounded-md text-sm">{apiError}</div>}
@@ -573,26 +427,8 @@ export default function RegisterClient() {
         {step === "otp" && (
           <Card className="shadow-sm border">
             <CardHeader className="space-y-1 border-b pb-4">
-              <CardTitle className="text-2xl text-center text-[#194a95]">Verify OTP</CardTitle>
-              <CardDescription className="text-center">
-                {existingClient?.exists ? (
-                  <div className="space-y-2">
-                    <div className="p-3 bg-green-50 rounded-md border border-green-200">
-                      <span className="text-green-700 font-medium">
-                        ✅ Existing Client: {existingClient.clientName}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-600">Enter OTP to access dashboard</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="p-3 bg-blue-50 rounded-md border border-blue-200">
-                      <span className="text-blue-700 font-medium">📱 Account Verification</span>
-                    </div>
-                    <p className="text-sm text-gray-600">Enter OTP to continue</p>
-                  </div>
-                )}
-              </CardDescription>
+              <CardTitle className="text-2xl text-center text-blue">Verify OTP</CardTitle>
+              <CardDescription className="text-center">Enter the OTP sent to your mobile number</CardDescription>
             </CardHeader>
 
             <CardContent className="pt-6">
@@ -600,7 +436,7 @@ export default function RegisterClient() {
                 <div className="text-center mb-6">
                   <p className="text-muted-foreground">
                     We&apos;ve sent a 6-digit OTP to{" "}
-                    <span className="font-medium text-foreground">+91{formData.mobile}</span>
+                    <span className="font-medium text-foreground">{formData.mobile}</span>
                   </p>
                 </div>
 
@@ -628,8 +464,31 @@ export default function RegisterClient() {
                     Didn&apos;t receive OTP?{" "}
                     <Button
                       variant="link"
-                      className="p-0 h-auto text-[#194a95]"
-                      onClick={handleResendOTP}
+                      className="p-0 h-auto text-blue"
+                      onClick={async () => {
+                        try {
+                          setIsSubmitting(true)
+                          const response = await axios.post("https://evershinebackend-2.onrender.com/api/otp/send", {
+                            phoneNumber: formattedPhone,
+                          })
+
+                          if (response.data.success) {
+                            toast({
+                              title: "OTP Resent",
+                              description: "A new verification code has been sent to your mobile number",
+                            })
+                          }
+                        } catch (error: any) {
+                          const errorMessage = error instanceof Error ? error.message : "Failed to resend OTP"
+                          toast({
+                            title: "Error",
+                            description: errorMessage,
+                            variant: "destructive",
+                          })
+                        } finally {
+                          setIsSubmitting(false)
+                        }
+                      }}
                       disabled={isSubmitting}
                     >
                       {isSubmitting ? "Sending..." : "Resend"}
@@ -639,7 +498,7 @@ export default function RegisterClient() {
 
                 <Button
                   type="submit"
-                  className="w-full h-12 mt-6 bg-[#194a95] hover:bg-[#0d3a7d] text-white rounded-md text-base"
+                  className="w-full h-12 mt-6 bg-blue hover:bg-blue/90 text-white rounded-md text-base"
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? (
@@ -647,10 +506,8 @@ export default function RegisterClient() {
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Verifying...
                     </>
-                  ) : existingClient?.exists ? (
-                    "Verify & Access Dashboard"
                   ) : (
-                    "Verify & Continue Registration"
+                    "Verify OTP"
                   )}
                 </Button>
                 {apiError && <div className="mt-4 p-3 bg-red-50 text-red-600 rounded-md text-sm">{apiError}</div>}
@@ -658,7 +515,7 @@ export default function RegisterClient() {
             </CardContent>
 
             <CardFooter className="flex justify-center">
-              <Button variant="link" onClick={() => setStep("initial")} className="text-[#194a95]">
+              <Button variant="link" onClick={() => setStep("initial")} className="text-blue">
                 Back to details
               </Button>
             </CardFooter>
@@ -668,7 +525,7 @@ export default function RegisterClient() {
         {step === "details" && (
           <Card className="shadow-sm border">
             <CardHeader className="space-y-1 border-b pb-4">
-              <CardTitle className="text-2xl text-center text-[#194a95]">New Client Registration</CardTitle>
+              <CardTitle className="text-2xl text-center text-blue">Client Details</CardTitle>
               <CardDescription className="text-center">Complete client registration with all details</CardDescription>
             </CardHeader>
 
@@ -794,7 +651,7 @@ export default function RegisterClient() {
                       placeholder="Enter architect details"
                       value={formData.architectDetails}
                       onChange={handleChange}
-                      className="h-12 rounded-md"
+                      className="h-12 pl-10 rounded-md"
                     />
                   </div>
                 </div>
@@ -851,7 +708,7 @@ export default function RegisterClient() {
                 {/* Consultant Level with colored dots */}
                 <div className="space-y-2 mt-4">
                   <Label htmlFor="consultantLevel" className="text-base font-medium">
-                    Consultant Level
+                    Consultant
                   </Label>
                   <div className="flex items-center gap-6 mt-2">
                     <button
@@ -893,7 +750,7 @@ export default function RegisterClient() {
 
                 <Button
                   type="submit"
-                  className="w-full h-12 mt-6 bg-[#194a95] hover:bg-[#0d3a7d] text-white rounded-md text-base"
+                  className="w-full h-12 mt-6 bg-blue hover:bg-blue/90 text-white rounded-md text-base"
                   disabled={!formData.agreeToTerms || isLoading}
                 >
                   {isLoading ? (
@@ -908,13 +765,11 @@ export default function RegisterClient() {
               </form>
             </CardContent>
 
-            {!isVerified && (
-              <CardFooter className="flex justify-center">
-                <Button variant="link" onClick={() => setStep("otp")} className="text-[#194a95]">
-                  Back to OTP verification
-                </Button>
-              </CardFooter>
-            )}
+            <CardFooter className="flex justify-center">
+              <Button variant="link" onClick={() => setStep("otp")} className="text-blue">
+                Back to OTP verification
+              </Button>
+            </CardFooter>
           </Card>
         )}
       </div>

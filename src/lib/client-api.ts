@@ -16,86 +16,6 @@ interface ClientData {
 }
 
 export const clientAPI = {
-  // NEW: Check if client exists by mobile number
-  checkExistingClient: async (mobile: string) => {
-    try {
-      // Format phone number if needed
-      const phoneNumber = mobile.startsWith("+") ? mobile : `+91${mobile}`
-
-      const response = await axios.post(`${API_BASE_URL}/check-existing-client`, {
-        mobile: phoneNumber,
-      })
-
-      return {
-        success: true,
-        exists: response.data.exists,
-        message: response.data.message,
-        clientName: response.data.clientName,
-        clientId: response.data.clientId,
-      }
-    } catch (error: any) {
-      console.error("Error checking client:", error)
-
-      // If the endpoint doesn't exist (404), we'll handle this gracefully
-      if (axios.isAxiosError(error) && error.response?.status === 404) {
-        console.log("Check-existing-client endpoint not found, will determine during registration")
-        return {
-          success: true,
-          exists: false, // Assume new client, let registration handle duplicates
-          message: "Client check endpoint not available",
-        }
-      }
-
-      const errorMessage =
-        axios.isAxiosError(error) && error.response?.data?.message
-          ? error.response.data.message
-          : error instanceof Error
-            ? error.message
-            : "Failed to check client"
-
-      return {
-        success: false,
-        exists: false,
-        message: errorMessage,
-      }
-    }
-  },
-
-  // NEW: Agent impersonate client
-  agentImpersonateClient: async (clientId: string, agentToken: string) => {
-    try {
-      const response = await axios.post(
-        `${API_BASE_URL}/api/agent/impersonate/${clientId}`,
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${agentToken}`,
-          },
-        },
-      )
-
-      return {
-        success: true,
-        impersonationToken: response.data.data.impersonationToken,
-        clientDetails: response.data.data.clientDetails,
-        message: "Successfully generated impersonation token",
-      }
-    } catch (error: any) {
-      console.error("Error impersonating client:", error)
-      const errorMessage =
-        axios.isAxiosError(error) && error.response?.data?.message
-          ? error.response.data.message
-          : error instanceof Error
-            ? error.message
-            : "Failed to impersonate client"
-
-      return {
-        success: false,
-        message: errorMessage,
-      }
-    }
-  },
-
   // Send OTP to phone number
   sendOTP: async (phoneNumber: string) => {
     try {
@@ -111,7 +31,7 @@ export const clientAPI = {
         message: response.data.message,
         formattedPhone,
       }
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
       console.error("Error sending OTP:", error)
       const errorMessage =
         axios.isAxiosError(error) && error.response?.data?.message
@@ -140,7 +60,7 @@ export const clientAPI = {
         message: response.data.message,
         data: response.data.data,
       }
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
       console.error("Error verifying OTP:", error)
       const errorMessage =
         axios.isAxiosError(error) && error.response?.data?.message
@@ -171,7 +91,7 @@ export const clientAPI = {
         message: response.data.message || "Client registered successfully",
         data: response.data.data,
       }
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
       console.error("Error registering client:", error)
       const errorMessage =
         axios.isAxiosError(error) && error.response?.data?.message
@@ -202,7 +122,7 @@ export const clientAPI = {
         message: response.data.message || "Client details updated successfully",
         data: response.data.data,
       }
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
       console.error("Error updating client details:", error)
       const errorMessage =
         axios.isAxiosError(error) && error.response?.data?.message

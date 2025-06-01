@@ -12,34 +12,6 @@ export const storeClientImpersonationToken = (clientId: string, token: string) =
   }
 }
 
-export const getClientImpersonationToken = () => {
-  if (typeof window === "undefined") {
-    return null
-  }
-  return localStorage.getItem("clientImpersonationToken")
-}
-
-export const getImpersonatedClientId = () => {
-  if (typeof window === "undefined") {
-    return null
-  }
-  return localStorage.getItem("impersonatedClientId")
-}
-
-export const hasClientImpersonation = () => {
-  if (typeof window === "undefined") {
-    return false
-  }
-  return !!localStorage.getItem("clientImpersonationToken")
-}
-
-export const clearClientImpersonation = () => {
-  if (typeof window !== "undefined") {
-    localStorage.removeItem("clientImpersonationToken")
-    localStorage.removeItem("impersonatedClientId")
-  }
-}
-
 export const clearAllTokens = () => {
   if (typeof window !== "undefined") {
     localStorage.removeItem("agentToken")
@@ -54,6 +26,13 @@ export const storeAgentTokens = (accessToken: string, refreshToken: string) => {
     localStorage.setItem("agentToken", accessToken)
     localStorage.setItem("refreshToken", refreshToken)
   }
+}
+
+export const hasClientImpersonation = () => {
+  if (typeof window === "undefined") {
+    return false
+  }
+  return !!localStorage.getItem("clientImpersonationToken")
 }
 
 /**
