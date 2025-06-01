@@ -4,7 +4,19 @@ import { useState, useEffect, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowLeft, Trash2, Loader2, ShoppingBag, Calculator, Package, Shield, Truck } from "lucide-react"
+import {
+  ArrowLeft,
+  Trash2,
+  Loader2,
+  ShoppingBag,
+  Calculator,
+  Package,
+  Shield,
+  Truck,
+  Calendar,
+  Clock,
+  MessageSquare,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -13,6 +25,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
+import { Textarea } from "@/components/ui/textarea"
 
 interface CartItem {
   _id: string
@@ -63,6 +76,13 @@ const GST_OPTIONS = [
   { value: 12, label: "12%", description: "Block items" },
 ]
 
+const FOLLOW_UP_OPTIONS = [
+  { value: "7days", label: "7 Days", description: "Follow up in 1 week" },
+  { value: "10days", label: "10 Days", description: "Follow up in 10 days" },
+  { value: "1month", label: "1 Month", description: "Follow up in 30 days" },
+  { value: "custom", label: "Custom", description: "Set custom days" },
+]
+
 export default function CartPage() {
   const router = useRouter()
   const params = useParams()
@@ -76,6 +96,19 @@ export default function CartPage() {
   const [isCheckingOut, setIsCheckingOut] = useState(false)
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
   const [updatingCharges, setUpdatingCharges] = useState(false)
+
+  // Follow-up reminder state
+  const [followUpReminder, setFollowUpReminder] = useState<{
+    enabled: boolean
+    period: string
+    customDays?: number
+    comment: string
+  }>({
+    enabled: false,
+    period: "7days",
+    customDays: undefined,
+    comment: "",
+  })
 
   // Local state for additional charges
   const [localCharges, setLocalCharges] = useState<AdditionalCharges>({
@@ -129,7 +162,8 @@ export default function CartPage() {
   // Calculate insurance based on amount
   const calculateInsurance = useCallback((amount: number) => {
     const amountInLakhs = amount / 100000
-    return Math.ceil(amountInLakhs * 345)
+    const roundedLakhs = Math.ceil(amountInLakhs) // Round UP to next lakh first
+    return roundedLakhs * 345 // Then multiply by 345
   }, [])
 
   const [isEditingInsurance, setIsEditingInsurance] = useState(false)
@@ -591,6 +625,13 @@ export default function CartPage() {
         shippingAddress,
         paymentMethod: "bank_transfer",
         notes: "Order placed via dashboard",
+        followUpReminder: followUpReminder.enabled
+          ? {
+              period: followUpReminder.period,
+              customDays: followUpReminder.customDays,
+              comment: followUpReminder.comment,
+            }
+          : null,
       }
 
       const response = await fetch(`${apiUrl}/api/createOrder`, {
@@ -1045,6 +1086,25 @@ export default function CartPage() {
                           size="sm"
                           variant="outline"
                           onClick={() => {
+                            const itemsSubtotal =
+                              cartData.subtotal -
+                              cartData.additionalCharges.loadingFee -
+                              cartData.additionalCharges.woodPackaging -
+                              cartData.additionalCharges.insurance -
+                              cartData.additionalCharges.transportAdvance
+                            const autoAmount = calculateInsurance(itemsSubtotal)
+                            setCustomInsurance(autoAmount)
+                            updateCharges({ insurance: autoAmount })
+                            setIsEditingInsurance(false)
+                          }}
+                          className="h-8"
+                        >
+                          Auto Calculate
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
                             setIsEditingInsurance(false)
                             setCustomInsurance(cartData?.additionalCharges.insurance || 0)
                           }}
@@ -1053,11 +1113,37 @@ export default function CartPage() {
                           Cancel
                         </Button>
                       </div>
+                      <p className="text-xs text-muted-foreground">
+                        Auto-calculated: ₹{(() => {
+                          const itemsSubtotal =
+                            cartData.subtotal -
+                            cartData.additionalCharges.loadingFee -
+                            cartData.additionalCharges.woodPackaging -
+                            cartData.additionalCharges.insurance -
+                            cartData.additionalCharges.transportAdvance
+                          const autoAmount = calculateInsurance(itemsSubtotal)
+                          const lakhs = Math.ceil(itemsSubtotal / 100000)
+                          return `${autoAmount.toLocaleString()} (${lakhs} lakh${lakhs > 1 ? "s" : ""} × ₹345)`
+                        })()}
+                      </p>
                     </div>
                   ) : (
                     <div className="bg-muted/50 rounded-lg p-3">
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">₹345 per lakh of billing amount</span>
+                        <div className="flex-1">
+                          <p className="text-sm text-muted-foreground">
+                            {(() => {
+                              const itemsSubtotal =
+                                cartData.subtotal -
+                                cartData.additionalCharges.loadingFee -
+                                cartData.additionalCharges.woodPackaging -
+                                cartData.additionalCharges.insurance -
+                                cartData.additionalCharges.transportAdvance
+                              const lakhs = Math.ceil(itemsSubtotal / 100000)
+                              return `${lakhs} lakh${lakhs > 1 ? "s" : ""} × ₹345`
+                            })()}
+                          </p>
+                        </div>
                         <div className="flex items-center gap-2">
                           <span className="font-medium">₹{cartData.additionalCharges.insurance.toLocaleString()}</span>
                           <Button
@@ -1207,6 +1293,147 @@ export default function CartPage() {
             </Card>
           </div>
         </div>
+      )}
+
+      {/* Follow-up Reminder Section */}
+      {cartData.items.length > 0 && (
+        <Card className="mt-4">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              Follow-up Reminder
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="enable-followup"
+                checked={followUpReminder.enabled}
+                onChange={(e) =>
+                  setFollowUpReminder((prev) => ({
+                    ...prev,
+                    enabled: e.target.checked,
+                  }))
+                }
+                className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+              />
+              <Label htmlFor="enable-followup" className="text-sm font-medium cursor-pointer">
+                Set follow-up reminder for this order
+              </Label>
+            </div>
+
+            {followUpReminder.enabled && (
+              <div className="space-y-4 pl-6 border-l-2 border-primary/20">
+                {/* Reminder Period Selection */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">Reminder Period</Label>
+                  <RadioGroup
+                    value={followUpReminder.period}
+                    onValueChange={(value) =>
+                      setFollowUpReminder((prev) => ({
+                        ...prev,
+                        period: value,
+                        customDays: value === "custom" ? prev.customDays : undefined,
+                      }))
+                    }
+                    className="grid grid-cols-2 gap-3"
+                  >
+                    {FOLLOW_UP_OPTIONS.map((option) => (
+                      <div
+                        key={option.value}
+                        className="flex items-center space-x-2 border rounded-lg p-3 hover:bg-muted/50"
+                      >
+                        <RadioGroupItem value={option.value} id={`followup-${option.value}`} />
+                        <Label htmlFor={`followup-${option.value}`} className="flex-1 cursor-pointer">
+                          <div className="font-medium">{option.label}</div>
+                          <div className="text-sm text-muted-foreground">{option.description}</div>
+                        </Label>
+                      </div>
+                    ))}
+                  </RadioGroup>
+                </div>
+
+                {/* Custom Days Input */}
+                {followUpReminder.period === "custom" && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Custom Days</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min="1"
+                        max="365"
+                        value={followUpReminder.customDays || ""}
+                        onChange={(e) =>
+                          setFollowUpReminder((prev) => ({
+                            ...prev,
+                            customDays: Number(e.target.value) || undefined,
+                          }))
+                        }
+                        className="w-24"
+                        placeholder="Days"
+                      />
+                      <span className="text-sm text-muted-foreground">days from order date</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Comment Section */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                    <Label className="text-sm font-medium">Follow-up Comment</Label>
+                  </div>
+                  <Textarea
+                    value={followUpReminder.comment}
+                    onChange={(e) =>
+                      setFollowUpReminder((prev) => ({
+                        ...prev,
+                        comment: e.target.value,
+                      }))
+                    }
+                    placeholder="Add a note for the follow-up reminder (optional)..."
+                    className="min-h-[80px] resize-none"
+                    maxLength={500}
+                  />
+                  <p className="text-xs text-muted-foreground">{followUpReminder.comment.length}/500 characters</p>
+                </div>
+
+                {/* Reminder Preview */}
+                <div className="bg-muted/50 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Calendar className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-medium">Reminder Preview</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {(() => {
+                      const days =
+                        followUpReminder.period === "custom"
+                          ? followUpReminder.customDays
+                          : followUpReminder.period === "7days"
+                            ? 7
+                            : followUpReminder.period === "10days"
+                              ? 10
+                              : 30
+
+                      if (!days) return "Please set custom days"
+
+                      const reminderDate = new Date()
+                      reminderDate.setDate(reminderDate.getDate() + days)
+
+                      return `Follow-up reminder will be set for ${reminderDate.toLocaleDateString()} (${days} days from today)`
+                    })()}
+                  </p>
+                  {followUpReminder.comment && (
+                    <div className="mt-2 pt-2 border-t border-muted">
+                      <p className="text-xs text-muted-foreground">Note: {followUpReminder.comment}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
     </div>
   )
