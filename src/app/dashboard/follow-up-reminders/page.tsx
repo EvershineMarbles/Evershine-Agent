@@ -1,554 +1,157 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import {
-  Calendar,
-  Clock,
-  Search,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
-  ChevronDown,
-  MessageSquare,
-  Phone,
-  RefreshCw,
-  Loader2,
-} from "lucide-react"
-import { format, isBefore } from "date-fns"
+import { Calendar, MessageSquare, Loader2 } from "lucide-react"
+import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/card"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { useToast } from "@/components/ui/use-toast"
 
-interface FollowUpReminder {
+interface Order {
   _id: string
-  orderId: {
-    _id: string
-    orderId: string
-    totalAmount: number
-    status: string
-    createdAt: string
-    clientName?: string
-  }
+  orderId: string
+  totalAmount: number
+  status: string
+  createdAt: string
   clientId: {
-    _id: string
     name: string
     mobile: string
     email: string
   }
-  agentId: string
-  enabled: boolean
-  period: string
-  customDays?: number
-  comment: string
-  status: "pending" | "completed" | "cancelled" | "overdue"
-  followUpDate: string
-  createdAt: string
-  updatedAt: string
-  completedBy?: string
-  completedAt?: string
-  completionNotes?: string
-  messageDetails?: {
-    messageSent: boolean
-    sentAt?: string
-    messageId?: string
-    deliveryStatus?: string
+  followUpReminder?: {
+    _id: string
+    followUpDate: string
+    status: string
+    comment: string
   }
 }
 
 export default function FollowUpRemindersPage() {
   const { toast } = useToast()
-  const [activeTab, setActiveTab] = useState("all")
-  const [followUps, setFollowUps] = useState<FollowUpReminder[]>([])
-  const [filteredFollowUps, setFilteredFollowUps] = useState<FollowUpReminder[]>([])
+  const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [selectedDateRange, setSelectedDateRange] = useState("all")
-  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({})
 
-  const getApiUrl = () => {
-    return process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
-  }
-
-  const getToken = () => {
-    try {
-      return localStorage.getItem("token") || localStorage.getItem("agentToken") || localStorage.getItem("adminToken")
-    } catch (e) {
-      return null
-    }
-  }
-
-  const fetchFollowUps = async () => {
+  const fetchOrders = async () => {
     try {
       setLoading(true)
-      const token = getToken()
+      const token = localStorage.getItem("token") || localStorage.getItem("agentToken")
 
       if (!token) {
-        console.log("No token found")
         toast({
-          title: "Authentication required",
-          description: "Please log in to view follow-up reminders",
+          title: "Error",
+          description: "Please log in to view orders",
           variant: "destructive",
         })
-        setFollowUps([])
-        setFilteredFollowUps([])
-        setLoading(false)
         return
       }
 
-      const apiUrl = getApiUrl()
+      const response = await fetch("https://evershinebackend-2.onrender.com/api/agent/followups", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
 
-      // Try different possible endpoints
-      const endpoints = [`${apiUrl}/api/agent/followups`, `${apiUrl}/api/followups`, `${apiUrl}/api/client/followups`]
-
-      let response = null
-      let lastError = null
-
-      for (const endpoint of endpoints) {
-        try {
-          console.log(`Trying endpoint: ${endpoint}`)
-          response = await fetch(endpoint, {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          })
-
-          if (response.ok) {
-            console.log(`Success with endpoint: ${endpoint}`)
-            break
-          } else {
-            console.log(`Failed with endpoint: ${endpoint}, status: ${response.status}`)
-            lastError = `${endpoint} returned ${response.status}`
-          }
-        } catch (error) {
-          console.log(`Error with endpoint: ${endpoint}`, error)
-          lastError = error
-        }
-      }
-
-      if (!response || !response.ok) {
-        throw new Error(lastError || "All endpoints failed")
-      }
-
-      const data = await response.json()
-      console.log("Full API Response:", JSON.stringify(data, null, 2))
-      console.log("Data array:", data.data)
-      console.log("Data length:", data.data?.length)
-      console.log("Data type:", typeof data.data)
-
-      if (data.success) {
-        console.log("Setting followUps to:", data.data)
-        setFollowUps(data.data || [])
-        setFilteredFollowUps(data.data || [])
-        toast({
-          title: "Success",
-          description: `Loaded ${data.data?.length || 0} follow-up reminders`,
-        })
+      if (response.ok) {
+        const data = await response.json()
+        console.log("API Response:", data)
+        setOrders(data.data || [])
       } else {
-        console.log("API returned success: false, message:", data.message)
-        throw new Error(data.message || "Failed to fetch follow-ups")
+        throw new Error("Failed to fetch orders")
       }
-    } catch (error: any) {
-      console.error("Error fetching follow-ups:", error)
+    } catch (error) {
+      console.error("Error:", error)
       toast({
         title: "Error",
-        description: `Failed to load follow-up reminders: ${error.message}`,
+        description: "Failed to load orders",
         variant: "destructive",
       })
-      setFollowUps([])
-      setFilteredFollowUps([])
     } finally {
       setLoading(false)
     }
   }
 
-  // Test API connectivity
-  const testApiConnection = async () => {
-    try {
-      const apiUrl = getApiUrl()
-      const response = await fetch(`${apiUrl}/api/test`, {
-        method: "GET",
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        console.log("API Test successful:", data)
-        toast({
-          title: "API Connection",
-          description: "Backend connection successful",
-        })
-      } else {
-        console.log("API Test failed:", response.status)
-        toast({
-          title: "API Connection",
-          description: `Backend connection failed: ${response.status}`,
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      console.error("API Test error:", error)
-      toast({
-        title: "API Connection",
-        description: "Cannot connect to backend",
-        variant: "destructive",
-      })
-    }
-  }
-
   useEffect(() => {
-    // Test API connection first
-    testApiConnection()
-    // Then fetch follow-ups
-    fetchFollowUps()
+    fetchOrders()
   }, [])
 
-  useEffect(() => {
-    applyFilters()
-  }, [activeTab, searchQuery, selectedDateRange, followUps])
-
-  const applyFilters = () => {
-    let filtered = [...followUps]
-
-    // Filter by tab (status)
-    if (activeTab === "pending") {
-      filtered = filtered.filter((item) => item.status === "pending")
-    }
-    // "all" tab shows everything, no filtering needed
-
-    // Filter by search query
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      filtered = filtered.filter(
-        (item) =>
-          (item.orderId?.orderId && item.orderId.orderId.toLowerCase().includes(query)) ||
-          (item.clientId?.name && item.clientId.name.toLowerCase().includes(query)) ||
-          (item.comment && item.comment.toLowerCase().includes(query)),
-      )
-    }
-
-    // Filter by date range
-    if (selectedDateRange !== "all") {
-      const today = new Date()
-      if (selectedDateRange === "today") {
-        filtered = filtered.filter((item) => {
-          const followUpDate = new Date(item.followUpDate)
-          return (
-            followUpDate.getDate() === today.getDate() &&
-            followUpDate.getMonth() === today.getMonth() &&
-            followUpDate.getFullYear() === today.getFullYear()
-          )
-        })
-      } else if (selectedDateRange === "thisWeek") {
-        const startOfWeek = new Date(today)
-        startOfWeek.setDate(today.getDate() - today.getDay())
-        const endOfWeek = new Date(today)
-        endOfWeek.setDate(startOfWeek.getDate() + 6)
-
-        filtered = filtered.filter((item) => {
-          const followUpDate = new Date(item.followUpDate)
-          return followUpDate >= startOfWeek && followUpDate <= endOfWeek
-        })
-      } else if (selectedDateRange === "thisMonth") {
-        filtered = filtered.filter((item) => {
-          const followUpDate = new Date(item.followUpDate)
-          return followUpDate.getMonth() === today.getMonth() && followUpDate.getFullYear() === today.getFullYear()
-        })
-      }
-    }
-
-    // Sort by follow-up date (ascending)
-    filtered.sort((a, b) => {
-      return new Date(a.followUpDate).getTime() - new Date(b.followUpDate).getTime()
-    })
-
-    setFilteredFollowUps(filtered)
-  }
-
-  const toggleExpand = (id: string) => {
-    setExpandedItems((prev) => ({
-      ...prev,
-      [id]: !prev[id],
-    }))
-  }
-
-  const getStatusBadge = (status: string, followUpDate: string) => {
-    const isPastDue = isBefore(new Date(followUpDate), new Date()) && status === "pending"
-
-    if (isPastDue) {
-      return (
-        <Badge variant="destructive" className="flex items-center gap-1">
-          <AlertCircle className="h-3 w-3" />
-          Overdue
-        </Badge>
-      )
-    }
-
-    switch (status) {
-      case "completed":
-        return (
-          <Badge variant="outline" className="bg-green-100 text-green-800 flex items-center gap-1">
-            <CheckCircle className="h-3 w-3" />
-            Completed
-          </Badge>
-        )
-      case "cancelled":
-        return (
-          <Badge variant="outline" className="bg-gray-100 text-gray-800 flex items-center gap-1">
-            <XCircle className="h-3 w-3" />
-            Cancelled
-          </Badge>
-        )
-      case "pending":
-        return (
-          <Badge variant="outline" className="bg-blue-100 text-blue-800 flex items-center gap-1">
-            <Clock className="h-3 w-3" />
-            Pending
-          </Badge>
-        )
-      default:
-        return (
-          <Badge variant="outline" className="bg-gray-100 text-gray-800">
-            {status}
-          </Badge>
-        )
-    }
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2">Loading orders...</span>
+      </div>
+    )
   }
 
   return (
     <div className="container mx-auto px-4 py-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">Follow-up Reminders</h1>
-          <p className="text-muted-foreground">Manage and track all your client follow-up reminders</p>
-        </div>
-        <div className="mt-4 md:mt-0 flex gap-2">
-          <Button variant="outline" size="sm" onClick={testApiConnection}>
-            Test API
-          </Button>
-          <Button variant="outline" className="flex items-center gap-2" onClick={fetchFollowUps}>
-            <RefreshCw className="h-4 w-4" />
-            Refresh
-          </Button>
-        </div>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold">Follow-up Reminders</h1>
+        <p className="text-muted-foreground">Orders with follow-up reminders</p>
       </div>
 
-      {/* Debug Info */}
-      <div className="mb-4 p-3 bg-muted/20 rounded-lg text-sm">
-        <p>
-          <strong>API URL:</strong> {getApiUrl()}
-        </p>
-        <p>
-          <strong>Token:</strong> {getToken() ? "✓ Found" : "✗ Missing"}
-        </p>
-        <p>
-          <strong>Follow-ups loaded:</strong> {followUps.length}
-        </p>
-      </div>
-
-      {/* Filters and Search */}
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="relative flex-grow">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by order ID, client name or comment..."
-            className="pl-10"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-        <div className="flex gap-2">
-          <Select value={selectedDateRange} onValueChange={setSelectedDateRange}>
-            <SelectTrigger className="w-[180px]">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                <SelectValue placeholder="Date Range" />
-              </div>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Dates</SelectItem>
-              <SelectItem value="today">Today</SelectItem>
-              <SelectItem value="thisWeek">This Week</SelectItem>
-              <SelectItem value="thisMonth">This Month</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {/* Tabs - Only All and Pending */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-        <TabsList className="grid grid-cols-2 md:w-fit">
-          <TabsTrigger value="all">All ({followUps.length})</TabsTrigger>
-          <TabsTrigger value="pending">Pending ({followUps.filter((f) => f.status === "pending").length})</TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      {/* Follow-up List */}
       <div className="space-y-4">
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-            <p className="text-muted-foreground">Loading follow-up reminders...</p>
-          </div>
-        ) : filteredFollowUps.length === 0 ? (
-          <div className="text-center py-12 bg-muted/20 rounded-lg">
+        {orders.length === 0 ? (
+          <div className="text-center py-12">
             <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">No follow-up reminders found</h3>
-            <p className="text-muted-foreground max-w-md mx-auto">
-              {followUps.length === 0
-                ? "No follow-up reminders have been created yet."
-                : activeTab === "pending"
-                  ? "No pending follow-up reminders match your filters."
-                  : "No follow-up reminders match your search criteria."}
-            </p>
+            <h3 className="text-lg font-medium mb-2">No orders found</h3>
+            <p className="text-muted-foreground">No orders with follow-up reminders yet.</p>
           </div>
         ) : (
-          filteredFollowUps.map((followUp) => {
-            const isExpanded = expandedItems[followUp._id] || false
-            const isPastDue = followUp.status === "pending" && isBefore(new Date(followUp.followUpDate), new Date())
-            const isToday =
-              followUp.status === "pending" &&
-              new Date(followUp.followUpDate).toDateString() === new Date().toDateString()
-
-            return (
-              <Card
-                key={followUp._id}
-                className={`border ${
-                  isPastDue ? "border-red-300 bg-red-50" : isToday ? "border-yellow-300 bg-yellow-50" : ""
-                }`}
-              >
-                <CardHeader className="pb-2">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-medium">Order #{followUp.orderId?.orderId || "N/A"}</h3>
-                      {getStatusBadge(followUp.status, followUp.followUpDate)}
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Calendar className="h-4 w-4" />
-                      <span>
-                        Follow-up:{" "}
-                        {followUp.followUpDate ? format(new Date(followUp.followUpDate), "dd MMM yyyy") : "Not set"}
-                      </span>
-                    </div>
+          orders.map((order) => (
+            <Card key={order._id}>
+              <CardHeader>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="font-medium">Order #{order.orderId}</h3>
+                    <p className="text-sm text-muted-foreground">Client: {order.clientId?.name || "Unknown"}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Amount: ₹{order.totalAmount?.toLocaleString() || "0"}
+                    </p>
                   </div>
-                </CardHeader>
-                <CardContent>
+                  <div className="text-right">
+                    <p className="text-sm text-muted-foreground">
+                      Order Date: {format(new Date(order.createdAt), "dd MMM yyyy")}
+                    </p>
+                    {order.followUpReminder && (
+                      <p className="text-sm text-muted-foreground">
+                        Follow-up: {format(new Date(order.followUpReminder.followUpDate), "dd MMM yyyy")}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {order.followUpReminder ? (
                   <div className="space-y-2">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">Client:</span>
-                        <span>{followUp.clientId?.name || "Unknown"}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">Amount:</span>
-                        <span>₹{followUp.orderId?.totalAmount?.toLocaleString() || "0"}</span>
-                      </div>
+                    <p className="text-sm">
+                      <strong>Status:</strong> {order.followUpReminder.status}
+                    </p>
+                    {order.followUpReminder.comment && (
+                      <p className="text-sm">
+                        <strong>Comment:</strong> {order.followUpReminder.comment}
+                      </p>
+                    )}
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline">
+                        <MessageSquare className="h-4 w-4 mr-1" />
+                        Send Reminder
+                      </Button>
+                      <Button size="sm">Mark Complete</Button>
                     </div>
-
-                    {followUp.comment && (
-                      <div className="bg-muted/30 p-2 rounded-md mt-2">
-                        <p className="text-sm">
-                          <span className="font-medium">Comment:</span> {followUp.comment}
-                        </p>
-                      </div>
-                    )}
-
-                    {isExpanded && (
-                      <div className="mt-4 space-y-3 pt-3 border-t">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <h4 className="text-sm font-medium mb-1">Client Details</h4>
-                            <div className="space-y-1">
-                              <p className="text-sm flex items-center gap-2">
-                                <Phone className="h-3 w-3" />
-                                {followUp.clientId?.mobile || "No phone"}
-                              </p>
-                              <p className="text-sm flex items-center gap-2">
-                                <MessageSquare className="h-3 w-3" />
-                                {followUp.clientId?.email || "No email"}
-                              </p>
-                            </div>
-                          </div>
-                          <div>
-                            <h4 className="text-sm font-medium mb-1">Follow-up Details</h4>
-                            <div className="space-y-1">
-                              <p className="text-sm">
-                                <span className="font-medium">Period:</span>{" "}
-                                {followUp.period === "custom"
-                                  ? `${followUp.customDays} days`
-                                  : followUp.period === "7days"
-                                    ? "7 days"
-                                    : followUp.period === "10days"
-                                      ? "10 days"
-                                      : "1 month"}
-                              </p>
-                              <p className="text-sm">
-                                <span className="font-medium">Created:</span>{" "}
-                                {format(new Date(followUp.createdAt), "dd MMM yyyy")}
-                              </p>
-                              {followUp.status === "completed" && followUp.completedAt && (
-                                <p className="text-sm">
-                                  <span className="font-medium">Completed:</span>{" "}
-                                  {format(new Date(followUp.completedAt), "dd MMM yyyy")}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {followUp.completionNotes && (
-                          <div className="bg-muted/30 p-2 rounded-md">
-                            <p className="text-sm">
-                              <span className="font-medium">Completion Notes:</span> {followUp.completionNotes}
-                            </p>
-                          </div>
-                        )}
-
-                        {followUp.messageDetails?.messageSent && (
-                          <div className="bg-blue-50 p-2 rounded-md">
-                            <p className="text-sm flex items-center gap-1">
-                              <MessageSquare className="h-3 w-3 text-blue-600" />
-                              <span className="font-medium">Message sent:</span>{" "}
-                              {followUp.messageDetails.sentAt
-                                ? format(new Date(followUp.messageDetails.sentAt), "dd MMM yyyy HH:mm")
-                                : "Unknown time"}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Status: {followUp.messageDetails.deliveryStatus || "Unknown"}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
-                </CardContent>
-                <CardFooter className="flex justify-between items-center">
-                  <Button variant="ghost" size="sm" onClick={() => toggleExpand(followUp._id)}>
-                    {isExpanded ? "Show Less" : "Show More"}
-                    <ChevronDown className={`ml-1 h-4 w-4 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
-                  </Button>
-                  <div className="flex gap-2">
-                    {followUp.status === "pending" && (
-                      <>
-                        <Button variant="outline" size="sm">
-                          <MessageSquare className="h-4 w-4 mr-1" />
-                          Send Message
-                        </Button>
-                        <Button variant="default" size="sm">
-                          <CheckCircle className="h-4 w-4 mr-1" />
-                          Mark Complete
-                        </Button>
-                      </>
-                    )}
+                ) : (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-2">No follow-up reminder set</p>
+                    <Button size="sm" variant="outline">
+                      Create Follow-up
+                    </Button>
                   </div>
-                </CardFooter>
-              </Card>
-            )
-          })
+                )}
+              </CardContent>
+            </Card>
+          ))
         )}
       </div>
     </div>
