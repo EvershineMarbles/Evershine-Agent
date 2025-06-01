@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/router"
+import { useRouter } from "next/navigation"
 import {
   Calendar,
   Clock,
@@ -88,6 +88,7 @@ interface FollowUpStatistics {
 export default function FollowUpRemindersPage() {
   const router = useRouter()
   const { toast } = useToast()
+  const [mounted, setMounted] = useState(false)
   const [activeTab, setActiveTab] = useState("all")
   const [followUps, setFollowUps] = useState<FollowUpReminder[]>([])
   const [filteredFollowUps, setFilteredFollowUps] = useState<FollowUpReminder[]>([])
@@ -112,11 +113,18 @@ export default function FollowUpRemindersPage() {
     direction: "ascending",
   })
 
+  // Handle client-side mounting
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   const getApiUrl = () => {
     return process.env.NEXT_PUBLIC_API_URL || "https://evershinebackend-2.onrender.com"
   }
 
   const getToken = () => {
+    if (!mounted) return null
+
     try {
       const token = localStorage.getItem("token")
       if (!token) {
@@ -140,6 +148,8 @@ export default function FollowUpRemindersPage() {
   }
 
   const fetchFollowUps = async () => {
+    if (!mounted) return
+
     try {
       setLoading(true)
       const token = getToken()
@@ -177,6 +187,8 @@ export default function FollowUpRemindersPage() {
   }
 
   const fetchStatistics = async () => {
+    if (!mounted) return
+
     try {
       const token = getToken()
       if (!token) return
@@ -204,9 +216,11 @@ export default function FollowUpRemindersPage() {
   }
 
   useEffect(() => {
-    fetchFollowUps()
-    fetchStatistics()
-  }, [])
+    if (mounted) {
+      fetchFollowUps()
+      fetchStatistics()
+    }
+  }, [mounted])
 
   useEffect(() => {
     if (followUps.length > 0) {
@@ -518,6 +532,38 @@ export default function FollowUpRemindersPage() {
           </CardFooter>
         </Card>
       ))
+  }
+
+  // Don't render anything until mounted (prevents SSR issues)
+  if (!mounted) {
+    return (
+      <div className="container mx-auto px-4 py-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+          <div>
+            <Skeleton className="h-8 w-64 mb-2" />
+            <Skeleton className="h-4 w-96" />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {Array(4)
+            .fill(0)
+            .map((_, i) => (
+              <Card key={i}>
+                <CardContent className="pt-6">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <Skeleton className="h-4 w-24 mb-2" />
+                      <Skeleton className="h-8 w-16" />
+                    </div>
+                    <Skeleton className="h-12 w-12 rounded-full" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+        </div>
+        {renderSkeletons()}
+      </div>
+    )
   }
 
   return (
@@ -861,7 +907,7 @@ export default function FollowUpRemindersPage() {
         )}
       </div>
 
-      {/* Send Message Dialg */}
+      {/* Send Message Dialog */}
       <Dialog open={isMessageDialogOpen} onOpenChange={setIsMessageDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
