@@ -1,7 +1,5 @@
 "use client"
 
-import { DialogTrigger } from "@/components/ui/dialog"
-
 import { useState, useEffect } from "react"
 import { CalendarIcon, MessageSquare, Plus, Loader2, CheckCircle, User, IndianRupee, Package, Send } from "lucide-react"
 import { format, differenceInDays } from "date-fns"
@@ -17,6 +15,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -80,7 +79,6 @@ export default function AgentOrdersPage() {
 
       if (response.ok) {
         const data = await response.json()
-        console.log("Orders Response:", data)
         setOrders(data.data || [])
         toast({
           title: "Success",
@@ -126,7 +124,7 @@ export default function AgentOrdersPage() {
 
       const requestBody = {
         period: followUpPeriod,
-        customDays: followUpPeriod === "custom" ? Number.parseInt(customDays) : undefined,
+        customDays: followUpPeriod === "custom" ? differenceInDays(customDate!, new Date()) : undefined,
         comment: comment.trim(),
       }
 
@@ -143,16 +141,11 @@ export default function AgentOrdersPage() {
       )
 
       if (response.ok) {
-        const data = await response.json()
         toast({
           title: "Success",
           description: "Follow-up reminder created successfully",
         })
-
-        // Refresh orders to show the new follow-up
         await fetchOrders()
-
-        // Reset form
         setSelectedOrder(null)
         setFollowUpPeriod("")
         setCustomDays("")
@@ -163,7 +156,6 @@ export default function AgentOrdersPage() {
         throw new Error(errorData.message || "Failed to create follow-up")
       }
     } catch (error: any) {
-      console.error("Error creating follow-up:", error)
       toast({
         title: "Error",
         description: error.message || "Failed to create follow-up reminder",
@@ -191,20 +183,16 @@ export default function AgentOrdersPage() {
       )
 
       if (response.ok) {
-        const data = await response.json()
         toast({
           title: "Success",
           description: "WhatsApp reminder sent successfully with invoice PDF!",
         })
-
-        // Refresh orders to update the message status
         await fetchOrders()
       } else {
         const errorData = await response.json()
         throw new Error(errorData.message || "Failed to send WhatsApp reminder")
       }
     } catch (error: any) {
-      console.error("Error sending WhatsApp reminder:", error)
       toast({
         title: "Error",
         description: error.message || "Failed to send WhatsApp reminder",
@@ -236,15 +224,12 @@ export default function AgentOrdersPage() {
           title: "Success",
           description: "Follow-up marked as complete",
         })
-
-        // Refresh orders
         await fetchOrders()
       } else {
         const errorData = await response.json()
         throw new Error(errorData.message || "Failed to mark follow-up as complete")
       }
     } catch (error: any) {
-      console.error("Error marking follow-up complete:", error)
       toast({
         title: "Error",
         description: error.message || "Failed to mark follow-up as complete",
@@ -318,9 +303,7 @@ export default function AgentOrdersPage() {
             <Card key={order._id} className="border-l-4 border-l-blue-500 shadow-sm hover:shadow-md transition-shadow">
               <CardHeader className="pb-4">
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                  {/* Left side - Client and Order Info */}
                   <div className="space-y-3">
-                    {/* Client Name - Most Prominent */}
                     <div className="flex items-center gap-3">
                       <div className="bg-blue-100 p-2 rounded-full">
                         <User className="h-5 w-5 text-blue-600" />
@@ -331,7 +314,6 @@ export default function AgentOrdersPage() {
                       </div>
                     </div>
 
-                    {/* Order Details */}
                     <div className="flex flex-wrap items-center gap-4">
                       <div className="flex items-center gap-2">
                         <Package className="h-4 w-4 text-gray-500" />
@@ -350,7 +332,6 @@ export default function AgentOrdersPage() {
                     </div>
                   </div>
 
-                  {/* Right side - Dates and Follow-up Status */}
                   <div className="text-left lg:text-right space-y-2">
                     <div className="flex items-center gap-2 lg:justify-end">
                       <CalendarIcon className="h-4 w-4 text-gray-500" />
@@ -470,8 +451,7 @@ export default function AgentOrdersPage() {
                           <DialogTitle>Create Follow-up Reminder</DialogTitle>
                           <DialogDescription>
                             Set up a follow-up reminder for <strong>{selectedOrder?.clientName}</strong> - Order #
-                            {selectedOrder?.orderId}. The system will automatically send a WhatsApp message with invoice
-                            PDF after the specified period.
+                            {selectedOrder?.orderId}
                           </DialogDescription>
                         </DialogHeader>
                         <div className="grid gap-4 py-4">
@@ -491,24 +471,17 @@ export default function AgentOrdersPage() {
                           </div>
                           {followUpPeriod === "custom" && (
                             <div className="grid gap-2">
-                              <Label>Custom Follow-up Date</Label>
+                              <Label>Select Follow-up Date</Label>
                               <Calendar
                                 mode="single"
                                 selected={customDate}
-                                onSelect={(date) => {
-                                  setCustomDate(date)
-                                  if (date) {
-                                    const days = differenceInDays(date, new Date())
-                                    setCustomDays(days.toString())
-                                  }
-                                }}
+                                onSelect={setCustomDate}
                                 disabled={(date) => date < new Date()}
                                 className="rounded-md border"
                               />
                               {customDate && (
                                 <p className="text-sm text-gray-600">
-                                  Follow-up in {differenceInDays(customDate, new Date())} days (
-                                  {format(customDate, "dd MMM yyyy")})
+                                  Follow-up in {differenceInDays(customDate, new Date())} days
                                 </p>
                               )}
                             </div>
