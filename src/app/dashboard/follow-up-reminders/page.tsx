@@ -6,8 +6,6 @@ import { useState, useEffect } from "react"
 import { CalendarIcon, MessageSquare, Plus, Loader2, CheckCircle, User, IndianRupee, Package, Send } from "lucide-react"
 import { format, differenceInDays } from "date-fns"
 import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -494,43 +492,24 @@ export default function AgentOrdersPage() {
                           {followUpPeriod === "custom" && (
                             <div className="grid gap-2">
                               <Label>Custom Follow-up Date</Label>
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    className={cn(
-                                      "w-full justify-start text-left font-normal",
-                                      !customDate && "text-muted-foreground",
-                                    )}
-                                  >
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {customDate ? format(customDate, "PPP") : "Pick a date"}
-                                  </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                  <Calendar
-                                    mode="single"
-                                    selected={customDate}
-                                    onSelect={(date) => {
-                                      setCustomDate(date)
-                                      if (date) {
-                                        const days = differenceInDays(date, new Date())
-                                        setCustomDays(days.toString())
-                                      }
-                                    }}
-                                    disabled={(date) => date < new Date()}
-                                    initialFocus
-                                  />
-                                </PopoverContent>
-                              </Popover>
+                              <Calendar
+                                mode="single"
+                                selected={customDate}
+                                onSelect={(date) => {
+                                  setCustomDate(date)
+                                  if (date) {
+                                    const days = differenceInDays(date, new Date())
+                                    setCustomDays(days.toString())
+                                  }
+                                }}
+                                disabled={(date) => date < new Date()}
+                                className="rounded-md border"
+                              />
                               {customDate && (
                                 <p className="text-sm text-gray-600">
                                   Follow-up in {differenceInDays(customDate, new Date())} days (
                                   {format(customDate, "dd MMM yyyy")})
                                 </p>
-                              )}
-                              {customDate && differenceInDays(customDate, new Date()) < 1 && (
-                                <p className="text-sm text-red-600">Please select a future date</p>
                               )}
                             </div>
                           )}
