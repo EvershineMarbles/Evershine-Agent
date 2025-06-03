@@ -18,9 +18,7 @@ import {
   MessageSquare,
   Save,
   Check,
-  CalendarIcon,
 } from "lucide-react"
-import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -30,9 +28,6 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
-import { Calendar as CalendarComponent } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { cn } from "@/lib/utils"
 
 interface CartItem {
   _id: string
@@ -75,7 +70,7 @@ interface FollowUpReminder {
   enabled: boolean
   period: string
   customDays?: number
-  customDate?: Date
+  customDate?: string
   comment: string
 }
 
@@ -125,9 +120,6 @@ export default function CartPage() {
   const [isSavingFollowUp, setIsSavingFollowUp] = useState(false)
   const [followUpSaved, setFollowUpSaved] = useState(false)
   const [savedFollowUpId, setSavedFollowUpId] = useState<string | null>(null)
-
-  // Calendar state
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false)
 
   // Local state for additional charges
   const [localCharges, setLocalCharges] = useState<AdditionalCharges>({
@@ -233,11 +225,30 @@ export default function CartPage() {
   )
 
   // Calculate days from custom date
-  const calculateDaysFromDate = (selectedDate: Date) => {
+  const calculateDaysFromDate = (selectedDate: string) => {
     const today = new Date()
-    const diffTime = selectedDate.getTime() - today.getTime()
+    const targetDate = new Date(selectedDate)
+    const diffTime = targetDate.getTime() - today.getTime()
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
     return Math.max(1, diffDays) // Ensure at least 1 day
+  }
+
+  // Get tomorrow's date in YYYY-MM-DD format for min attribute
+  const getTomorrowDate = () => {
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    return tomorrow.toISOString().split("T")[0]
+  }
+
+  // Format date for display
+  const formatDateForDisplay = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    })
   }
 
   // NEW: Save follow-up reminder function - UPDATED to use the new direct endpoint
@@ -1404,7 +1415,7 @@ export default function CartPage() {
               </CardContent>
             </Card>
 
-            {/* Follow-up Reminder Section - UPDATED WITH CALENDAR */}
+            {/* Follow-up Reminder Section - UPDATED WITH SIMPLE DATE INPUT */}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg flex items-center gap-2">
@@ -1464,53 +1475,33 @@ export default function CartPage() {
                       </RadioGroup>
                     </div>
 
-                    {/* Custom Date Picker */}
+                    {/* Custom Date Input - SIMPLIFIED */}
                     {followUpReminder.period === "custom" && (
                       <div className="space-y-2">
                         <Label className="text-sm font-medium">Select Follow-up Date</Label>
-                        <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              className={cn(
-                                "w-full justify-start text-left font-normal",
-                                !followUpReminder.customDate && "text-muted-foreground",
-                              )}
-                            >
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {followUpReminder.customDate ? (
-                                format(followUpReminder.customDate, "PPP")
-                              ) : (
-                                <span>Pick a date</span>
-                              )}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <CalendarComponent
-                              mode="single"
-                              selected={followUpReminder.customDate}
-                              onSelect={(date) => {
-                                setFollowUpReminder((prev) => ({
-                                  ...prev,
-                                  customDate: date,
-                                  customDays: date ? calculateDaysFromDate(date) : undefined,
-                                }))
-                                setIsCalendarOpen(false)
-                              }}
-                              disabled={(date) => {
-                                const today = new Date()
-                                today.setHours(0, 0, 0, 0)
-                                return date <= today
-                              }}
-                              initialFocus
-                            />
-                          </PopoverContent>
-                        </Popover>
+                        <Input
+                          type="date"
+                          value={followUpReminder.customDate || ""}
+                          onChange={(e) => {
+                            setFollowUpReminder((prev) => ({
+                              ...prev,
+                              customDate: e.target.value,
+                              customDays: e.target.value ? calculateDaysFromDate(e.target.value) : undefined,
+                            }))
+                          }}
+                          min={getTomorrowDate()}
+                          className="w-full max-w-xs"
+                        />
                         {followUpReminder.customDate && (
-                          <p className="text-xs text-muted-foreground">
-                            Follow-up will be set for {calculateDaysFromDate(followUpReminder.customDate)} days from
-                            today
-                          </p>
+                          <div className="space-y-1">
+                            <p className="text-sm text-muted-foreground">
+                              Selected: {formatDateForDisplay(followUpReminder.customDate)}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Follow-up will be set for {calculateDaysFromDate(followUpReminder.customDate)} days from
+                              today
+                            </p>
+                          </div>
                         )}
                       </div>
                     )}
@@ -1573,7 +1564,7 @@ export default function CartPage() {
                         {(() => {
                           if (followUpReminder.period === "custom") {
                             if (followUpReminder.customDate) {
-                              return `Follow-up reminder will be set for ${format(followUpReminder.customDate, "PPP")}`
+                              return `Follow-up reminder will be set for ${formatDateForDisplay(followUpReminder.customDate)}`
                             }
                             return "Please select a custom date"
                           }
