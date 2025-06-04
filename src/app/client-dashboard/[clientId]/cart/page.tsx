@@ -227,17 +227,18 @@ export default function CartPage() {
   // Calculate days from custom date
   const calculateDaysFromDate = (selectedDate: string) => {
     const today = new Date()
+    today.setHours(0, 0, 0, 0)
     const targetDate = new Date(selectedDate)
+    targetDate.setHours(0, 0, 0, 0)
     const diffTime = targetDate.getTime() - today.getTime()
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    return Math.max(1, diffDays) // Ensure at least 1 day
+    return Math.max(0, diffDays) // Allow 0 days for today
   }
 
-  // Get tomorrow's date in YYYY-MM-DD format for min attribute
-  const getTomorrowDate = () => {
-    const tomorrow = new Date()
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    return tomorrow.toISOString().split("T")[0]
+  // Get today's date in YYYY-MM-DD format for min attribute
+  const getTodayDate = () => {
+    const today = new Date()
+    return today.toISOString().split("T")[0]
   }
 
   // Format date for display
@@ -279,16 +280,16 @@ export default function CartPage() {
             return
           }
 
-          // Check if selected date is in the future
+          // Check if selected date is today or in the future
           const today = new Date()
           today.setHours(0, 0, 0, 0)
           const selectedDate = new Date(followUpReminder.customDate)
           selectedDate.setHours(0, 0, 0, 0)
 
-          if (selectedDate <= today) {
+          if (selectedDate < today) {
             toast({
               title: "Validation Error",
-              description: "Please select a future date",
+              description: "Please select today's date or a future date",
               variant: "destructive",
             })
             return
@@ -1489,7 +1490,7 @@ export default function CartPage() {
                               customDays: e.target.value ? calculateDaysFromDate(e.target.value) : undefined,
                             }))
                           }}
-                          min={getTomorrowDate()}
+                          min={getTodayDate()}
                           className="w-full max-w-xs"
                         />
                         {followUpReminder.customDate && (
@@ -1498,8 +1499,10 @@ export default function CartPage() {
                               Selected: {formatDateForDisplay(followUpReminder.customDate)}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              Follow-up will be set for {calculateDaysFromDate(followUpReminder.customDate)} days from
-                              today
+                              Follow-up will be set for {(() => {
+                                const days = calculateDaysFromDate(followUpReminder.customDate)
+                                return days === 0 ? "today (immediate)" : `${days} days from today`
+                              })()}
                             </p>
                           </div>
                         )}
@@ -1564,7 +1567,11 @@ export default function CartPage() {
                         {(() => {
                           if (followUpReminder.period === "custom") {
                             if (followUpReminder.customDate) {
-                              return `Follow-up reminder will be set for ${formatDateForDisplay(followUpReminder.customDate)}`
+                              const days = calculateDaysFromDate(followUpReminder.customDate)
+                              const dateDisplay = formatDateForDisplay(followUpReminder.customDate)
+                              return days === 0
+                                ? `Follow-up reminder will be set for today (${dateDisplay})`
+                                : `Follow-up reminder will be set for ${dateDisplay}`
                             }
                             return "Please select a custom date"
                           }
